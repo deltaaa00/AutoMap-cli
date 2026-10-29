@@ -1,4 +1,4 @@
-# AutoMap
+# AutoMap-cli (AutoMap v2.0)
 
 ![Logo](resources/demo/banner.png)
 
@@ -11,8 +11,6 @@ It ships with three parts:
 - and a Python API (`map.auto_map.auto_map`).
 
 ## Features
-
-![Web UI](resources/demo/app.png)
 
 AutoMap can render three map types:
 
@@ -133,7 +131,6 @@ The result is saved as `result.png`.
 
 AutoMap ships with a few default fonts. You can drop your own `.ttf` / `.otf` files into `resources/fonts` and select them on the map.
 
-![Fonts GUI](resources/demo/fonts_gui.png)
 ![Fonts](resources/demo/fonts.png)
 
 ## Filling
