@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map CLI Studio — Map Generator Web Interface</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            900: '#0f172a',
+                            950: '#080d1a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(71, 85, 105, 0.8);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.8);
+        }
+
+        /* Grid Pattern for Map Canvas */
+        .canvas-grid {
+            background-size: 24px 24px;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+        }
+
+        /* Range Slider Custom Styling */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #6366f1;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
+            transition: transform 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white overflow-x-hidden">
+
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-slate-800/80 bg-slate-900/75 backdrop-blur-md sticky top-0 z-30">
+        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+            <!-- Brand -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+                    <i class="fa-solid fa-earth-europe text-white text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-bold text-lg tracking-tight text-white">Map CLI Studio</h1>
+                        <span class="text-[11px] font-mono uppercase px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 font-semibold">Flask UI</span>
+                    </div>
+                    <p class="text-xs text-slate-400 hidden sm:block">CLI argument configuration & map rendering dashboard</p>
+                </div>
+            </div>
+
+            <!-- Connection Mode & Actions -->
+            <div class="flex items-center gap-3">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Layout -->
+    <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- LEFT COLUMN: CLI FLAGS & CONFIGURATION (5 Cols on Desktop) -->
+        <section class="lg:col-span-5 xl:col-span-4 flex flex-col gap-5">
+            
+            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl p-5 shadow-xl">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-indigo-400"></i>
+                        <h2 class="font-semibold text-base text-white">Generation Parameters (Flags)</h2>
+                    </div>
+                    <button onclick="resetForm()" class="text-xs text-slate-400 hover:text-indigo-400 transition flex items-center gap-1" title="Reset to default values">
+                        <i class="fa-solid fa-rotate-left"></i>
+                        <span>Reset</span>
+                    </button>
+                </div>
+
+                <form id="cliForm" onsubmit="handleGenerate(event)" class="space-y-5">
+                    
+                    <!-- API Key Input: shown only when the server has no .env key -->
+                    <div id="apiKeySection" class="hidden">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label for="apiKeyInput" class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                                <i class="fa-solid fa-key text-amber-400"></i>
+                                Gemini API Key (required — no .env found)
+                            </label>
+                        </div>
+                        <div class="relative">
+                            <input type="password" id="apiKeyInput" placeholder="Paste your Gemini API key..."
+                                autocomplete="off" spellcheck="false"
+                                class="w-full px-3.5 py-2.5 pr-10 bg-slate-950 border border-amber-600/50 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition">
+                            <button type="button" onclick="toggleApiKeyVisibility()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1" title="Show / hide key">
+                                <i id="apiKeyEyeIcon" class="fa-solid fa-eye text-xs"></i>
+                            </button>
+                        </div>
+                        <p class="text-[11px] text-amber-400/80 mt-1">This key is used for this request only and is never stored on the server.</p>
+                    </div>
+
+                    <!-- Optional Topic / Prompt Input (Often passed to Gemini in Map Generators) -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label for="topicInput" class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                                <i class="fa-solid fa-comment-dots text-indigo-400"></i>
+                                Map Topic or Query (Prompt / Args)
+                            </label>
+                        </div>
+                        <input type="text" id="topicInput" placeholder="e.g., How many bears are there in your country?" 
+                            oninput="updateCommandPreview()"
+                            class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition">
+                    </div>
+
+                    <!-- 1. Flag: -m, --mode -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-xs font-medium text-slate-300">Data Mode</label>
+                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">-m, --mode</code>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="mode" value="text" checked onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 peer-checked:text-white text-slate-400 hover:border-slate-700 transition flex items-center gap-2.5">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-800 peer-checked:bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+                                        <i class="fa-solid fa-font"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-medium text-slate-200">text</div>
+                                        <div class="text-[11px] text-slate-500">Text labels</div>
+                                    </div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="mode" value="number" onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 peer-checked:text-white text-slate-400 hover:border-slate-700 transition flex items-center gap-2.5">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-emerald-400">
+                                        <i class="fa-solid fa-hashtag"></i>
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-medium text-slate-200">number</div>
+                                        <div class="text-[11px] text-slate-500">Numeric values</div>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 2. Flag: -mp, --map-type -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-xs font-medium text-slate-300">Map Type</label>
+                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">-mp, --map-type</code>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2.5">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="map_type" value="default" checked onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
+                                    <i class="fa-solid fa-map text-indigo-400 mb-1 text-base"></i>
+                                    <div class="text-xs font-semibold text-slate-200">default</div>
+                                    <div class="text-[10px] text-slate-500">Standard</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="map_type" value="flag" onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
+                                    <i class="fa-solid fa-flag text-amber-400 mb-1 text-base"></i>
+                                    <div class="text-xs font-semibold text-slate-200">flag</div>
+                                    <div class="text-[10px] text-slate-500">With Flags</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="map_type" value="world" onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
+                                    <i class="fa-solid fa-globe text-sky-400 mb-1 text-base"></i>
+                                    <div class="text-xs font-semibold text-slate-200">world</div>
+                                    <div class="text-[10px] text-slate-500">World Map</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 3. Flag: -gsm, --global-size-modifier -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="gsmNumber" class="text-xs font-medium text-slate-300">Global Size Modifier (Integer)</label>
+                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">-gsm, --global-size-modifier</code>
+                        </div>
+                        <div class="flex items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <input type="range" id="gsmRange" min="-50" max="100" step="1" value="15" 
+                                oninput="syncGsm(this.value)"
+                                class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                            <div class="flex items-center bg-slate-900 border border-slate-700 rounded-lg overflow-hidden shrink-0">
+                                <button type="button" onclick="adjustGsm(-1)" class="px-2.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 transition">-</button>
+                                <input type="number" id="gsmNumber" name="gsm" value="15" step="1"
+                                    oninput="syncGsm(this.value)"
+                                    class="w-14 text-center bg-transparent text-sm font-mono text-white focus:outline-none">
+                                <button type="button" onclick="adjustGsm(1)" class="px-2.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 transition">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Flag: -eop, --extra-option -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="extraOptionSelect" class="text-xs font-medium text-slate-300">Extra Display Options</label>
+                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">-eop, --extra-option</code>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="extra_option" value="none" checked onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
+                                    <div class="text-xs font-mono font-medium text-slate-200">none</div>
+                                    <div class="text-[10px] text-slate-500 mt-0.5">Default</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="extra_option" value="show_most_least" onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="px-2 py-2.5 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
+                                    <div class="text-xs font-mono font-medium text-slate-200 truncate">show_most_least</div>
+                                    <div class="text-[10px] text-slate-500 mt-0.5">Min / Max</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="extra_option" value="short_form" onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
+                                    <div class="text-xs font-mono font-medium text-slate-200">short_form</div>
+                                    <div class="text-[10px] text-slate-500 mt-0.5">Abbreviated</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 5. Flag: --model -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="modelSelect" class="text-xs font-medium text-slate-300">AI Model (Gemini Model ID)</label>
+                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">--model</code>
+                        </div>
+                        <div class="flex gap-2">
+                            <div class="relative flex-1">
+                                <select id="modelSelect" onchange="updateCommandPreview()" 
+                                    class="w-full appearance-none px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-indigo-500 transition pr-9">
+                                    <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                                    <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                                    <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                                    <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                                    <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none"></i>
+                            </div>
+                            <button type="button" onclick="toggleCustomModelInput()" class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium transition shrink-0" title="Add custom Model ID">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                        <!-- Add custom model input -->
+                        <div id="customModelBox" class="hidden mt-2 flex gap-2">
+                            <input type="text" id="newModelInput" placeholder="Enter new Gemini model ID..." 
+                                class="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
+                            <button type="button" onclick="addCustomModel()" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium">Add</button>
+                        </div>
+                    </div>
+
+                    <!-- 6. Flag: --font -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="fontSelect" class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                                <span>Font from <span class="font-mono text-slate-400">resources/fonts</span></span>
+                            </label>
+                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">--font</code>
+                        </div>
+                        <div class="flex gap-2">
+                            <div class="relative flex-1">
+                                <select id="fontSelect" onchange="updateCommandPreview()" 
+                                    class="w-full appearance-none px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-indigo-500 transition pr-9">
+                                    <option value="Bips.ttf">Bips.ttf</option>
+                                    <option value="DIN Condensed.ttf">DIN Condensed.ttf</option>
+                                    <option value="arialroundedmtbold.ttf">arialroundedmtbold.ttf</option>
+                                    <option value="kodchasan.ttf">kodchasan.ttf</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none"></i>
+                            </div>
+                            <button type="button" onclick="fetchFontsFromServer()" class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium transition shrink-0 flex items-center gap-1.5" title="Refresh font list from resources/fonts">
+                                <i id="fontRefreshIcon" class="fa-solid fa-sync"></i>
+                            </button>
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-1">Auto-discovered by the server from the <code class="text-slate-400">resources/fonts</code> directory</p>
+                    </div>
+
+                    <!-- Submit / Generate Button -->
+                    <button type="submit" id="generateBtn" class="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/25 hover:shadow-indigo-600/40 transition-all flex items-center justify-center gap-2.5 group">
+                        <i id="generateBtnIcon" class="fa-solid fa-play transition-transform group-hover:translate-x-0.5"></i>
+                        <span id="generateBtnText">Run CLI & Generate Map</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Live CLI Command Builder Preview Card -->
+            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl p-4 shadow-xl">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-300">
+                        <i class="fa-solid fa-terminal text-emerald-400"></i>
+                        <span>Generated CLI Command</span>
+                    </div>
+                    <button onclick="copyCliCommand()" class="text-xs px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1.5">
+                        <i id="copyIcon" class="fa-regular fa-copy"></i>
+                        <span id="copyText">Copy</span>
+                    </button>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-400 overflow-x-auto whitespace-nowrap select-all" id="cliCommandDisplay">
+                    python cli.py make "" -m text -mp default -gsm 15 -eop none --model gemini-2.5-flash --font Bips.ttf
+                </div>
+            </div>
+
+        </section>
+
+        <!-- RIGHT COLUMN: MAP VIEWER & TERMINAL OUTPUT (7 or 8 Cols on Desktop) -->
+        <section class="lg:col-span-7 xl:col-span-8 flex flex-col gap-5">
+            
+            <!-- Map Preview Card -->
+            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl shadow-xl flex flex-col flex-1 min-h-[480px] overflow-hidden">
+                
+                <!-- Map Viewer Toolbar -->
+                <div class="px-5 py-3.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-900/90">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" id="statusIndicator"></span>
+                        <h2 class="font-semibold text-sm sm:text-base text-white">Generated Map Preview</h2>
+                        <span id="mapMetaBadge" class="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700">Ready</span>
+                    </div>
+
+                    <!-- Zoom & Download Controls -->
+                    <div class="flex items-center gap-1.5">
+                        <div class="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5">
+                            <button onclick="zoomMap(-0.2)" class="p-2 text-slate-400 hover:text-white transition" title="Zoom Out">
+                                <i class="fa-solid fa-magnifying-glass-minus text-xs"></i>
+                            </button>
+                            <span id="zoomLevelText" class="text-xs font-mono px-2 text-slate-300">100%</span>
+                            <button onclick="zoomMap(0.2)" class="p-2 text-slate-400 hover:text-white transition" title="Zoom In">
+                                <i class="fa-solid fa-magnifying-glass-plus text-xs"></i>
+                            </button>
+                            <button onclick="resetZoom()" class="p-2 text-slate-400 hover:text-white transition border-l border-slate-800" title="Reset Zoom">
+                                <i class="fa-solid fa-compress text-xs"></i>
+                            </button>
+                        </div>
+
+                        <button onclick="toggleFullscreenMap()" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition" title="Toggle Fullscreen">
+                            <i class="fa-solid fa-expand text-xs"></i>
+                        </button>
+
+                        <button onclick="downloadCurrentMap()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-download"></i>
+                            <span class="hidden sm:inline">Download</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Map Viewport Area -->
+                <div id="mapViewport" class="relative flex-1 bg-slate-950 canvas-grid flex items-center justify-center overflow-hidden select-none p-4 sm:p-8">
+                    
+                    <!-- Loading Overlay -->
+                    <div id="loadingOverlay" class="hidden absolute inset-0 bg-slate-950/85 backdrop-blur-sm z-20 flex flex-col items-center justify-center gap-4">
+                        <div class="relative w-16 h-16 flex items-center justify-center">
+                            <div class="absolute inset-0 rounded-full border-4 border-indigo-500/20"></div>
+                            <div class="absolute inset-0 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin"></div>
+                            <i class="fa-solid fa-earth-americas text-indigo-400 text-xl animate-pulse"></i>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-sm font-semibold text-white">Executing CLI script...</div>
+                            <div id="loadingStepText" class="text-xs text-slate-400 mt-1 font-mono">Querying Gemini model and rendering map</div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Image Container -->
+                    <div id="mapCanvasWrapper" class="transition-transform duration-200 ease-out origin-center max-w-full max-h-full flex items-center justify-center">
+                        
+                        <!-- Server Image (real generated map returned by Flask as a data URL) -->
+                        <img id="serverMapImage" src="" alt="Generated Map" class="hidden max-h-[520px] w-auto rounded-xl shadow-2xl border border-slate-800 object-contain">
+
+                        <!-- Empty-state placeholder shown before the first generation -->
+                        <div id="emptyState" class="w-full max-w-[780px] aspect-[8/5] rounded-xl border border-dashed border-slate-700 bg-slate-900/60 flex flex-col items-center justify-center gap-3 text-center px-6">
+                            <i class="fa-solid fa-map-location-dot text-slate-600 text-4xl"></i>
+                            <p class="text-sm text-slate-400">Configure the flags on the left and click <span class="text-indigo-400 font-medium">Run CLI & Generate Map</span>.</p>
+                            <p class="text-xs text-slate-500">The generated map will appear here.</p>
+                        </div>
+
+                    </div>
+
+                    <!-- Applied Flags Watermark Bar -->
+                    <div class="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+                        <div id="activeFlagsBadges" class="flex flex-wrap gap-1.5">
+                            <!-- Populated by JS -->
+                        </div>
+                        <div class="text-[11px] font-mono text-slate-500 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
+                            Use mouse wheel or toolbar buttons to zoom
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CLI Console Output & History Tabs -->
+            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl shadow-xl overflow-hidden">
+                <div class="px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <button onclick="switchBottomTab('console')" id="tabConsoleBtn" class="text-xs font-semibold text-indigo-400 border-b-2 border-indigo-500 pb-2 -mb-2.5 flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-terminal"></i>
+                            <span>Console Output (stdout / stderr)</span>
+                        </button>
+                        <button onclick="switchBottomTab('history')" id="tabHistoryBtn" class="text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            <span>Run History</span>
+                            <span id="historyCountBadge" class="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px]">0</span>
+                        </button>
+                    </div>
+                    <button onclick="clearConsole()" class="text-[11px] text-slate-500 hover:text-slate-300 transition">
+                        Clear
+                    </button>
+                </div>
+
+                <!-- Tab 1: Console Logs -->
+                <div id="consoleTabContent" class="p-4 bg-slate-950/90 font-mono text-xs h-40 overflow-y-auto space-y-1.5">
+                    <div class="text-slate-500">[System] Web interface initialized and ready.</div>
+                    <div class="text-slate-400">[Info] Select your desired flags <span class="text-indigo-400">-m, -mp, -gsm, -eop, --model, --font</span> and click "Run CLI & Generate Map".</div>
+                </div>
+
+                <!-- Tab 2: Generation History -->
+                <div id="historyTabContent" class="hidden p-4 bg-slate-950/90 h-40 overflow-y-auto">
+                    <div id="historyList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                        <div class="text-xs text-slate-500 col-span-full text-center py-8">No runs yet. Generate your first map!</div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-medium">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toastMsg">Operation successful</span>
+    </div>
+
+    <!-- Application JavaScript -->
+    <script>
+        // --- State ---
+        let currentZoom = 1;
+        let runHistory = [];
+        let apiKeyRequired = false;
+
+        // --- Initialize on Load ---
+        window.addEventListener('DOMContentLoaded', () => {
+            updateCommandPreview();
+            // Discover real fonts from the backend on startup (silent — no toast)
+            fetchFontsFromServer(true);
+            // Ask the server whether an API key from .env is available.
+            checkApiKeyStatus();
+
+            // Mouse wheel zoom support on the map viewport
+            const viewport = document.getElementById('mapViewport');
+            viewport.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY < 0 ? 0.12 : -0.12;
+                zoomMap(delta);
+            }, { passive: false });
+        });
+
+        // --- API key status / input ---
+        async function checkApiKeyStatus() {
+            try {
+                const res = await fetch('/api/status');
+                if (!res.ok) throw new Error('status endpoint unavailable');
+                const data = await res.json();
+                apiKeyRequired = !!data.needs_api_key;
+            } catch (err) {
+                // If we can't determine status, be safe and assume no .env key.
+                apiKeyRequired = true;
+                logToConsole(`[Warning] Could not read /api/status (${err.message}). Assuming API key is required.`, 'warn');
+            }
+
+            const section = document.getElementById('apiKeySection');
+            if (apiKeyRequired) {
+                section.classList.remove('hidden');
+                logToConsole('[Info] No .env API key detected — please enter your Gemini API key above.', 'warn');
+            } else {
+                section.classList.add('hidden');
+                logToConsole('[Info] Server has a Gemini API key from .env — no key input needed.', 'info');
+            }
+        }
+
+        function toggleApiKeyVisibility() {
+            const input = document.getElementById('apiKeyInput');
+            const icon = document.getElementById('apiKeyEyeIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fa-solid fa-eye-slash text-xs';
+            } else {
+                input.type = 'password';
+                icon.className = 'fa-solid fa-eye text-xs';
+            }
+        }
+
+        // --- Get Current Form Values ---
+        function getFormState() {
+            const mode = document.querySelector('input[name="mode"]:checked')?.value || 'text';
+            const mapType = document.querySelector('input[name="map_type"]:checked')?.value || 'default';
+            const gsm = parseInt(document.getElementById('gsmNumber').value, 10) || 15;
+            const extraOption = document.querySelector('input[name="extra_option"]:checked')?.value || 'none';
+            const model = document.getElementById('modelSelect').value;
+            const font = document.getElementById('fontSelect').value;
+            const topic = document.getElementById('topicInput').value.trim();
+            const apiKey = document.getElementById('apiKeyInput').value.trim();
+
+            return { mode, map_type: mapType, gsm, extra_option: extraOption, model, font, topic, api_key: apiKey };
+        }
+
+        // --- Sync Global Size Modifier Slider & Number Input ---
+        function syncGsm(val) {
+            const parsed = parseInt(val, 10);
+            const safeVal = isNaN(parsed) ? 15 : parsed;
+            document.getElementById('gsmRange').value = Math.max(-50, Math.min(100, safeVal));
+            document.getElementById('gsmNumber').value = safeVal;
+            updateCommandPreview();
+        }
+
+        function adjustGsm(delta) {
+            const current = parseInt(document.getElementById('gsmNumber').value, 10) || 0;
+            syncGsm(current + delta);
+        }
+
+        // --- Build & Update Live CLI Command ---
+        function updateCommandPreview() {
+            const state = getFormState();
+
+            // Match cli.py's signature: `cli.py make "<prompt>" -m ... -mp ... -gsm ... -eop ... --model ... --font ...`
+            const escapedTopic = (state.topic || '').replace(/"/g, '\\"');
+            let cmd = `python cli.py make "${escapedTopic}" -m ${state.mode} -mp ${state.map_type} -gsm ${state.gsm} -eop ${state.extra_option} --model ${state.model} --font "${state.font}"`;
+
+            document.getElementById('cliCommandDisplay').textContent = cmd;
+            updateActiveBadges(state);
+        }
+
+        // --- Update Watermark Badges on Map ---
+        function updateActiveBadges(state) {
+            const container = document.getElementById('activeFlagsBadges');
+            const badges = [
+                { label: `mode: ${state.mode}`, color: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' },
+                { label: `map: ${state.map_type}`, color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
+                { label: `gsm: ${state.gsm}`, color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
+                { label: `eop: ${state.extra_option}`, color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
+                { label: state.model, color: 'bg-sky-500/20 text-sky-300 border-sky-500/30' },
+                { label: state.font, color: 'bg-slate-800 text-slate-300 border-slate-700' }
+            ];
+
+            container.innerHTML = badges.map(b => 
+                `<span class="text-[11px] font-mono px-2.5 py-0.5 rounded-lg border backdrop-blur-md ${b.color}">${b.label}</span>`
+            ).join('');
+        }
+
+        // --- Custom Model Addition ---
+        function toggleCustomModelInput() {
+            const box = document.getElementById('customModelBox');
+            box.classList.toggle('hidden');
+            if (!box.classList.contains('hidden')) {
+                document.getElementById('newModelInput').focus();
+            }
+        }
+
+        function addCustomModel() {
+            const input = document.getElementById('newModelInput');
+            const val = input.value.trim();
+            if (!val) return;
+
+            const select = document.getElementById('modelSelect');
+            const option = document.createElement('option');
+            option.value = val;
+            option.textContent = val;
+            select.appendChild(option);
+            select.value = val;
+
+            input.value = '';
+            document.getElementById('customModelBox').classList.add('hidden');
+            updateCommandPreview();
+            showToast(`Model "${val}" added to the list`, 'success');
+        }
+
+        // --- Auto-discover Fonts from Flask `/api/fonts` ---
+        async function fetchFontsFromServer(silent = false) {
+            const icon = document.getElementById('fontRefreshIcon');
+            icon.classList.add('fa-spin');
+
+            try {
+                const res = await fetch('/api/fonts');
+                if (!res.ok) throw new Error('Flask server did not respond');
+                const data = await res.json();
+                if (Array.isArray(data.fonts) && data.fonts.length > 0) {
+                    const select = document.getElementById('fontSelect');
+                    const previous = select.value;
+                    select.innerHTML = data.fonts.map(f => `<option value="${f}">${f}</option>`).join('');
+                    // Keep the previously selected font if it still exists.
+                    if (data.fonts.includes(previous)) select.value = previous;
+                    updateCommandPreview();
+                    if (!silent) showToast(`Discovered ${data.fonts.length} fonts in resources/fonts`, 'success');
+                }
+            } catch (err) {
+                logToConsole(`[Warning] Could not fetch fonts from /api/fonts (${err.message}). Using default font list.`, 'warn');
+                if (!silent) {
+                    showToast("Could not connect to /api/fonts", "warn");
+                }
+            } finally {
+                setTimeout(() => icon.classList.remove('fa-spin'), 400);
+            }
+        }
+
+        // --- Handle Map Generation (Form Submit) ---
+        async function handleGenerate(e) {
+            e.preventDefault();
+            const state = getFormState();
+            const cmd = document.getElementById('cliCommandDisplay').textContent;
+
+            const overlay = document.getElementById('loadingOverlay');
+            const btn = document.getElementById('generateBtn');
+            const metaBadge = document.getElementById('mapMetaBadge');
+
+            // If the server has no .env key, a key must be entered in the form.
+            if (apiKeyRequired && !state.api_key) {
+                logToConsole('[Error] API key is required. Enter your Gemini API key in the form.', 'error');
+                showToast("Please enter your Gemini API key first.", "error");
+                document.getElementById('apiKeyInput').focus();
+                return;
+            }
+
+            overlay.classList.remove('hidden');
+            btn.disabled = true;
+            btn.classList.add('opacity-70');
+            metaBadge.textContent = "Running...";
+
+            logToConsole(`$ ${cmd}`, 'cmd');
+
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(state)
+                });
+
+                // The backend may return JSON on error; guard against non-JSON bodies.
+                let result;
+                try {
+                    result = await response.json();
+                } catch {
+                    throw new Error(`Server returned ${response.status} ${response.statusText}`);
+                }
+
+                if (response.ok && result.status === 'success') {
+                    if (result.command) logToConsole(`[Server] ${result.command}`, 'info');
+                    logToConsole(`[Success] Map generated and loaded (${describeDataUrl(result.image_url)})`, 'success');
+
+                    // Display actual image returned by Flask (data URL)
+                    const imgEl = document.getElementById('serverMapImage');
+                    const emptyEl = document.getElementById('emptyState');
+                    imgEl.onload = () => resetZoom();
+                    imgEl.src = result.image_url;
+                    imgEl.classList.remove('hidden');
+                    if (emptyEl) emptyEl.classList.add('hidden');
+
+                    metaBadge.textContent = `Generated (${new Date().toLocaleTimeString()})`;
+                    addToHistory(state, cmd);
+                    showToast("Map generated successfully!", "success");
+                } else {
+                    // Backend errors use {status:'error', error:'...'}
+                    throw new Error(result.error || result.stderr || 'Generation failed');
+                }
+            } catch (error) {
+                logToConsole(`[API Error] ${error.message}`, 'error');
+                showToast("Map generation failed. Check console logs.", "error");
+                metaBadge.textContent = "Execution Error";
+            } finally {
+                overlay.classList.add('hidden');
+                btn.disabled = false;
+                btn.classList.remove('opacity-70');
+            }
+        }
+
+        // --- Zoom & Fullscreen Controls ---
+        function zoomMap(delta) {
+            currentZoom = Math.max(0.5, Math.min(2.5, +(currentZoom + delta).toFixed(2)));
+            applyZoom();
+        }
+
+        function resetZoom() {
+            currentZoom = 1;
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const wrapper = document.getElementById('mapCanvasWrapper');
+            wrapper.style.transform = `scale(${currentZoom})`;
+            document.getElementById('zoomLevelText').textContent = `${Math.round(currentZoom * 100)}%`;
+        }
+
+        function toggleFullscreenMap() {
+            const viewport = document.getElementById('mapViewport');
+            if (!document.fullscreenElement) {
+                viewport.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // --- Download Map (real generated PNG) ---
+        function downloadCurrentMap() {
+            const serverImg = document.getElementById('serverMapImage');
+            if (serverImg.classList.contains('hidden') || !serverImg.src) {
+                showToast("Generate a map first.", "warn");
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = serverImg.src;
+            a.download = `map_${Date.now()}.png`;
+            a.click();
+            showToast("Downloading PNG map...", "success");
+        }
+
+        // --- Console & History Management ---
+        // Short, human-readable description of a (possibly huge) data URL,
+        // so we never dump the full base64 payload into the console.
+        function describeDataUrl(url) {
+            if (!url) return 'no image';
+            const m = /^data:([^;]+);base64,(.*)$/.exec(url);
+            if (!m) return url.length > 60 ? url.slice(0, 60) + '…' : url;
+            const mime = m[1];
+            const bytes = Math.floor(m[2].length * 0.75);
+            const kb = (bytes / 1024).toFixed(1);
+            return `${mime}, ${kb} kB`;
+        }
+
+        function logToConsole(text, type = 'info') {
+            const box = document.getElementById('consoleTabContent');
+            const line = document.createElement('div');
+            const time = new Date().toLocaleTimeString();
+
+            const colorMap = {
+                cmd: 'text-emerald-400 font-semibold',
+                info: 'text-slate-300',
+                success: 'text-indigo-400 font-medium',
+                warn: 'text-amber-400',
+                error: 'text-rose-400 font-semibold'
+            };
+
+            line.className = `${colorMap[type] || 'text-slate-300'} break-all`;
+            line.textContent = `[${time}] ${text}`;
+            box.appendChild(line);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('consoleTabContent').innerHTML = '<div class="text-slate-500">[System] Console cleared.</div>';
+        }
+
+        function addToHistory(state, cmd) {
+            runHistory.unshift({
+                time: new Date().toLocaleTimeString(),
+                state: { ...state },
+                cmd
+            });
+            document.getElementById('historyCountBadge').textContent = runHistory.length;
+
+            const list = document.getElementById('historyList');
+            list.innerHTML = runHistory.map((item, idx) => `
+                <div onclick="restoreHistoryItem(${idx})" class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/60 cursor-pointer transition flex flex-col justify-between gap-1.5">
+                    <div class="flex items-center justify-between text-[11px]">
+                        <span class="font-mono text-indigo-400 font-semibold">${item.state.map_type} / ${item.state.mode}</span>
+                        <span class="text-slate-500">${item.time}</span>
+                    </div>
+                    <div class="text-[11px] font-mono text-slate-400 truncate">${item.cmd}</div>
+                </div>
+            `).join('');
+        }
+
+        function restoreHistoryItem(index) {
+            const item = runHistory[index];
+            if (!item) return;
+
+            const s = item.state;
+            document.querySelector(`input[name="mode"][value="${s.mode}"]`).checked = true;
+            document.querySelector(`input[name="map_type"][value="${s.map_type}"]`).checked = true;
+            syncGsm(s.gsm);
+            document.querySelector(`input[name="extra_option"][value="${s.extra_option}"]`).checked = true;
+            document.getElementById('modelSelect').value = s.model;
+            document.getElementById('fontSelect').value = s.font;
+            document.getElementById('topicInput').value = s.topic || '';
+
+            updateCommandPreview();
+            showToast("Parameters restored from history", "info");
+        }
+
+        function switchBottomTab(tab) {
+            const consoleTab = document.getElementById('consoleTabContent');
+            const historyTab = document.getElementById('historyTabContent');
+            const consoleBtn = document.getElementById('tabConsoleBtn');
+            const historyBtn = document.getElementById('tabHistoryBtn');
+
+            if (tab === 'console') {
+                consoleTab.classList.remove('hidden');
+                historyTab.classList.add('hidden');
+                consoleBtn.className = "text-xs font-semibold text-indigo-400 border-b-2 border-indigo-500 pb-2 -mb-2.5 flex items-center gap-1.5 transition";
+                historyBtn.className = "text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-1.5 transition";
+            } else {
+                consoleTab.classList.add('hidden');
+                historyTab.classList.remove('hidden');
+                historyBtn.className = "text-xs font-semibold text-indigo-400 border-b-2 border-indigo-500 pb-2 -mb-2.5 flex items-center gap-1.5 transition";
+                consoleBtn.className = "text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-1.5 transition";
+            }
+        }
+
+        // --- Reset Form ---
+        function resetForm() {
+            document.querySelector('input[name="mode"][value="text"]').checked = true;
+            document.querySelector('input[name="map_type"][value="default"]').checked = true;
+            syncGsm(15);
+            document.querySelector('input[name="extra_option"][value="none"]').checked = true;
+            document.getElementById('modelSelect').selectedIndex = 0;
+            document.getElementById('fontSelect').selectedIndex = 0;
+            document.getElementById('topicInput').value = '';
+            updateCommandPreview();
+            showToast("Settings reset to defaults", "info");
+        }
+
+        // --- Clipboard Helpers ---
+        function copyTextToClipboard(text, onSuccess) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                if (onSuccess) onSuccess();
+            } catch (err) {
+                console.error('Copy error', err);
+            }
+            document.body.removeChild(textarea);
+        }
+
+        function copyCliCommand() {
+            const cmd = document.getElementById('cliCommandDisplay').textContent;
+            copyTextToClipboard(cmd, () => {
+                const icon = document.getElementById('copyIcon');
+                const txt = document.getElementById('copyText');
+                icon.className = "fa-solid fa-check text-emerald-400";
+                txt.textContent = "Copied!";
+                showToast("CLI command copied to clipboard", "success");
+                setTimeout(() => {
+                    icon.className = "fa-regular fa-copy";
+                    txt.textContent = "Copy";
+                }, 2000);
+            });
+        }
+
+        // --- Toast ---
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMsg');
+
+            msg.textContent = message;
+            if (type === 'success') icon.className = "fa-solid fa-circle-check text-emerald-400 text-base";
+            else if (type === 'warn') icon.className = "fa-solid fa-triangle-exclamation text-amber-400 text-base";
+            else if (type === 'error') icon.className = "fa-solid fa-circle-xmark text-rose-400 text-base";
+            else icon.className = "fa-solid fa-circle-info text-indigo-400 text-base";
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            clearTimeout(window.toastTimeout);
+            window.toastTimeout = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
