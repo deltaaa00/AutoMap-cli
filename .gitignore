@@ -30,7 +30,7 @@ resources/fonts/*
 !resources/fonts/kodchasan.ttf
 
 map/filling.json
-*.txt
+.pytest_cache/
 
 result.png
 !example.env

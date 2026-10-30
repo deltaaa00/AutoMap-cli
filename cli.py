@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from pathlib import Path
 
 import click
@@ -86,7 +87,11 @@ def main():
               is_flag=True,
               default=False,
               help="Print detailed progress output.")
-def make(prompt, mode, map_type, size_mod, optional_feature, model, font_name, show_result, verbose):
+@click.option("--key",
+              "api_key",
+              default=None,
+              help="Gemini API key for this run (overrides GEMINI_API_KEY env var).")
+def make(prompt, mode, map_type, size_mod, optional_feature, model, font_name, show_result, verbose, api_key):
     """Generate a map from PROMPT and save it as result.png.
 
     Example:
@@ -102,6 +107,10 @@ def make(prompt, mode, map_type, size_mod, optional_feature, model, font_name, s
 
     # Normalise the "none" extra option to a real None.
     feature = None if optional_feature.lower() == "none" else optional_feature.lower()
+
+    # A key passed on the command line overrides the env var for this run only.
+    if api_key:
+        os.environ["GEMINI_API_KEY"] = api_key
 
     out_path = auto_map(
         prompt=prompt,

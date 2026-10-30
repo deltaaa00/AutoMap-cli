@@ -17,7 +17,10 @@ def _warning(title: str, message: str = ""):
     """Print a warning message (CLI-safe replacement for tkinter showwarning)."""
     log.warning(f"{title}: {message}" if message else title)
 # mode selecting
-def ai_request(prompt: str, mode: str, ai_model: str, api_key: str | None = None):
+
+def _ai_request(prompt, mode, ai_model, api_key=None) -> str | None:
+    """Send a request to the AI model and return the response as a string."""
+
     if mode == 'default' or mode == 'flag':
         dict_ = constants.europe
     elif mode == 'world':
@@ -28,11 +31,11 @@ def ai_request(prompt: str, mode: str, ai_model: str, api_key: str | None = None
     Search the internet and return the result as JSON. Dont write 'json' in start
 
     If there is no exact data for a country or continent, use the approximate value.
-             
+                
     Provide the answer only as a dictionary, without explanations.
 
     Dont include luxembourg
-                      
+                        
     {dict_}
     """
 
@@ -51,20 +54,36 @@ def ai_request(prompt: str, mode: str, ai_model: str, api_key: str | None = None
         _error(f"AI request failed: {e}")
         return None
 
+    return request.text
+
+
+def ai_request(prompt: str, mode: str, ai_model: str, api_key: str | None = None, _ai_answer = None) -> dict | None:
+    "handle the AI request and parse the response into a dictionary."
+    if _ai_answer is not None:
+        request = _ai_answer
+    else:
+        request = _ai_request(prompt, mode, ai_model, api_key)
+
     try:
-        json_style = request.text.strip().replace("```json", "").replace("```", "").strip()
+        json_style = request.strip().replace("```json", "").replace("```", "").strip()
         country_dict = json.loads(json_style)
+
         return country_dict
     except json.JSONDecodeError:
         try:
-            json_style = request.text.strip().replace("```python", "").replace("```", "").strip()
+            json_style = request.strip().replace("```python", "").replace("```", "").strip()
             country_dict = json.loads(json_style)
+
+
             return country_dict
 
         except json.JSONDecodeError:
             _error(f"Failed to convert into dictionary. Result {json_style}")
             print("Result:", json_style)
             return None
+
+
+
 
 
 def load_filling():
@@ -100,6 +119,7 @@ def load_filling():
     except Exception as e:
         _error("JSON reading error", str(e))
 
-    return filling_txt, filling_num
+    
 
     return filling_txt, filling_num
+
