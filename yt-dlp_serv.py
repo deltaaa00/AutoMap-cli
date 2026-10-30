@@ -10,9 +10,6 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-if "/tmp" not in os.environ.get("PATH", ""):
-    os.environ["PATH"] = f"/tmp:{os.environ.get('PATH', '')}"
-
 # ---------------------------------------------------------------------------
 # In-memory job store.
 #
