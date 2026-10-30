@@ -24,6 +24,7 @@ value is forwarded to the generation request only.
 import os
 import re
 import time
+
 from pathlib import Path
 
 # auto_map() loads fonts/maps via *relative* paths ("resources/fonts", ...),
@@ -162,6 +163,86 @@ def generate():
         "command": command,
         "image_url": f"data:image/png;base64,{encoded}",
     })
+
+def _get_song_title(url: str) -> str | None:
+
+    """Try to extract the song title from the given URL."""
+
+    import requests
+    
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+
+        
+        match = re.search(r'<meta\s+property="og:title"\s+content="([^"]+)"', response.text)
+        if match:
+            return match.group(1)
+
+        
+        match_title = re.search(r'<title>(.*?)</title>', response.text)
+        if match_title:
+            return match_title.group(1)
+
+    except requests.RequestException as e:
+        return None
+
+    
+
+@app.route('/api/music_download/', methods=['POST'])
+def music_download():
+    data = request.get_json(silent=True) or {}
+    url = data.get('url')
+
+    command = [
+        "yt-dlp",
+        "-f", "ba[ext=m4a]/ba",
+        "-x",
+        "--audio-format", "mp3",
+        "--audio-quality", "0",
+        "-o", "-",
+        url
+    ]
+    import base64
+    import subprocess
+
+    try:
+
+        result = subprocess.run(
+            command, 
+            capture_output=True, 
+            check=True
+        )
+
+
+        base64_audio = base64.b64encode(result.stdout).decode("utf-8")
+
+        return jsonify({
+            "status": "success",
+            "file": base64_audio,
+            "title": _get_song_title(url) or "music_automap"
+        }), 200
+
+    except subprocess.CalledProcessError as e:
+        error_message = e.stderr.decode("utf-8", errors="ignore").strip()
+        
+        return jsonify({
+            "status": "error",
+            "message": "yt-dlp ERROR: Failed to download or convert the audio.",
+            "details": error_message
+        }), 400
+
+    except FileNotFoundError:
+        return jsonify({
+            "status": "error",
+            "message": "yt-dlp або ffmpeg not installed in PATH"
+        }), 500
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

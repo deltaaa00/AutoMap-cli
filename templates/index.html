@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Map CLI Studio — Map Generator Web Interface</title>
+    <title>AutoMap-CLI</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Icons -->
@@ -331,6 +331,56 @@
                         <span id="generateBtnText">Run CLI & Generate Map</span>
                     </button>
                 </form>
+            </div>
+
+            <!-- Music Downloader Card -->
+            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl p-5 shadow-xl">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-brands fa-youtube text-rose-500"></i>
+                        <h2 class="font-semibold text-base text-white">Music Downloader</h2>
+                    </div>
+                    <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">/api/music_download</code>
+                </div>
+
+                <form id="musicForm" onsubmit="handleMusicDownload(event)" class="space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label for="musicUrlInput" class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                                <i class="fa-solid fa-link text-rose-400"></i>
+                                YouTube Music Link
+                            </label>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="url" id="musicUrlInput" placeholder="https://music.youtube.com/watch?v=..." required
+                                autocomplete="off" spellcheck="false"
+                                class="flex-1 px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition">
+                            <button type="button" onclick="pasteMusicUrl()" class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium transition shrink-0" title="Paste from clipboard">
+                                <i class="fa-regular fa-paste"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="musicBtn" class="w-full py-3 px-5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold text-sm shadow-lg shadow-rose-600/25 hover:shadow-rose-600/40 transition-all flex items-center justify-center gap-2.5 group">
+                        <i id="musicBtnIcon" class="fa-solid fa-download transition-transform group-hover:translate-y-0.5"></i>
+                        <span id="musicBtnText">Download MP3</span>
+                    </button>
+                </form>
+
+                <!-- Download status / result -->
+                <div id="musicResult" class="hidden mt-4 p-3 rounded-xl bg-slate-950 border border-slate-800">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <i class="fa-solid fa-file-audio text-rose-400"></i>
+                            <span id="musicResultText" class="text-xs font-mono text-slate-300 truncate">Ready</span>
+                        </div>
+                        <button onclick="downloadMusicFile()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium transition flex items-center gap-1.5 shrink-0">
+                            <i class="fa-solid fa-download"></i>
+                            <span>Save</span>
+                        </button>
+                    </div>
+                    <audio id="musicPreview" class="hidden mt-3 w-full" controls></audio>
+                </div>
             </div>
 
             <!-- Live CLI Command Builder Preview Card -->
@@ -718,6 +768,117 @@
             }
         }
 
+        // --- Music Downloader ---
+        let musicDataUrl = null;   // populated with data:audio/mpeg;base64,... from the API
+        let musicFileName = 'music_automap';  // filename stem taken from the API "title" field
+
+        // Make the API-provided title safe to use as a download filename.
+        function sanitizeFileName(name) {
+            if (!name || typeof name !== 'string') return '';
+            return name
+                .replace(/[/\\?%*:|"<>]/g, '_')  // characters illegal in filenames
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 120);
+        }
+
+        async function pasteMusicUrl() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    document.getElementById('musicUrlInput').value = text.trim();
+                    showToast("Link pasted from clipboard", "info");
+                }
+            } catch (err) {
+                logToConsole(`[Warning] Clipboard read failed (${err.message}). Paste manually.`, 'warn');
+            }
+        }
+
+        async function handleMusicDownload(e) {
+            e.preventDefault();
+            const url = document.getElementById('musicUrlInput').value.trim();
+            const btn = document.getElementById('musicBtn');
+            const btnText = document.getElementById('musicBtnText');
+            const btnIcon = document.getElementById('musicBtnIcon');
+
+            if (!url) {
+                showToast("Please paste a YouTube Music link first.", "warn");
+                return;
+            }
+
+            musicDataUrl = null;
+            musicFileName = 'music_automap';
+            btn.disabled = true;
+            btn.classList.add('opacity-70');
+            btnText.textContent = "Downloading...";
+            btnIcon.className = "fa-solid fa-circle-notch animate-spin";
+
+            logToConsole(`[Music] POST /api/music_download ${url}`, 'cmd');
+
+            try {
+                const response = await fetch('/api/music_download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+
+                let result;
+                try {
+                    result = await response.json();
+                } catch {
+                    throw new Error(`Server returned ${response.status} ${response.statusText}`);
+                }
+
+                if (!response.ok || result.status === 'error') {
+                    throw new Error(result.error || 'Music download failed');
+                }
+
+                // Endpoint response: { "status": "success", "file": "<base64 mp3>", "title": "<song title>" }
+                const raw = result.file;
+                if (!raw) throw new Error('Response did not contain a base64 MP3 payload');
+
+                // Normalise: strip a data URL prefix if the server included one.
+                const base64 = raw.startsWith('data:') ? raw.split(',')[1] : raw;
+                musicDataUrl = `data:audio/mpeg;base64,${base64}`;
+                musicFileName = sanitizeFileName(result.title) || 'music_automap';
+
+                logToConsole(`[Success] Music file received "${musicFileName}.mp3" (${describeDataUrl(musicDataUrl)})`, 'success');
+
+                const resultBox = document.getElementById('musicResult');
+                const resultText = document.getElementById('musicResultText');
+                const preview = document.getElementById('musicPreview');
+
+                resultText.textContent = result.title
+                    ? `${result.title} — ${describeDataUrl(musicDataUrl)}`
+                    : describeDataUrl(musicDataUrl);
+                preview.src = musicDataUrl;
+                preview.classList.remove('hidden');
+                resultBox.classList.remove('hidden');
+
+                showToast("Music downloaded! Click Save to store the MP3.", "success");
+            } catch (error) {
+                logToConsole(`[API Error] ${error.message}`, 'error');
+                showToast("Music download failed. Check console logs.", "error");
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-70');
+                btnText.textContent = "Download MP3";
+                btnIcon.className = "fa-solid fa-download";
+            }
+        }
+
+        function downloadMusicFile() {
+            if (!musicDataUrl) {
+                showToast("Download a track first.", "warn");
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = musicDataUrl;
+            a.download = `${musicFileName || 'music_automap'}.mp3`;
+            a.click();
+            showToast("Saving MP3 file...", "success");
+        }
+
         // --- Zoom & Fullscreen Controls ---
         function zoomMap(delta) {
             currentZoom = Math.max(0.5, Math.min(2.5, +(currentZoom + delta).toFixed(2)));
@@ -753,7 +914,7 @@
             }
             const a = document.createElement('a');
             a.href = serverImg.src;
-            a.download = `map_${Date.now()}.png`;
+            a.download = `result_map.png`;
             a.click();
             showToast("Downloading PNG map...", "success");
         }
