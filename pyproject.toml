@@ -25,3 +25,7 @@ packages = ["map"]
 
 [tool.setuptools.package-data]
 map = ["filling.json", "filling.template.json"]
+
+[tool.pytest.ini_options]
+pythonpath = "."
+testpaths = ["tests"]
