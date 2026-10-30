@@ -164,85 +164,82 @@ def generate():
         "image_url": f"data:image/png;base64,{encoded}",
     })
 
-def _get_song_title(url: str) -> str | None:
 
-    """Try to extract the song title from the given URL."""
 
-    import requests
-    
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
+def _music_service_url(path: str) -> str:
+    """Build the downstream music-service URL for ``path``.
 
-        
-        match = re.search(r'<meta\s+property="og:title"\s+content="([^"]+)"', response.text)
-        if match:
-            return match.group(1)
+    Uses ``RENDER_SERVICE_URL`` when set, otherwise the local yt-dlp service.
+    """
+    render_url = os.environ.get("RENDER_SERVICE_URL", "").rstrip("/")
+    base = render_url or "http://localhost:8080"
+    return f"{base}{path}"
 
-        
-        match_title = re.search(r'<title>(.*?)</title>', response.text)
-        if match_title:
-            return match_title.group(1)
-
-    except requests.RequestException as e:
-        return None
-
-    
 
 @app.route('/api/music_download/', methods=['POST'])
+@app.route('/api/music_download', methods=['POST'])
 def music_download():
-    data = request.get_json(silent=True) or {}
-    url = data.get('url')
+    """Start a music-download job on the downstream render/yt-dlp service.
 
-    command = [
-        "yt-dlp",
-        "-f", "ba[ext=m4a]/ba",
-        "-x",
-        "--audio-format", "mp3",
-        "--audio-quality", "0",
-        "-o", "-",
-        url
-    ]
-    import base64
-    import subprocess
+    Returns the downstream ``job_id`` so the client can poll status via
+    ``GET /api/music_download/<job_id>``.
+    """
+    import requests
+
+    data = request.get_json(silent=True) or {}
+    url = (data.get('url') or '').strip()
+    if not url:
+        return jsonify({"status": "error", "error": "Missing 'url' in request body."}), 400
+
+    # Another service downloads music from YouTube and converts it to mp3.
+    try:
+        response = requests.post(
+            _music_service_url("/api/music_download/"),
+            json={"url": url},
+            timeout=10,
+        )
+    except requests.RequestException as e:
+        return jsonify({"status": "error",
+                        "error": f"Music service unreachable: {e}"}), 502
 
     try:
+        payload = response.json()
+    except ValueError:
+        return jsonify({"status": "error",
+                        "error": "Music service returned a non-JSON response."}), 502
 
-        result = subprocess.run(
-            command, 
-            capture_output=True, 
-            check=True
+    # Pass the downstream payload/status straight through (job_id on success).
+    return jsonify(payload), response.status_code
+
+
+@app.route('/api/music_download/<job_id>', methods=['GET'])
+def music_download_status(job_id):
+    """Proxy the downstream job status so the browser can poll it.
+
+    Response passthrough:
+        { "status": "pending" | "running", "job_id": "..." }
+        { "status": "done", "job_id", "title", "file": "<base64 mp3>" }
+        { "status": "error", "job_id", "error", "details" }
+    """
+    import requests
+
+    try:
+        response = requests.get(
+            _music_service_url(f"/api/music_download/{job_id}"),
+            timeout=10,
         )
+    except requests.RequestException as e:
+        return jsonify({"status": "error",
+                        "error": f"Music service unreachable: {e}"}), 502
 
+    try:
+        payload = response.json()
+    except ValueError:
+        return jsonify({"status": "error",
+                        "error": "Music service returned a non-JSON response."}), 502
 
-        base64_audio = base64.b64encode(result.stdout).decode("utf-8")
+    return jsonify(payload), response.status_code
 
-        return jsonify({
-            "status": "success",
-            "file": base64_audio,
-            "title": _get_song_title(url) or "music_automap"
-        }), 200
-
-    except subprocess.CalledProcessError as e:
-        error_message = e.stderr.decode("utf-8", errors="ignore").strip()
-        
-        return jsonify({
-            "status": "error",
-            "message": "yt-dlp ERROR: Failed to download or convert the audio.",
-            "details": error_message
-        }), 400
-
-    except FileNotFoundError:
-        return jsonify({
-            "status": "error",
-            "message": "yt-dlp або ffmpeg not installed in PATH"
-        }), 500
-
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

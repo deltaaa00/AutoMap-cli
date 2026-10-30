@@ -794,6 +794,43 @@
             }
         }
 
+        // Poll GET /api/music_download/<job_id> until the job finishes.
+        // Resolves with the final {file, title} payload, rejects on error/timeout.
+        async function pollMusicJob(jobId, { intervalMs = 2000, timeoutMs = 5 * 60 * 1000 } = {}) {
+            const started = Date.now();
+            let lastStatus = null;
+
+            while (true) {
+                if (Date.now() - started > timeoutMs) {
+                    throw new Error('Timed out waiting for the music download to finish.');
+                }
+
+                const res = await fetch(`/api/music_download/${encodeURIComponent(jobId)}`);
+                let job;
+                try {
+                    job = await res.json();
+                } catch {
+                    throw new Error(`Status endpoint returned ${res.status} ${res.statusText}`);
+                }
+
+                if (job.status !== lastStatus) {
+                    logToConsole(`[Music] Job ${jobId.slice(0, 8)}… status: ${job.status}`, 'info');
+                    lastStatus = job.status;
+                }
+
+                if (job.status === 'done') {
+                    if (!job.file) throw new Error('Job finished but no audio was returned.');
+                    return job;
+                }
+                if (job.status === 'error') {
+                    throw new Error(job.error || 'Music download failed');
+                }
+
+                // pending / running -> wait and poll again
+                await new Promise(r => setTimeout(r, intervalMs));
+            }
+        }
+
         async function handleMusicDownload(e) {
             e.preventDefault();
             const url = document.getElementById('musicUrlInput').value.trim();
@@ -816,28 +853,33 @@
             logToConsole(`[Music] POST /api/music_download ${url}`, 'cmd');
 
             try {
+                // Step 1: start the job, get a job_id back immediately.
                 const response = await fetch('/api/music_download', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url })
                 });
 
-                let result;
+                let start;
                 try {
-                    result = await response.json();
+                    start = await response.json();
                 } catch {
                     throw new Error(`Server returned ${response.status} ${response.statusText}`);
                 }
 
-                if (!response.ok || result.status === 'error') {
-                    throw new Error(result.error || 'Music download failed');
+                if (!response.ok || start.status === 'error') {
+                    throw new Error(start.error || 'Could not start music download');
                 }
 
-                // Endpoint response: { "status": "success", "file": "<base64 mp3>", "title": "<song title>" }
-                const raw = result.file;
-                if (!raw) throw new Error('Response did not contain a base64 MP3 payload');
+                const jobId = start.job_id;
+                if (!jobId) throw new Error('Server did not return a job_id');
+                logToConsole(`[Music] Job queued: ${jobId}`, 'info');
+                btnText.textContent = "Processing...";
 
-                // Normalise: strip a data URL prefix if the server included one.
+                // Step 2: poll until the job completes and returns the audio.
+                const result = await pollMusicJob(jobId);
+
+                const raw = result.file;
                 const base64 = raw.startsWith('data:') ? raw.split(',')[1] : raw;
                 musicDataUrl = `data:audio/mpeg;base64,${base64}`;
                 musicFileName = sanitizeFileName(result.title) || 'music_automap';
