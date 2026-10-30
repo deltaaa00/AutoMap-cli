@@ -6,7 +6,7 @@
 
 AutoMap.egg-info/
 
-.env
+
 .venv
 env/
 venv/

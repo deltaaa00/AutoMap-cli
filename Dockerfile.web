@@ -7,9 +7,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 
-COPY yt-dlp_serv.py .
+COPY . .
 
-EXPOSE 8080
+EXPOSE 5000
 
 
-CMD ["python", "yt-dlp_serv.py"]
+CMD ["python", "main.py"]
