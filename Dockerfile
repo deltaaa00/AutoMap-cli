@@ -18,4 +18,4 @@ COPY yt-dlp_serv.py .
 EXPOSE 8080
 
 
-CMD ["python", "yt_dlp_serv.py"]
+CMD ["python", "yt-dlp_serv.py"]
