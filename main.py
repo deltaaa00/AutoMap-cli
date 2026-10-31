@@ -33,6 +33,13 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 os.chdir(BASE_DIR)
 
+STORAGE_DIR = "/tmp/automap_storage"
+DOWNLOADS = os.path.join(STORAGE_DIR, "downloads")
+CUT_DIR = os.path.join(STORAGE_DIR, "cut")
+
+os.makedirs(STORAGE_DIR, exist_ok=True)
+os.makedirs(CUT_DIR, exist_ok=True)
+
 from dotenv import dotenv_values
 from map.auto_map import auto_map
 
@@ -260,6 +267,114 @@ def cut_audio():
     # Pass the downstream payload/status straight through.
     return jsonify(payload), response.status_code
 
+@app.route('/api/render_video', methods=['POST'])
+@app.route('/api/render_video/', methods=['POST'])
+def make_video():
+    """Render a video via the downstream render service.
+
+    Request JSON:
+        {
+            "map_file": "<base64 / data URL>",
+            "background_video": "<base64 / data URL>",
+            "video_title": "<title>",
+            "codec": "libx264"
+        }
+
+    Response JSON (passthrough from the downstream service):
+        { "status": "success", "file_path": "...", "download_url": "..." }
+        { "status": "error", "error": "<message>" }
+    """
+    import requests
+
+    data = request.get_json(silent=True) or {}
+
+    # The frontend sends base64 strings; keep them as-is (default to empty string).
+    map_b64 = data.get('map_file') or ''
+    background_b64 = data.get('background_video') or ''
+    # Frontend field is "video_title"; accept legacy "title" as a fallback.
+    title = (data.get('video_title') or data.get('title') or '').strip()
+    codec = (data.get('codec') or 'libx264').strip()
+
+    try:
+        response = requests.post(
+            "http://yt-dlp-worker:8080/api/render_video/",
+            json={
+                "map_file": map_b64,
+                "background_video": background_b64,
+                "video_title": title,
+                "codec": codec,
+            },
+            # Video rendering (moviepy/ffmpeg) can take a while - allow more time.
+            timeout=300,
+        )
+
+    except requests.RequestException as e:
+        return jsonify({"status": "error",
+                        "error": f"Video service unreachable: {e}"}), 502
+
+    try:
+        payload = response.json()
+    except ValueError:
+        return jsonify({"status": "error",
+                        "error": "Video service returned a non-JSON response."}), 502
+
+    # Pass the downstream payload/status straight through.
+    return jsonify(payload), response.status_code
+
+
+@app.route('/api/download_video', methods=['GET'])
+@app.route('/api/download_video/', methods=['GET'])
+def download_video():
+    """Stream a rendered video from the downstream render service.
+
+    The browser hits this endpoint on the web origin, but the rendered .mp4
+    lives in the worker container's storage, so we proxy the download to the
+    worker and stream its response back as an attachment.
+    """
+    import requests
+    from flask import Response
+
+    raw_path = (request.args.get('path') or '').strip()
+    if not raw_path:
+        return jsonify({"status": "error", "error": "Missing 'path' query param."}), 400
+
+    try:
+        upstream = requests.get(
+            "http://yt-dlp-worker:8080/api/download_video",
+            params={"path": raw_path},
+            stream=True,
+            timeout=120,
+        )
+    except requests.RequestException as e:
+        return jsonify({"status": "error",
+                        "error": f"Video service unreachable: {e}"}), 502
+
+    # If the worker did not return a file (e.g. 404/400 JSON error), pass it through.
+    if upstream.status_code != 200:
+        content_type = upstream.headers.get("Content-Type", "")
+        if "application/json" in content_type:
+            try:
+                return jsonify(upstream.json()), upstream.status_code
+            except ValueError:
+                pass
+        return (upstream.text or "Download failed"), upstream.status_code
+
+    disposition = upstream.headers.get(
+        "Content-Disposition",
+        'attachment; filename="rendered_video.mp4"',
+    )
+
+    def _generate():
+        # Stream in chunks so large videos don't load fully into memory.
+        for chunk in upstream.iter_content(chunk_size=64 * 1024):
+            if chunk:
+                yield chunk
+
+    return Response(
+        _generate(),
+        mimetype="video/mp4",
+        headers={"Content-Disposition": disposition},
+    )
 
 
 if __name__ == "__main__":

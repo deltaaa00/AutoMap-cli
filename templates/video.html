@@ -215,47 +215,140 @@
 
         </section>
 
-        <!-- RIGHT COLUMN: WORKSPACE / STATUS -->
+        <!-- RIGHT COLUMN: VIDEO RENDER -->
         <section class="lg:col-span-7 xl:col-span-8 flex flex-col gap-5">
 
-            <!-- Workspace Card -->
+            <!-- Render Video Card -->
             <div class="bg-slate-900 border border-slate-800/90 rounded-2xl shadow-xl flex flex-col flex-1 min-h-[480px] overflow-hidden">
 
                 <!-- Toolbar -->
                 <div class="px-5 py-3.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-900/90">
                     <div class="flex items-center gap-2.5">
                         <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" id="statusIndicator"></span>
-                        <h2 class="font-semibold text-sm sm:text-base text-white">Music Workspace</h2>
+                        <h2 class="font-semibold text-sm sm:text-base text-white">Render Video</h2>
                         <span id="studioMetaBadge" class="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700">Ready</span>
                     </div>
+                    <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">/api/render_video</code>
                 </div>
 
-                <!-- Viewport Area -->
-                <div id="studioViewport" class="relative flex-1 bg-slate-950 canvas-grid flex items-center justify-center overflow-hidden select-none p-4 sm:p-8">
+                <!-- Form -->
+                <form id="renderForm" onsubmit="handleRenderVideo(event)" class="relative flex-1 p-5 flex flex-col gap-4">
 
-                    <!-- Loading Overlay -->
-                    <div id="loadingOverlay" class="hidden absolute inset-0 bg-slate-950/85 backdrop-blur-sm z-20 flex flex-col items-center justify-center gap-4">
+                    <!-- Rendering overlay -->
+                    <div id="renderOverlay" class="hidden absolute inset-0 bg-slate-950/85 backdrop-blur-sm z-20 flex flex-col items-center justify-center gap-4 rounded-b-2xl">
                         <div class="relative w-16 h-16 flex items-center justify-center">
-                            <div class="absolute inset-0 rounded-full border-4 border-rose-500/20"></div>
-                            <div class="absolute inset-0 rounded-full border-4 border-rose-500 border-t-transparent animate-spin"></div>
-                            <i class="fa-solid fa-music text-rose-400 text-xl animate-pulse"></i>
+                            <div class="absolute inset-0 rounded-full border-4 border-indigo-500/20"></div>
+                            <div class="absolute inset-0 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin"></div>
+                            <i class="fa-solid fa-film text-indigo-400 text-xl animate-pulse"></i>
                         </div>
                         <div class="text-center">
-                            <div class="text-sm font-semibold text-white">Downloading audio...</div>
-                            <div id="loadingStepText" class="text-xs text-slate-400 mt-1 font-mono">Fetching track and converting to MP3</div>
+                            <div class="text-sm font-semibold text-white">Rendering video...</div>
+                            <div class="text-xs text-slate-400 mt-1 font-mono">Uploading materials and encoding on the server</div>
                         </div>
                     </div>
 
-                    <!-- Center: empty state / player -->
-                    <div class="w-full max-w-[720px] flex flex-col items-center justify-center gap-4">
-                        <div id="emptyState" class="w-full aspect-[8/5] rounded-xl border border-dashed border-slate-700 bg-slate-900/60 flex flex-col items-center justify-center gap-3 text-center px-6">
-                            <i class="fa-solid fa-music text-slate-600 text-4xl"></i>
-                            <p class="text-sm text-slate-400">Paste a link on the left and click <span class="text-rose-400 font-medium">Download MP3</span>.</p>
-                            <p class="text-xs text-slate-500">Your track will appear here for preview.</p>
+                    <!-- Upload map (drag & drop) -->
+                    <div>
+                        <label class="text-xs font-medium text-slate-300 flex items-center gap-1.5 mb-1.5">
+                            <i class="fa-solid fa-map text-indigo-400"></i>
+                            Upload map
+                        </label>
+                        <div id="mapDropzone" data-input="mapFileInput"
+                            class="dropzone relative rounded-xl border border-dashed border-slate-700 bg-slate-950 hover:border-indigo-500/70 transition cursor-pointer px-4 py-5 text-center">
+                            <input type="file" id="mapFileInput" accept="image/*" class="hidden">
+                            <div class="dropzone-empty flex flex-col items-center gap-1.5 pointer-events-none">
+                                <i class="fa-solid fa-cloud-arrow-up text-slate-500 text-2xl"></i>
+                                <p class="text-sm text-slate-400"><span class="text-indigo-400 font-medium">Drop an image here</span> or click to browse</p>
+                                <p class="text-[11px] text-slate-500 font-mono">PNG / JPG &middot; max 10 MB</p>
+                            </div>
+                            <div class="dropzone-filled hidden items-center justify-between gap-3 text-left">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <i class="fa-solid fa-image text-indigo-400"></i>
+                                    <span class="dropzone-name text-xs font-mono text-slate-200 truncate">map.png</span>
+                                </div>
+                                <button type="button" class="dropzone-clear text-slate-500 hover:text-rose-400 transition" title="Remove">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                </div>
+                    <!-- Background video (drag & drop) -->
+                    <div>
+                        <label class="text-xs font-medium text-slate-300 flex items-center gap-1.5 mb-1.5">
+                            <i class="fa-solid fa-video text-purple-400"></i>
+                            Background video
+                        </label>
+                        <div id="bgDropzone" data-input="bgFileInput"
+                            class="dropzone relative rounded-xl border border-dashed border-slate-700 bg-slate-950 hover:border-purple-500/70 transition cursor-pointer px-4 py-5 text-center">
+                            <input type="file" id="bgFileInput" accept="video/*" class="hidden">
+                            <div class="dropzone-empty flex flex-col items-center gap-1.5 pointer-events-none">
+                                <i class="fa-solid fa-cloud-arrow-up text-slate-500 text-2xl"></i>
+                                <p class="text-sm text-slate-400"><span class="text-purple-400 font-medium">Drop a video here</span> or click to browse</p>
+                                <p class="text-[11px] text-slate-500 font-mono">MP4 / MOV / WEBM &middot; max 10 MB</p>
+                            </div>
+                            <div class="dropzone-filled hidden items-center justify-between gap-3 text-left">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <i class="fa-solid fa-video text-purple-400"></i>
+                                    <span class="dropzone-name text-xs font-mono text-slate-200 truncate">background.mp4</span>
+                                </div>
+                                <button type="button" class="dropzone-clear text-slate-500 hover:text-rose-400 transition" title="Remove">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Video title -->
+                    <div>
+                        <label for="videoTitleInput" class="text-xs font-medium text-slate-300 flex items-center gap-1.5 mb-1.5">
+                            <i class="fa-solid fa-heading text-emerald-400"></i>
+                            Video title
+                        </label>
+                        <input type="text" id="videoTitleInput" placeholder="My awesome map video"
+                            autocomplete="off" spellcheck="false"
+                            class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition">
+                    </div>
+
+                    <!-- Codec -->
+                    <div>
+                        <label for="codecSelect" class="text-xs font-medium text-slate-300 flex items-center gap-1.5 mb-1.5">
+                            <i class="fa-solid fa-microchip text-sky-400"></i>
+                            Codec
+                        </label>
+                        <select id="codecSelect"
+                            class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition">
+                            <option value="libx264" selected>libx264</option>
+                            <option value="h264_nvenc">h264_nvenc</option>
+                            <option value="h264_videotoolbox">h264_videotoolbox</option>
+                        </select>
+                        <ul class="mt-2 space-y-1 text-[11px] text-slate-500 leading-relaxed">
+                            <li><code class="text-slate-300 font-mono">libx264</code> &mdash; universal software encoder (works everywhere)</li>
+                            <li><code class="text-slate-300 font-mono">h264_nvenc</code> &mdash; for NVIDIA graphics cards</li>
+                            <li><code class="text-slate-300 font-mono">h264_videotoolbox</code> &mdash; for Apple Silicon chips</li>
+                        </ul>
+                    </div>
+
+                    <!-- Render button -->
+                    <button type="submit" id="renderBtn" class="mt-auto w-full py-3 px-5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/25 hover:shadow-indigo-600/40 transition-all flex items-center justify-center gap-2.5 group">
+                        <i id="renderBtnIcon" class="fa-solid fa-film transition-transform group-hover:scale-110"></i>
+                        <span id="renderBtnText">Render video</span>
+                    </button>
+
+                    <!-- Render result -->
+                    <div id="renderResult" class="hidden p-3 rounded-xl bg-slate-950 border border-slate-800">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <i class="fa-solid fa-file-video text-emerald-400"></i>
+                                <span id="renderResultText" class="text-xs font-mono text-slate-300 truncate">Ready</span>
+                            </div>
+                            <button type="button" id="downloadVideoBtn" onclick="downloadRenderedVideo()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition flex items-center gap-1.5 shrink-0">
+                                <i class="fa-solid fa-download"></i>
+                                <span>Download video</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
             </div>
 
             <!-- Studio Console Output -->
@@ -368,7 +461,6 @@
             const btn = document.getElementById('musicBtn');
             const btnText = document.getElementById('musicBtnText');
             const btnIcon = document.getElementById('musicBtnIcon');
-            const overlay = document.getElementById('loadingOverlay');
             const metaBadge = document.getElementById('studioMetaBadge');
 
             if (!url) {
@@ -382,7 +474,6 @@
             btn.classList.add('opacity-70');
             btnText.textContent = "Downloading...";
             btnIcon.className = "fa-solid fa-circle-notch animate-spin";
-            overlay.classList.remove('hidden');
             metaBadge.textContent = "Downloading...";
 
             logToConsole(`[Music] POST /api/music_download ${url}`, 'cmd');
@@ -438,7 +529,6 @@
                 showToast("Music download failed. Check console logs.", "error");
                 metaBadge.textContent = "Error";
             } finally {
-                overlay.classList.add('hidden');
                 btn.disabled = false;
                 btn.classList.remove('opacity-70');
                 btnText.textContent = "Download MP3";
@@ -647,6 +737,244 @@
         function clearConsole() {
             document.getElementById('consoleTabContent').innerHTML = '<div class="text-slate-500">[System] Console cleared.</div>';
         }
+
+        // --- Render Video ---
+        const MAX_MATERIAL_BYTES = 10 * 1024 * 1024;  // 10 MB per input file
+        const ALLOWED_CODECS = ['libx264', 'h264_nvenc', 'h264_videotoolbox'];
+
+        // Selected files for the render, keyed by input id.
+        const renderFiles = { mapFileInput: null, bgFileInput: null };
+        // Last successful render result: { status, file_path, download_url }
+        let renderResultData = null;
+
+        function humanSize(bytes) {
+            if (bytes < 1024) return `${bytes} B`;
+            if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} kB`;
+            return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        }
+
+        // Attach click / drag-drop handlers to a dropzone element.
+        function setupDropzone(zoneId) {
+            const zone = document.getElementById(zoneId);
+            if (!zone) return;
+            const input = document.getElementById(zone.dataset.input);
+
+            // Click anywhere on the zone opens the file picker (but not on the clear button).
+            zone.addEventListener('click', (e) => {
+                if (e.target.closest('.dropzone-clear')) return;
+                input.click();
+            });
+
+            input.addEventListener('change', () => {
+                if (input.files && input.files[0]) acceptFile(input.id, input.files[0]);
+            });
+
+            // Drag & drop
+            ['dragenter', 'dragover'].forEach((ev) =>
+                zone.addEventListener(ev, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    zone.classList.add('border-indigo-500', 'bg-slate-900');
+                })
+            );
+            ['dragleave', 'drop'].forEach((ev) =>
+                zone.addEventListener(ev, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    zone.classList.remove('border-indigo-500', 'bg-slate-900');
+                })
+            );
+            zone.addEventListener('drop', (e) => {
+                const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+                if (file) acceptFile(input.id, file);
+            });
+
+            // Clear button resets the zone.
+            const clearBtn = zone.querySelector('.dropzone-clear');
+            if (clearBtn) {
+                clearBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    resetDropzone(input.id);
+                });
+            }
+        }
+
+        function acceptFile(inputId, file) {
+            // Size guard: reject material files larger than 10 MB.
+            if (file.size > MAX_MATERIAL_BYTES) {
+                showToast(`${file.name} is ${humanSize(file.size)} — max allowed is 10 MB.`, 'error');
+                logToConsole(`[Reject] ${file.name} (${humanSize(file.size)}) exceeds 10 MB limit.`, 'error');
+                resetDropzone(inputId);
+                return;
+            }
+            // Basic type guard (map = image, background = video).
+            const isMap = inputId === 'mapFileInput';
+            const wantType = isMap ? 'image/' : 'video/';
+            if (file.type && !file.type.startsWith(wantType)) {
+                showToast(`Wrong file type for ${isMap ? 'map' : 'background video'}.`, 'error');
+                resetDropzone(inputId);
+                return;
+            }
+
+            renderFiles[inputId] = file;
+            const zone = document.querySelector(`.dropzone[data-input="${inputId}"]`);
+            if (!zone) return;
+            zone.querySelector('.dropzone-empty').classList.add('hidden');
+            const filled = zone.querySelector('.dropzone-filled');
+            filled.classList.remove('hidden');
+            filled.classList.add('flex');
+            zone.querySelector('.dropzone-name').textContent = `${file.name} (${humanSize(file.size)})`;
+            logToConsole(`[File] Selected ${file.name} (${humanSize(file.size)})`, 'info');
+        }
+
+        function resetDropzone(inputId) {
+            renderFiles[inputId] = null;
+            const input = document.getElementById(inputId);
+            if (input) input.value = '';
+            const zone = document.querySelector(`.dropzone[data-input="${inputId}"]`);
+            if (!zone) return;
+            zone.querySelector('.dropzone-empty').classList.remove('hidden');
+            const filled = zone.querySelector('.dropzone-filled');
+            filled.classList.add('hidden');
+            filled.classList.remove('flex');
+        }
+
+        // Read a File as a base64 data URL string (e.g. "data:image/png;base64,....").
+        function fileToDataUrl(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error || new Error('Failed to read file'));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function handleRenderVideo(e) {
+            e.preventDefault();
+            const btn = document.getElementById('renderBtn');
+            const btnText = document.getElementById('renderBtnText');
+            const btnIcon = document.getElementById('renderBtnIcon');
+            const overlay = document.getElementById('renderOverlay');
+            const metaBadge = document.getElementById('studioMetaBadge');
+
+            const mapFile = renderFiles.mapFileInput;
+            const bgFile = renderFiles.bgFileInput;
+            const title = document.getElementById('videoTitleInput').value.trim();
+            const codec = document.getElementById('codecSelect').value;
+
+            if (!mapFile) {
+                showToast("Please upload a map file first.", 'warn');
+                return;
+            }
+            if (!bgFile) {
+                showToast("Please upload a background video first.", 'warn');
+                return;
+            }
+            if (!title) {
+                showToast("Please enter a video title.", 'warn');
+                document.getElementById('videoTitleInput').focus();
+                return;
+            }
+            if (!ALLOWED_CODECS.includes(codec)) {
+                showToast("Unsupported codec selected.", 'error');
+                return;
+            }
+            // Final size double-check before uploading.
+            if (mapFile.size > MAX_MATERIAL_BYTES || bgFile.size > MAX_MATERIAL_BYTES) {
+                showToast("A file exceeds the 10 MB limit.", 'error');
+                return;
+            }
+
+            renderResultData = null;
+            btn.disabled = true;
+            btn.classList.add('opacity-70');
+            btnText.textContent = "Rendering...";
+            btnIcon.className = "fa-solid fa-circle-notch animate-spin";
+            overlay.classList.remove('hidden');
+            metaBadge.textContent = "Rendering...";
+
+            logToConsole(`[Render] POST /api/render_video title="${title}" codec=${codec} map=${mapFile.name} bg=${bgFile.name}`, 'cmd');
+
+            try {
+                // Encode both materials as base64 data URLs.
+                const [mapB64, bgB64] = await Promise.all([fileToDataUrl(mapFile), fileToDataUrl(bgFile)]);
+
+                // Everything (files as base64 + user args) goes in a single JSON body.
+                const payload = {
+                    map_file: mapB64,               // data URL string (base64)
+                    background_video: bgB64,        // data URL string (base64)
+                    video_title: title,
+                    codec: codec,
+                };
+
+                const response = await fetch('/api/render_video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                let result;
+                try {
+                    result = await response.json();
+                } catch {
+                    throw new Error(`Server returned ${response.status} ${response.statusText}`);
+                }
+
+                // Expected response: { status: "success"|"error", file_path, error? }
+                if (!response.ok || result.status === 'error') {
+                    throw new Error(result.error || 'Video render failed');
+                }
+
+                renderResultData = result;
+                const filePath = result.file_path || result.path || result.file || '(unknown path)';
+
+                const resultBox = document.getElementById('renderResult');
+                const resultText = document.getElementById('renderResultText');
+                resultText.textContent = filePath;
+                resultText.title = filePath;
+                resultBox.classList.remove('hidden');
+
+                logToConsole(`[Success] Video rendered: ${filePath}`, 'success');
+                metaBadge.textContent = `Done (${new Date().toLocaleTimeString()})`;
+                showToast("Video rendered! Click Download video.", 'success');
+            } catch (error) {
+                logToConsole(`[API Error] ${error.message}`, 'error');
+                showToast("Video render failed. Check console logs.", 'error');
+                metaBadge.textContent = "Error";
+            } finally {
+                overlay.classList.add('hidden');
+                btn.disabled = false;
+                btn.classList.remove('opacity-70');
+                btnText.textContent = "Render video";
+                btnIcon.className = "fa-solid fa-film";
+            }
+        }
+
+        function downloadRenderedVideo() {
+            if (!renderResultData) {
+                showToast("Render a video first.", 'warn');
+                return;
+            }
+            // Prefer an explicit download URL from the server, otherwise fall back to a
+            // download endpoint that streams the rendered file by its server path.
+            const filePath = renderResultData.file_path || renderResultData.path || renderResultData.file;
+            const url = renderResultData.download_url
+                || `/api/download_video?path=${encodeURIComponent(filePath || '')}`;
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            showToast("Downloading video...", 'success');
+        }
+
+        // Wire up render dropzones once the DOM is ready.
+        document.addEventListener('DOMContentLoaded', () => {
+            setupDropzone('mapDropzone');
+            setupDropzone('bgDropzone');
+        });
 
         // --- Toast ---
         function showToast(message, type = 'success') {
