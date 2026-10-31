@@ -15,7 +15,7 @@ dependencies = [
     "pytest>=9.0.0",
     "yt-dlp>=2026.10.26",
     "requests>=2.34.0",
-    "pydub>=
+    "pydub>=0.25.0",
 ]
 
 [project.scripts]
