@@ -65,6 +65,12 @@ app = Flask(__name__)
 def main():
     return render_template("index.html")
 
+
+@app.route('/studio')
+def studio():
+    """Serve the dedicated Video Studio page (music downloader)."""
+    return render_template("video.html")
+
 @app.route('/api/fonts/')
 @app.route('/api/fonts')
 def api_fonts():
@@ -165,24 +171,17 @@ def generate():
     })
 
 
-
-def _music_service_url(path: str) -> str:
-    """Build the downstream music-service URL for ``path``.
-
-    Uses ``RENDER_SERVICE_URL`` when set, otherwise the local yt-dlp service.
-    """
-    render_url = os.environ.get("RENDER_URL", "").rstrip("/")
-    base = render_url or "http://:8080"
-    return f"{base}{path}"
-
-
 @app.route('/api/music_download/', methods=['POST'])
 @app.route('/api/music_download', methods=['POST'])
 def music_download():
-    """Start a music-download job on the downstream render/yt-dlp service.
+    """Download a track via the downstream render/yt-dlp service.
 
-    Returns the downstream ``job_id`` so the client can poll status via
-    ``GET /api/music_download/<job_id>``.
+    Request JSON:
+        { "url": "https://music.youtube.com/watch?v=..." }
+
+    Response JSON (passthrough from the downstream service):
+        { "status": "success", "file": "<base64 mp3>", "title": "<song title>" }
+        { "status": "error", "error": "<message>" }
     """
     import requests
 
@@ -194,9 +193,9 @@ def music_download():
     # Another service downloads music from YouTube and converts it to mp3.
     try:
         response = requests.post(
-            _music_service_url("/api/music_download/"),
+            "http://yt-dlp-worker:8080/api/music_download/",
             json={"url": url},
-            timeout=10,
+            timeout=40,
         )
     except requests.RequestException as e:
         return jsonify({"status": "error",
@@ -208,26 +207,46 @@ def music_download():
         return jsonify({"status": "error",
                         "error": "Music service returned a non-JSON response."}), 502
 
-    # Pass the downstream payload/status straight through (job_id on success).
+    # Pass the downstream payload/status straight through.
     return jsonify(payload), response.status_code
 
+@app.route('/api/music_cut', methods=['POST'])
+@app.route('/api/music_cut/', methods=['POST'])
+def cut_audio():
+    """Cut a previously downloaded track via the downstream render service.
 
-@app.route('/api/music_download/<job_id>', methods=['GET'])
-def music_download_status(job_id):
-    """Proxy the downstream job status so the browser can poll it.
+    Request JSON:
+        { "start_time": "00:01:30", "title": "<song title>" }
 
-    Response passthrough:
-        { "status": "pending" | "running", "job_id": "..." }
-        { "status": "done", "job_id", "title", "file": "<base64 mp3>" }
-        { "status": "error", "job_id", "error", "details" }
+    Response JSON (passthrough from the downstream service):
+        { "status": "success", "file": "<base64 mp3>", "title": "<song title>" }
+        { "status": "error", "error": "<message>" }
+    """
+    """Cut a previously downloaded track via the downstream render service.
+
+    Request JSON:
+        { "start_time": "00:01:30", "title": "<song title>" }
+
+    Response JSON (passthrough from the downstream service):
+        { "status": "success", "file": "<base64 mp3>", "title": "<song title>" }
+        { "status": "error", "error": "<message>" }
     """
     import requests
 
+    data = request.get_json(silent=True) or {}
+    start_time = (data.get('start_time') or '').strip()
+    title = (data.get('title') or '').strip()
+    if not title:
+        return jsonify({"status": "error", "error": "Missing 'title' in request body."}), 400
+
+    # Another service downloads music from YouTube and converts it to mp3.
     try:
-        response = requests.get(
-            _music_service_url(f"/api/music_download/{job_id}"),
-            timeout=10,
+        response = requests.post(
+            "http://yt-dlp-worker:8080/api/music_cut/",
+            json={"start_time": start_time, "title": title},
+            timeout=40,
         )
+
     except requests.RequestException as e:
         return jsonify({"status": "error",
                         "error": f"Music service unreachable: {e}"}), 502
@@ -238,7 +257,9 @@ def music_download_status(job_id):
         return jsonify({"status": "error",
                         "error": "Music service returned a non-JSON response."}), 502
 
+    # Pass the downstream payload/status straight through.
     return jsonify(payload), response.status_code
+
 
 
 if __name__ == "__main__":

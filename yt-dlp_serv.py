@@ -1,51 +1,33 @@
 import base64
 import os
 import re
+import shutil
 import subprocess
-import threading
+import tempfile
 import time
-import uuid
 
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# ---------------------------------------------------------------------------
-# In-memory job store.
-#
-# A job is a plain dict: {status, url, title, file, error, details, created, updated}
-#   status: "pending" -> "running" -> "done" | "error"
-# `file` holds the base64 mp3 only once status == "done".
-#
-# Access is guarded by a single lock; the store is pruned on every write so a
-# long-running server does not leak memory from finished jobs.
-# ---------------------------------------------------------------------------
-TASKS: dict[str, dict] = {}
-_TASKS_LOCK = threading.Lock()
+STORAGE_DIR = "/tmp/automap_storage"
+DOWNLOADS = os.path.join(STORAGE_DIR, "downloads")
+CUT_DIR = os.path.join(STORAGE_DIR, "cut")
 
-# How long (seconds) a finished job stays available before it is pruned.
-JOB_TTL = 5 * 60  # 10 minutes
+os.makedirs(STORAGE_DIR, exist_ok=True)
+os.makedirs(CUT_DIR, exist_ok=True)
 
-
-def _prune_locked(now: float) -> None:
-    """Drop finished jobs older than JOB_TTL. Caller must hold _TASKS_LOCK."""
-    expired = [
-        jid for jid, job in TASKS.items()
-        if job["status"] in ("done", "error") and now - job["updated"] > JOB_TTL
-    ]
-    for jid in expired:
-        TASKS.pop(jid, None)
-
-
-def _update_job(job_id: str, **fields) -> None:
-    """Thread-safe partial update of a job."""
-    with _TASKS_LOCK:
-        job = TASKS.get(job_id)
-        if job is None:
-            return
-        job.update(fields)
-        job["updated"] = time.time()
-
+def cleanup_old_files(max_age_seconds=1800):
+    """Delete old files"""
+    now = time.time()
+    for item in os.listdir(STORAGE_DIR):
+        item_path = os.path.join(STORAGE_DIR, item)
+        # Якщо файл/папка старіші за 30 хвилин — видаляємо
+        if now - os.path.getmtime(item_path) > max_age_seconds:
+            if os.path.isdir(item_path):
+                shutil.rmtree(item_path, ignore_errors=True)
+            else:
+                os.remove(item_path)
 
 def _get_song_title(url: str) -> str | None:
     """Try to extract the song title from the given URL."""
@@ -69,91 +51,25 @@ def _get_song_title(url: str) -> str | None:
 
 @app.route('/api/music_download/', methods=['POST'])
 @app.route('/api/music_download', methods=['POST'])
-def job_id_send():
-    """Create a download job and return immediately with its job_id."""
-    request_data = request.get_json(silent=True) or {}
-    url = request_data.get('url')
+def music_download():
+    """Download a video's audio, convert it to mp3, and return it as base64.
 
-    if not url or not isinstance(url, str):
+    Request JSON:
+        { "url": "https://music.youtube.com/watch?v=..." }
+
+    Response JSON (success):
+        { "status": "success", "file": "<base64 mp3>", "title": "<song title>" }
+
+    Response JSON (error):
+        { "status": "error", "error": "<message>" }
+    """
+    data = request.get_json(silent=True) or {}
+    url = (data.get('url') or '').strip()
+    if not url:
         return jsonify({"status": "error", "error": "Missing 'url' in request body."}), 400
-
-    job_id = str(uuid.uuid4())
-
-    now = time.time()
-    with _TASKS_LOCK:
-        _prune_locked(now)
-        TASKS[job_id] = {
-            "status": "pending",
-            "url": url,
-            "title": None,
-            "file": None,
-            "error": None,
-            "details": None,
-            "created": now,
-            "updated": now,
-        }
-
-    # Background worker: actually download/convert the audio.
-    thread = threading.Thread(
-        target=music_download, args=(url, job_id), daemon=True
-    )
-    thread.start()
-
-    return jsonify({
-        "status": "success",
-        "job_id": job_id,
-    }), 200
-
-
-@app.route('/api/music_download/<job_id>', methods=['GET'])
-def job_status(job_id: str):
-    """Return the current state of a download job.
-
-    pending/running -> { "status": "pending" | "running", "job_id": "..." }
-    done            -> { "status": "done", "job_id", "title", "file": "<base64 mp3>" }
-    error           -> { "status": "error", "job_id", "error", "details" }
-
-    404 if the job_id is unknown (never existed or already pruned).
-    """
-    with _TASKS_LOCK:
-        job = TASKS.get(job_id)
-        if job is None:
-            return jsonify({"status": "error", "error": "Unknown job_id."}), 404
-        # Copy out under the lock so the worker thread can't mutate mid-serialise.
-        snapshot = dict(job)
-
-    status = snapshot["status"]
-    if status in ("pending", "running"):
-        return jsonify({"status": status, "job_id": job_id}), 200
-
-    if status == "done":
-        return jsonify({
-            "status": "done",
-            "job_id": job_id,
-            "title": snapshot["title"] or "music_automap",
-            "file": snapshot["file"],
-        }), 200
-
-    # status == "error"
-    return jsonify({
-        "status": "error",
-        "job_id": job_id,
-        "error": snapshot["error"] or "Download failed.",
-        "details": snapshot.get("details") or "",
-    }), 200
-
-
-def music_download(url: str, job_id: str) -> None:
-    """Worker: download + convert to mp3 and store the result in TASKS.
-
-    Runs in a background thread, so it must NEVER touch Flask's request/response
-    objects (no jsonify/return). It only mutates the shared TASKS store.
-    """
-    _update_job(job_id, status="running")
 
     # yt-dlp with `-x` writes to a temp file, so pipe through the temp dir and
     # read the produced .mp3 back. `-o -` is unreliable when extracting audio.
-    tmp_dir = os.path.join(os.environ.get("TMPDIR", "/tmp"), f"automap_{job_id}")
 
     command = [
         "yt-dlp",
@@ -161,20 +77,16 @@ def music_download(url: str, job_id: str) -> None:
         "-x",
         "--audio-format", "mp3",
         "--audio-quality", "0",
-        "-o", os.path.join(tmp_dir, "%(title)s.%(ext)s"),
+        "-o", os.path.join(DOWNLOADS, "%(title)s.%(ext)s"),
         url,
     ]
 
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            check=True,
-        )
+        subprocess.run(command, capture_output=True, check=True)
 
-        # Find the produced mp3 inside the job temp dir.
+        # Find the produced mp3 inside the temp dir.
         mp3_path = None
-        for root, _dirs, files in os.walk(tmp_dir):
+        for root, _dirs, files in os.walk(DOWNLOADS):
             for name in files:
                 if name.lower().endswith(".mp3"):
                     mp3_path = os.path.join(root, name)
@@ -183,45 +95,97 @@ def music_download(url: str, job_id: str) -> None:
                 break
 
         if not mp3_path:
-            _update_job(job_id, status="error",
-                        error="yt-dlp finished but no MP3 was produced.",
-                        details=result.stdout.decode("utf-8", errors="ignore")[-2000:])
-            return
+            return jsonify({"status": "error",
+                            "error": "yt-dlp ERROR: No mp3 file produced."}), 500
+
+        import uuid
+        title = _get_song_title(url) or str(uuid.uuid4())
+        title = re.sub(r'[^\w\-]', '_', title)
 
         with open(mp3_path, "rb") as fh:
             base64_audio = base64.b64encode(fh.read()).decode("utf-8")
+            new_mp3_path = os.path.join(DOWNLOADS, f"{title}.mp3")
+            os.rename(mp3_path, new_mp3_path)
 
-        _update_job(
-            job_id,
-            status="done",
-            file=base64_audio,
-            title=_get_song_title(url) or "music_automap",
-        )
+        return jsonify({
+            "status": "success",
+            "file": base64_audio,
+            "title": title,
+        }), 200
 
     except subprocess.CalledProcessError as e:
         error_message = e.stderr.decode("utf-8", errors="ignore").strip()
-        _update_job(
-            job_id,
-            status="error",
-            error="yt-dlp ERROR: Failed to download or convert the audio.",
-            details=error_message,
-        )
+        return jsonify({"status": "error",
+                        "error": f"yt-dlp ERROR: {error_message}"}), 500
 
     except FileNotFoundError:
-        _update_job(
-            job_id,
-            status="error",
-            error="yt-dlp or ffmpeg not installed / not on PATH.",
+        return jsonify({"status": "error",
+                        "error": "yt-dlp not found. Please ensure yt-dlp is installed."}), 500
+
+    except Exception as e:  # noqa: BLE001 - surface any failure to the client
+        return jsonify({"status": "error", "error": f"Unexpected error: {str(e)}"}), 500
+        
+
+@app.route('/api/music_cut/', methods=['POST'])
+@app.route('/api/music_cut', methods=['POST'])
+def cut_audio():
+    data = request.get_json(silent=True)
+
+    """Cut a stored mp3 into a short clip and return it as base64.
+
+    Reads a previously downloaded track from ``DOWNLOADS`` (by title), slices
+    it starting at ``start_time``, and writes the clip to ``CUT_DIR``.
+
+    Request JSON:
+        { "start_time": "MM:SS", "title": "<song title>" }
+
+    Response JSON (success):
+        { "status": "successfull", "file": "<base64 mp3 clip>" }
+
+    Response JSON (error):
+        { "status": "error", "error": "<message>" }
+    """
+    try:
+        time = data['start_time']
+        filename = data['title']
+
+        #Parsing time
+        minutes, seconds = time.split(":")
+        minutes, seconds = int(minutes), int(seconds)
+
+        #Converting to ms
+        start_ms = (minutes * 60 + seconds) * 1000
+
+        #Audio must be only 8 second long
+        end_ms = (minutes * 60 + seconds) * 1000 + 8000 
+
+        from pydub import AudioSegment
+
+        audio = AudioSegment.from_file(os.path.join(DOWNLOADS, f"{filename}.mp3"))
+
+        cut = audio[start_ms:end_ms]
+
+        cut.export(
+            f"{CUT_DIR}/{filename}_cut.mp3",
+            format="mp3",
+            bitrate="192k",
         )
 
-    except Exception as e:  # noqa: BLE001 - surface any failure to the poller
-        _update_job(job_id, status="error", error=str(e))
+        #Encoding in base64
+        with open(f"{CUT_DIR}/{filename}_cut.mp3", 'rb') as file:
+            cut_base64 = base64.b64encode(file.read()).decode('utf-8')
 
-    finally:
-        # Clean up the temp directory regardless of outcome.
-        import shutil
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+        return jsonify({
+            "status": "successfull",
+            "file": cut_base64
+        }), 200
+    
+    except Exception as e:
 
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
 
 if __name__ == "__main__":
 

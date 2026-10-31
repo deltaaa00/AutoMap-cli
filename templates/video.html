@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Studio - AutoMap-CLI</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            900: '#0f172a',
+                            950: '#080d1a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(71, 85, 105, 0.8);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.8);
+        }
+
+        /* Grid Pattern for Studio Canvas */
+        .canvas-grid {
+            background-size: 24px 24px;
+            background-image:
+                linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white overflow-x-hidden">
+
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-slate-800/80 bg-slate-900/75 backdrop-blur-md sticky top-0 z-30">
+        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+            <!-- Brand -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+                    <i class="fa-solid fa-earth-europe text-white text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-bold text-lg tracking-tight text-white">Video Studio</h1>
+                        <span class="text-[11px] font-mono uppercase px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/30 font-semibold">Flask UI</span>
+                    </div>
+                    <p class="text-xs text-slate-400 hidden sm:block">Download music tracks for your videos</p>
+                </div>
+            </div>
+
+            <!-- Back to main page -->
+            <div class="flex items-center gap-3">
+                <a href="/" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>Back to Map Studio</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Layout -->
+    <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- LEFT COLUMN: MUSIC DOWNLOAD CONFIGURATION -->
+        <section class="lg:col-span-5 xl:col-span-4 flex flex-col gap-5">
+
+            <!-- Music Downloader Card -->
+            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl p-5 shadow-xl">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-brands fa-youtube text-rose-500"></i>
+                        <h2 class="font-semibold text-base text-white">Music Downloader</h2>
+                    </div>
+                    <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">/api/music_download</code>
+                </div>
+
+                <form id="musicForm" onsubmit="handleMusicDownload(event)" class="space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label for="musicUrlInput" class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                                <i class="fa-solid fa-link text-rose-400"></i>
+                                YouTube Music Link
+                            </label>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="url" id="musicUrlInput" placeholder="https://music.youtube.com/watch?v=..." required
+                                autocomplete="off" spellcheck="false"
+                                class="flex-1 px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition">
+                            <button type="button" onclick="pasteMusicUrl()" class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium transition shrink-0" title="Paste from clipboard">
+                                <i class="fa-regular fa-paste"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="musicBtn" class="w-full py-3 px-5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold text-sm shadow-lg shadow-rose-600/25 hover:shadow-rose-600/40 transition-all flex items-center justify-center gap-2.5 group">
+                        <i id="musicBtnIcon" class="fa-solid fa-download transition-transform group-hover:translate-y-0.5"></i>
+                        <span id="musicBtnText">Download MP3</span>
+                    </button>
+                </form>
+
+                <!-- Download status / result -->
+                <div id="musicResult" class="hidden mt-4 p-3 rounded-xl bg-slate-950 border border-slate-800">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <i class="fa-solid fa-file-audio text-rose-400"></i>
+                            <span id="musicResultText" class="text-xs font-mono text-slate-300 truncate">Ready</span>
+                        </div>
+                        <button onclick="downloadMusicFile()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium transition flex items-center gap-1.5 shrink-0">
+                            <i class="fa-solid fa-download"></i>
+                            <span>Save</span>
+                        </button>
+                    </div>
+                    <audio id="musicPreview" class="hidden mt-3 w-full" controls></audio>
+                </div>
+            </div>
+
+            <!-- Music Cut Card -->
+            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl p-5 shadow-xl">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-scissors text-amber-400"></i>
+                        <h2 class="font-semibold text-base text-white">Music Cut</h2>
+                    </div>
+                    <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">/api/music_cut</code>
+                </div>
+
+                <form id="cutForm" onsubmit="handleMusicCut(event)" class="space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label for="cutStartInput" class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                                <i class="fa-solid fa-clock text-amber-400"></i>
+                                Start Time
+                            </label>
+                            <span class="text-[11px] font-mono text-slate-500">MM:SS</span>
+                        </div>
+                        <input type="text" id="cutStartInput" placeholder="01:30" required
+                            inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="5"
+                            oninput="onCutStartInput(this)"
+                            class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition">
+                        <!-- Live cut range preview -->
+                        <p class="text-[11px] text-slate-500 mt-1.5 font-mono">
+                            Cut segment: <span id="cutRangeStart" class="text-amber-400">--:--</span>
+                            <span class="text-slate-600">&rarr;</span>
+                            <span id="cutRangeEnd" class="text-amber-400">--:--</span>
+                            <span class="text-slate-600">(8 s)</span>
+                        </p>
+                        <!-- Shows which track title will be sent with the cut request -->
+                        <p id="cutTitleHint" class="hidden text-[11px] text-amber-400/80 mt-1 font-mono truncate"></p>
+                    </div>
+
+                    <button type="submit" id="cutBtn" class="w-full py-3 px-5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-semibold text-sm shadow-lg shadow-amber-600/25 hover:shadow-amber-600/40 transition-all flex items-center justify-center gap-2.5 group">
+                        <i id="cutBtnIcon" class="fa-solid fa-scissors transition-transform group-hover:rotate-12"></i>
+                        <span id="cutBtnText">Cut 8 Seconds</span>
+                    </button>
+                </form>
+
+                <!-- Cut result -->
+                <div id="cutResult" class="hidden mt-4 p-3 rounded-xl bg-slate-950 border border-slate-800">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <i class="fa-solid fa-file-audio text-amber-400"></i>
+                            <span id="cutResultText" class="text-xs font-mono text-slate-300 truncate">Ready</span>
+                        </div>
+                        <button onclick="downloadCutFile()" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium transition flex items-center gap-1.5 shrink-0">
+                            <i class="fa-solid fa-download"></i>
+                            <span>Save</span>
+                        </button>
+                    </div>
+                    <audio id="cutPreview" class="hidden mt-3 w-full" controls></audio>
+                </div>
+            </div>
+
+            <!-- Info Card -->
+            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl p-4 shadow-xl">
+                <div class="flex items-center gap-2 text-xs font-semibold text-slate-300 mb-2">
+                    <i class="fa-solid fa-circle-info text-emerald-400"></i>
+                    <span>How it works</span>
+                </div>
+                <p class="text-[11px] text-slate-500 leading-relaxed">
+                    Paste a YouTube Music link and click <span class="text-slate-300">Download MP3</span> to fetch the
+                    track. The nearest <span class="text-slate-300">Save</span> stores it locally as an MP3.
+                    Use <span class="text-amber-400">Music Cut</span> to grab an 8-second segment starting at your
+                    chosen time — the saved track title is sent along with the cut request.
+                </p>
+            </div>
+
+        </section>
+
+        <!-- RIGHT COLUMN: WORKSPACE / STATUS -->
+        <section class="lg:col-span-7 xl:col-span-8 flex flex-col gap-5">
+
+            <!-- Workspace Card -->
+            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl shadow-xl flex flex-col flex-1 min-h-[480px] overflow-hidden">
+
+                <!-- Toolbar -->
+                <div class="px-5 py-3.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-900/90">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" id="statusIndicator"></span>
+                        <h2 class="font-semibold text-sm sm:text-base text-white">Music Workspace</h2>
+                        <span id="studioMetaBadge" class="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700">Ready</span>
+                    </div>
+                </div>
+
+                <!-- Viewport Area -->
+                <div id="studioViewport" class="relative flex-1 bg-slate-950 canvas-grid flex items-center justify-center overflow-hidden select-none p-4 sm:p-8">
+
+                    <!-- Loading Overlay -->
+                    <div id="loadingOverlay" class="hidden absolute inset-0 bg-slate-950/85 backdrop-blur-sm z-20 flex flex-col items-center justify-center gap-4">
+                        <div class="relative w-16 h-16 flex items-center justify-center">
+                            <div class="absolute inset-0 rounded-full border-4 border-rose-500/20"></div>
+                            <div class="absolute inset-0 rounded-full border-4 border-rose-500 border-t-transparent animate-spin"></div>
+                            <i class="fa-solid fa-music text-rose-400 text-xl animate-pulse"></i>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-sm font-semibold text-white">Downloading audio...</div>
+                            <div id="loadingStepText" class="text-xs text-slate-400 mt-1 font-mono">Fetching track and converting to MP3</div>
+                        </div>
+                    </div>
+
+                    <!-- Center: empty state / player -->
+                    <div class="w-full max-w-[720px] flex flex-col items-center justify-center gap-4">
+                        <div id="emptyState" class="w-full aspect-[8/5] rounded-xl border border-dashed border-slate-700 bg-slate-900/60 flex flex-col items-center justify-center gap-3 text-center px-6">
+                            <i class="fa-solid fa-music text-slate-600 text-4xl"></i>
+                            <p class="text-sm text-slate-400">Paste a link on the left and click <span class="text-rose-400 font-medium">Download MP3</span>.</p>
+                            <p class="text-xs text-slate-500">Your track will appear here for preview.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Studio Console Output -->
+            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl shadow-xl overflow-hidden">
+                <div class="px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <span class="text-xs font-semibold text-rose-400 border-b-2 border-rose-500 pb-2 -mb-2.5 flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-terminal"></i>
+                            <span>Studio Output</span>
+                        </span>
+                    </div>
+                    <button onclick="clearConsole()" class="text-[11px] text-slate-500 hover:text-slate-300 transition">
+                        Clear
+                    </button>
+                </div>
+
+                <div id="consoleTabContent" class="p-4 bg-slate-950/90 font-mono text-xs h-40 overflow-y-auto space-y-1.5">
+                    <div class="text-slate-500">[System] Video Studio initialized and ready.</div>
+                    <div class="text-slate-400">[Info] Paste a YouTube Music link and click <span class="text-rose-400">Download MP3</span>.</div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-medium">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toastMsg">Operation successful</span>
+    </div>
+
+    <!-- Application JavaScript -->
+    <script>
+        // --- Music Downloader ---
+        let musicDataUrl = null;   // populated with data:audio/mpeg;base64,... from the API
+        let musicFileName = 'music_automap';  // filename stem taken from the API "title" field
+
+        // localStorage key holding the last downloaded track's title (cross-tab / reload persistence).
+        const MUSIC_TITLE_KEY = 'automap_music_title';
+
+        function saveMusicTitle(title) {
+            try {
+                if (title) localStorage.setItem(MUSIC_TITLE_KEY, title);
+                else localStorage.removeItem(MUSIC_TITLE_KEY);
+            } catch (e) {
+                // localStorage can be unavailable (private mode / quota) - fail silently.
+            }
+        }
+
+        function loadMusicTitle() {
+            try {
+                return localStorage.getItem(MUSIC_TITLE_KEY) || '';
+            } catch (e) {
+                return '';
+            }
+        }
+
+        // Reflect the currently-saved track title under the Music Cut input.
+        function updateCutTitleHint(title) {
+            const hint = document.getElementById('cutTitleHint');
+            if (!hint) return;
+            const t = (title || '').trim();
+            if (t) {
+                hint.textContent = `Using track title: ${t}`;
+                hint.classList.remove('hidden');
+            } else {
+                hint.textContent = '';
+                hint.classList.add('hidden');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            // Restore focus to the URL field for quick use.
+            document.getElementById('musicUrlInput').focus();
+
+            // If a previous session stored a title, surface it so the user knows cuts will use it.
+            const saved = loadMusicTitle();
+            const cutTitleHint = document.getElementById('cutTitleHint');
+            if (saved && cutTitleHint) {
+                cutTitleHint.textContent = `Using saved title: ${saved}`;
+                cutTitleHint.classList.remove('hidden');
+            }
+        });
+
+        // Make the API-provided title safe to use as a download filename.
+        function sanitizeFileName(name) {
+            if (!name || typeof name !== 'string') return '';
+            return name
+                .replace(/[/\\?%*:|"<>]/g, '_')  // characters illegal in filenames
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 120);
+        }
+
+        async function pasteMusicUrl() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    document.getElementById('musicUrlInput').value = text.trim();
+                    showToast("Link pasted from clipboard", "info");
+                }
+            } catch (err) {
+                logToConsole(`[Warning] Clipboard read failed (${err.message}). Paste manually.`, 'warn');
+            }
+        }
+
+        async function handleMusicDownload(e) {
+            e.preventDefault();
+            const url = document.getElementById('musicUrlInput').value.trim();
+            const btn = document.getElementById('musicBtn');
+            const btnText = document.getElementById('musicBtnText');
+            const btnIcon = document.getElementById('musicBtnIcon');
+            const overlay = document.getElementById('loadingOverlay');
+            const metaBadge = document.getElementById('studioMetaBadge');
+
+            if (!url) {
+                showToast("Please paste a YouTube Music link first.", "warn");
+                return;
+            }
+
+            musicDataUrl = null;
+            musicFileName = 'music_automap';
+            btn.disabled = true;
+            btn.classList.add('opacity-70');
+            btnText.textContent = "Downloading...";
+            btnIcon.className = "fa-solid fa-circle-notch animate-spin";
+            overlay.classList.remove('hidden');
+            metaBadge.textContent = "Downloading...";
+
+            logToConsole(`[Music] POST /api/music_download ${url}`, 'cmd');
+
+            try {
+                // Single request: backend downloads + converts and returns the audio directly.
+                const response = await fetch('/api/music_download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+
+                let result;
+                try {
+                    result = await response.json();
+                } catch {
+                    throw new Error(`Server returned ${response.status} ${response.statusText}`);
+                }
+
+                if (!response.ok || result.status === 'error') {
+                    throw new Error(result.error || 'Music download failed');
+                }
+
+                // Backend returns base64 audio (raw base64 or a data: URL).
+                const raw = result.file || result.audio || result.data;
+                if (!raw) throw new Error('Server did not return audio.');
+                const base64 = raw.startsWith('data:') ? raw.split(',')[1] : raw;
+                musicDataUrl = `data:audio/mpeg;base64,${base64}`;
+                musicFileName = sanitizeFileName(result.title) || 'music_automap';
+
+                // Persist the track title so the Music Cut request can send it later.
+                const trackTitle = (result.title || '').trim();
+                saveMusicTitle(trackTitle);
+                updateCutTitleHint(trackTitle);
+
+                logToConsole(`[Success] Music file received "${musicFileName}.mp3" (${describeDataUrl(musicDataUrl)})`, 'success');
+
+                const resultBox = document.getElementById('musicResult');
+                const resultText = document.getElementById('musicResultText');
+                const preview = document.getElementById('musicPreview');
+
+                resultText.textContent = result.title
+                    ? `${result.title} — ${describeDataUrl(musicDataUrl)}`
+                    : describeDataUrl(musicDataUrl);
+                preview.src = musicDataUrl;
+                preview.classList.remove('hidden');
+                resultBox.classList.remove('hidden');
+
+                metaBadge.textContent = `Done (${new Date().toLocaleTimeString()})`;
+                showToast("Music downloaded! Click Save to store the MP3.", "success");
+            } catch (error) {
+                logToConsole(`[API Error] ${error.message}`, 'error');
+                showToast("Music download failed. Check console logs.", "error");
+                metaBadge.textContent = "Error";
+            } finally {
+                overlay.classList.add('hidden');
+                btn.disabled = false;
+                btn.classList.remove('opacity-70');
+                btnText.textContent = "Download MP3";
+                btnIcon.className = "fa-solid fa-download";
+            }
+        }
+
+        function downloadMusicFile() {
+            if (!musicDataUrl) {
+                showToast("Download a track first.", "warn");
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = musicDataUrl;
+            a.download = `${musicFileName || 'music_automap'}.mp3`;
+            a.click();
+            showToast("Saving MP3 file...", "success");
+        }
+
+        // --- Music Cut ---
+        const CUT_SECONDS = 8;  // segment length: start -> start + 8s
+        let cutDataUrl = null;
+        let cutFileName = 'music_cut';
+
+        // Parse "MM:SS" (or a bare number of seconds) into total seconds. Returns null if invalid.
+        function parseTimeToSeconds(value) {
+            if (!value) return null;
+            const trimmed = value.trim();
+            const m = /^(\d{1,3}):([0-5]?\d)$/.exec(trimmed);
+            if (m) {
+                return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+            }
+            // Bare seconds, e.g. "90"
+            if (/^\d{1,5}$/.test(trimmed)) {
+                return parseInt(trimmed, 10);
+            }
+            return null;
+        }
+
+        // Format total seconds as "MM:SS".
+        function formatSecondsToTime(totalSeconds) {
+            const s = Math.max(0, Math.floor(totalSeconds));
+            const mm = String(Math.floor(s / 60)).padStart(2, '0');
+            const ss = String(s % 60).padStart(2, '0');
+            return `${mm}:${ss}`;
+        }
+
+        // Lightweight input mask: keep digits and a single colon, auto-insert colon.
+        function onCutStartInput(input) {
+            let v = input.value.replace(/[^\d:]/g, '');
+            const firstColon = v.indexOf(':');
+            if (firstColon !== -1) {
+                v = v.slice(0, firstColon + 1) + v.slice(firstColon + 1).replace(/:/g, '');
+            }
+            // "130" -> "01:30" convenience when the user types 3+ digits with no colon.
+            if (firstColon === -1 && v.length >= 3) {
+                v = v.slice(0, 2) + ':' + v.slice(2, 4);
+            }
+            input.value = v.slice(0, 5);
+            updateCutRangePreview();
+        }
+
+        function updateCutRangePreview() {
+            const startEl = document.getElementById('cutRangeStart');
+            const endEl = document.getElementById('cutRangeEnd');
+            const secs = parseTimeToSeconds(document.getElementById('cutStartInput').value);
+            if (secs === null) {
+                startEl.textContent = '--:--';
+                endEl.textContent = '--:--';
+                return;
+            }
+            startEl.textContent = formatSecondsToTime(secs);
+            endEl.textContent = formatSecondsToTime(secs + CUT_SECONDS);
+        }
+
+        async function handleMusicCut(e) {
+            e.preventDefault();
+            const startInput = document.getElementById('cutStartInput');
+            const startTime = startInput.value.trim();
+            const btn = document.getElementById('cutBtn');
+            const btnText = document.getElementById('cutBtnText');
+            const btnIcon = document.getElementById('cutBtnIcon');
+            const metaBadge = document.getElementById('studioMetaBadge');
+
+            const startSecs = parseTimeToSeconds(startTime);
+            if (startSecs === null) {
+                showToast("Enter start time as MM:SS (e.g. 01:30).", "warn");
+                startInput.focus();
+                return;
+            }
+
+            cutDataUrl = null;
+            cutFileName = 'music_cut';
+            btn.disabled = true;
+            btn.classList.add('opacity-70');
+            btnText.textContent = "Cutting...";
+            btnIcon.className = "fa-solid fa-circle-notch animate-spin";
+            metaBadge.textContent = "Cutting...";
+
+            const endLabel = formatSecondsToTime(startSecs + CUT_SECONDS);
+            const trackTitle = loadMusicTitle();
+            logToConsole(`[Cut] POST /api/music_cut start=${startTime} (${formatSecondsToTime(startSecs)} -> ${endLabel})${trackTitle ? ` title="${trackTitle}"` : ''}`, 'cmd');
+
+            try {
+                // Send the start time and (if previously downloaded) the track title.
+                const payload = { start_time: startTime };
+                if (trackTitle) payload.title = trackTitle;
+
+                const response = await fetch('/api/music_cut', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                let result;
+                try {
+                    result = await response.json();
+                } catch {
+                    throw new Error(`Server returned ${response.status} ${response.statusText}`);
+                }
+
+                if (!response.ok || result.status === 'error') {
+                    throw new Error(result.error || 'Music cut failed');
+                }
+
+                // Backend returns base64 audio (raw base64 or a data: URL).
+                const raw = result.file || result.audio || result.data;
+                if (!raw) throw new Error('Server did not return cut audio.');
+                const base64 = raw.startsWith('data:') ? raw.split(',')[1] : raw;
+                cutDataUrl = `data:audio/mpeg;base64,${base64}`;
+
+                // Filename hint: prefer the server's title, else the saved track title.
+                const titleHint = sanitizeFileName(result.title || trackTitle || '');
+                const stamp = formatSecondsToTime(startSecs).replace(':', '-');
+                cutFileName = titleHint ? `${titleHint}_${stamp}` : `music_cut_${stamp}`;
+
+                logToConsole(`[Success] Cut segment ${formatSecondsToTime(startSecs)} -> ${endLabel} (${describeDataUrl(cutDataUrl)})`, 'success');
+
+                const resultBox = document.getElementById('cutResult');
+                const resultText = document.getElementById('cutResultText');
+                const preview = document.getElementById('cutPreview');
+
+                resultText.textContent = `${formatSecondsToTime(startSecs)} -> ${endLabel} — ${describeDataUrl(cutDataUrl)}`;
+                preview.src = cutDataUrl;
+                preview.classList.remove('hidden');
+                resultBox.classList.remove('hidden');
+
+                metaBadge.textContent = `Cut done (${new Date().toLocaleTimeString()})`;
+                showToast("Segment cut! Click Save to store the MP3.", "success");
+            } catch (error) {
+                logToConsole(`[API Error] ${error.message}`, 'error');
+                showToast("Music cut failed. Check console logs.", "error");
+                metaBadge.textContent = "Error";
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-70');
+                btnText.textContent = "Cut 8 Seconds";
+                btnIcon.className = "fa-solid fa-scissors";
+            }
+        }
+
+        function downloadCutFile() {
+            if (!cutDataUrl) {
+                showToast("Cut a segment first.", "warn");
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = cutDataUrl;
+            a.download = `${cutFileName || 'music_cut'}.mp3`;
+            a.click();
+            showToast("Saving cut MP3...", "success");
+        }
+
+        // --- Console Management ---
+        // Short, human-readable description of a (possibly huge) data URL,
+        // so we never dump the full base64 payload into the console.
+        function describeDataUrl(url) {
+            if (!url) return 'no audio';
+            const m = /^data:([^;]+);base64,(.*)$/.exec(url);
+            if (!m) return url.length > 60 ? url.slice(0, 60) + '…' : url;
+            const mime = m[1];
+            const bytes = Math.floor(m[2].length * 0.75);
+            const kb = (bytes / 1024).toFixed(1);
+            return `${mime}, ${kb} kB`;
+        }
+
+        function logToConsole(text, type = 'info') {
+            const box = document.getElementById('consoleTabContent');
+            const line = document.createElement('div');
+            const time = new Date().toLocaleTimeString();
+
+            const colorMap = {
+                cmd: 'text-emerald-400 font-semibold',
+                info: 'text-slate-300',
+                success: 'text-indigo-400 font-medium',
+                warn: 'text-amber-400',
+                error: 'text-rose-400 font-semibold'
+            };
+
+            line.className = `${colorMap[type] || 'text-slate-300'} break-all`;
+            line.textContent = `[${time}] ${text}`;
+            box.appendChild(line);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('consoleTabContent').innerHTML = '<div class="text-slate-500">[System] Console cleared.</div>';
+        }
+
+        // --- Toast ---
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const msg = document.getElementById('toastMsg');
+
+            msg.textContent = message;
+            if (type === 'success') icon.className = "fa-solid fa-circle-check text-emerald-400 text-base";
+            else if (type === 'warn') icon.className = "fa-solid fa-triangle-exclamation text-amber-400 text-base";
+            else if (type === 'error') icon.className = "fa-solid fa-circle-xmark text-rose-400 text-base";
+            else icon.className = "fa-solid fa-circle-info text-indigo-400 text-base";
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            clearTimeout(window.toastTimeout);
+            window.toastTimeout = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
