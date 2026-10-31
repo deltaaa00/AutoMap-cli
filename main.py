@@ -172,7 +172,7 @@ def _music_service_url(path: str) -> str:
     Uses ``RENDER_SERVICE_URL`` when set, otherwise the local yt-dlp service.
     """
     render_url = os.environ.get("RENDER_URL", "").rstrip("/")
-    base = render_url or "http://localhost:8080"
+    base = render_url or "http://:8080"
     return f"{base}{path}"
 
 
