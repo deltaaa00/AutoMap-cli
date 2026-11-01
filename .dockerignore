@@ -29,7 +29,6 @@ resources/fonts/*
 !resources/fonts/DIN Condensed.ttf
 !resources/fonts/kodchasan.ttf
 
-map/filling.json
 .pytest_cache/
 
 result.png

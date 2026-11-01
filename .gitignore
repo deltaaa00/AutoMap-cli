@@ -34,3 +34,5 @@ map/filling.json
 
 result.png
 !example.env
+
+.ruff_cache/

@@ -64,6 +64,12 @@ def ai_request(prompt: str, mode: str, ai_model: str, api_key: str | None = None
     else:
         request = _ai_request(prompt, mode, ai_model, api_key)
 
+    # The AI request can fail and return None (the error is already logged).
+    # Guard against that to avoid "AttributeError: 'NoneType' object has no attribute 'strip'".
+    if not request:
+        _error("AI request failed", "empty response from the AI model")
+        return None
+
     try:
         json_style = request.strip().replace("```json", "").replace("```", "").strip()
         country_dict = json.loads(json_style)
@@ -81,6 +87,9 @@ def ai_request(prompt: str, mode: str, ai_model: str, api_key: str | None = None
             _error(f"Failed to convert into dictionary. Result {json_style}")
             print("Result:", json_style)
             return None
+    except (AttributeError, TypeError) as e:
+        _error("AI response parsing error", str(e))
+        return None
 
 
 
@@ -122,4 +131,6 @@ def load_filling():
     
 
     return filling_txt, filling_num
+
+
 

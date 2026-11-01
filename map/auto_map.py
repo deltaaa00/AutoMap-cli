@@ -51,6 +51,10 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
     filling_txt, filling_num = load_filling()  # Loading filling from JSON
 
+    # Case-insensitive lookups for text mode. Keys from the JSON are trimmed and
+    # lower-cased so that AI answers like "Yes", "yes" or " yes " all match.
+    filling_txt_ci = {str(k).strip().lower(): v for k, v in filling_txt.items()}
+
     # Most least and short form conflict solution
     # @TODO Make most/least and short form compatible
 
@@ -135,31 +139,47 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         '''Number mode'''
         if mode == 'number':
             try:
-                color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
                 info = ai_answer[name]
-                for (low_lim, high_lim), color_tup in filling_num.items():
-                    info = int(info)
-                    if low_lim <= info <= high_lim:
-                        color = color_tup
-                        break
+                color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
+                try:
+                    num_value = int(info)
+                except (ValueError, TypeError):
+                    log.warning(f"Non-numeric value for {name}: {info!r}; using random color")
+                    num_value = None
+
+                if num_value is not None:
+                    # Pick the colour of the first matching range. Ranges are
+                    # treated as (low < value <= high) per the docs.
+                    for (low_lim, high_lim), color_tup in filling_num.items():
+                        if low_lim < num_value <= high_lim:
+                            color = color_tup
+                            break
             except KeyError as e:
+                info = ""
                 log.warning(f"No data / color for {e}; using random color")
                 color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
                 random_colors[name] = color
 
         elif mode == 'text':
             '''Text mode'''
+            info = str(ai_answer.get(name, "")).strip()
+            if not info:
+                log.info(f"No information for {name}, skipping")
+                continue
             try:
-                info = str(ai_answer[name])
-                color = filling_txt[info]
-            except Exception as e:
+                # Match filling colours case-insensitively and ignoring whitespace,
+                # so "Yes", "yes" and " yes " all find the same colour.
+                color = filling_txt_ci[info.lower()]
+            except KeyError:
                 if map_type == 'default' or map_type == 'world':
-                    log.info(f"No filling color for '{info}' ({e}); using random")
+                    log.info(f"No filling color for '{info}'; using random")
                     try:
                         color = random_colors[info]
                     except KeyError:
                         color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
                         random_colors[info] = color
+                else:
+                    color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
         else:
             showerror("Error", f"Unknown mode: {mode}")
             return
@@ -180,11 +200,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
         x, y = points[0]
 
-        try:
-            info = str(info)
-        except UnboundLocalError:
-            log.info(f"No information for {name}, skipping label")
-            continue
+        info = str(info)
 
         if map_type == 'flag' or map_type == 'default':
             if len(info) >= 2:
