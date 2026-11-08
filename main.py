@@ -48,7 +48,9 @@ from flask import Flask, request, jsonify, send_file, render_template
 FONTS_DIR = BASE_DIR / "resources" / "fonts"
 
 env = BASE_DIR / ".env"
-key = (dotenv_values(env).get("GEMINI_API_KEY") or "").strip() if env.is_file() else ""
+key = (os.environ.get("GEMINI_API_KEY") or "").strip()
+if not key and env.is_file():
+    key = (dotenv_values(env).get("GEMINI_API_KEY") or "").strip()
 needs_api_key = not key or key.startswith("your_")
 
 

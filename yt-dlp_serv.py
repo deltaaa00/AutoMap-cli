@@ -17,6 +17,7 @@ CUT_DIR = os.path.join(STORAGE_DIR, "cut")
 RENDER_DIR = os.path.join(STORAGE_DIR, "render")
 
 os.makedirs(STORAGE_DIR, exist_ok=True)
+os.makedirs(DOWNLOADS, exist_ok=True)
 os.makedirs(CUT_DIR, exist_ok=True)
 os.makedirs(RENDER_DIR, exist_ok=True)
 
@@ -32,14 +33,14 @@ ALLOWED_CODECS = ("libx264", "h264_nvenc", "h264_videotoolbox")
 def cleanup_old_files(max_age_seconds=1800):
     """Delete old files"""
     now = time.time()
-    for item in os.listdir(STORAGE_DIR):
-        item_path = os.path.join(STORAGE_DIR, item)
-        
-        if now - os.path.getmtime(item_path) > max_age_seconds:
-            if os.path.isdir(item_path):
-                shutil.rmtree(item_path, ignore_errors=True)
-            else:
-                os.remove(item_path)
+    for root, _dirs, files in os.walk(STORAGE_DIR):
+        for name in files:
+            item_path = os.path.join(root, name)
+            try:
+                if now - os.path.getmtime(item_path) > max_age_seconds:
+                    os.remove(item_path)
+            except FileNotFoundError:
+                pass  # Another request may have removed or renamed the file.
 
 def _get_song_title(url: str) -> str | None:
     """Try to extract the song title from the given URL."""
@@ -84,13 +85,15 @@ def music_download():
     # yt-dlp with `-x` writes to a temp file, so pipe through the temp dir and
     # read the produced .mp3 back. `-o -` is unreliable when extracting audio.
 
+    download_dir = tempfile.mkdtemp(prefix="automap_download_")
     command = [
         "yt-dlp",
         "-f", "ba[ext=m4a]/ba",
         "-x",
         "--audio-format", "mp3",
         "--audio-quality", "0",
-        "-o", os.path.join(DOWNLOADS, "%(title)s.%(ext)s"),
+        "--no-playlist",
+        "-o", os.path.join(download_dir, "track.%(ext)s"),
         url,
     ]
 
@@ -99,7 +102,7 @@ def music_download():
 
         # Find the produced mp3 inside the temp dir.
         mp3_path = None
-        for root, _dirs, files in os.walk(DOWNLOADS):
+        for root, _dirs, files in os.walk(download_dir):
             for name in files:
                 if name.lower().endswith(".mp3"):
                     mp3_path = os.path.join(root, name)
@@ -137,6 +140,8 @@ def music_download():
 
     except Exception as e:  # noqa: BLE001 - surface any failure to the client
         return jsonify({"status": "error", "error": f"Unexpected error: {str(e)}"}), 500
+    finally:
+        shutil.rmtree(download_dir, ignore_errors=True)
         
 
 @app.route('/api/music_cut/', methods=['POST'])
@@ -161,6 +166,10 @@ def cut_audio():
     try:
         time = data['start_time']
         filename = data['title']
+        if not isinstance(filename, str) or not re.fullmatch(r'[\w\-]+', filename):
+            return jsonify({"status": "error", "error": "Invalid track title."}), 400
+
+        os.makedirs(CUT_DIR, exist_ok=True)
 
         #Parsing time
         minutes, seconds = time.split(":")
