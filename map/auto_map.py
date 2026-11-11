@@ -14,6 +14,7 @@
 
 import random
 import io
+import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -21,6 +22,23 @@ from PIL import Image, ImageDraw, ImageFont
 from .constants import europe_coords, world_coords
 from .functions import ai_request, load_filling, _warning as showwarning, _error as showerror
 from . import log
+
+
+def _numeric_extrema(values):
+    """Return region names for finite numeric extrema, or None if absent."""
+    numeric = {}
+    for name, value in values.items():
+        if isinstance(value, bool):
+            continue
+        try:
+            number = float(value)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if math.isfinite(number):
+            numeric[name] = number
+    if not numeric:
+        return None
+    return max(numeric, key=numeric.get), min(numeric, key=numeric.get)
 
 
 def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
@@ -116,13 +134,15 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
     log.success(f"Got information from AI ({len(ai_answer)} entries)")
 
     most_least = None
-    if optional_feature == "show_most_least":
+    extrema = _numeric_extrema(ai_answer) if optional_feature == "show_most_least" else None
+    if optional_feature == "show_most_least" and extrema is None:
+        log.warning("No numeric values available; skipping most / least overlay")
+    if extrema is not None:
         log.step("Computing most / least values")
         most_least = Image.new("RGBA", img.size, (255, 255, 255, 0))
         ml_draw = ImageDraw.Draw(most_least)
         '''Writing the most and the least country'''
-        most_country = max(ai_answer, key=ai_answer.get)
-        least_country = min(ai_answer, key=ai_answer.get)
+        most_country, least_country = extrema
         log.info(f"Most: {most_country} | Least: {least_country}")
 
         ml_draw.text((106, 1240),
