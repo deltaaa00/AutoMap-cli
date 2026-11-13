@@ -146,16 +146,15 @@ def music_download():
 
 @app.route('/api/music_cut/', methods=['POST'])
 @app.route('/api/music_cut', methods=['POST'])
-def cut_audio():
-    data = request.get_json(silent=True)
-
+def cut_audio() -> tuple[object, int]:
     """Cut a stored mp3 into a short clip and return it as base64.
 
     Reads a previously downloaded track from ``DOWNLOADS`` (by title), slices
-    it starting at ``start_time``, and writes the clip to ``CUT_DIR``.
+    it starting at ``start_time`` for ``duration`` seconds (1..30, default 8),
+    and writes the clip to ``CUT_DIR``.
 
     Request JSON:
-        { "start_time": "MM:SS", "title": "<song title>" }
+        { "start_time": "MM:SS", "title": "<song title>", "duration": 8 }
 
     Response JSON (success):
         { "status": "successfull", "file": "<base64 mp3 clip>" }
@@ -163,23 +162,32 @@ def cut_audio():
     Response JSON (error):
         { "status": "error", "error": "<message>" }
     """
+    data: dict[str, object] = request.get_json(silent=True) or {}
+
     try:
-        time = data['start_time']
+        time = str(data['start_time'])
         filename = data['title']
         if not isinstance(filename, str) or not re.fullmatch(r'[\w\-]+', filename):
             return jsonify({"status": "error", "error": "Invalid track title."}), 400
 
+        raw_duration = data.get('duration', 8)
+        try:
+            duration = int(raw_duration) if raw_duration is not None else 8
+        except (TypeError, ValueError):
+            duration = 8
+        duration = max(1, min(30, duration))
+
         os.makedirs(CUT_DIR, exist_ok=True)
 
-        #Parsing time
+        # Parsing time
         minutes, seconds = time.split(":")
         minutes, seconds = int(minutes), int(seconds)
 
-        #Converting to ms
+        # Converting to ms
         start_ms = (minutes * 60 + seconds) * 1000
 
-        #Audio must be only 8 second long
-        end_ms = (minutes * 60 + seconds) * 1000 + 8000 
+        # Audio clip duration (1..30 seconds, default 8 seconds)
+        end_ms = start_ms + (duration * 1000)
 
         from pydub import AudioSegment
 
@@ -193,7 +201,7 @@ def cut_audio():
             bitrate="192k",
         )
 
-        #Encoding in base64
+        # Encoding in base64
         with open(f"{CUT_DIR}/{filename}_cut.mp3", 'rb') as file:
             cut_base64 = base64.b64encode(file.read()).decode('utf-8')
 
@@ -201,9 +209,8 @@ def cut_audio():
             "status": "successfull",
             "file": cut_base64
         }), 200
-    
-    except Exception as e:
 
+    except Exception as e:
         return jsonify({
             "status": "error",
             "error": str(e)
@@ -270,13 +277,14 @@ def _build_title_clip(title: str, duration: float, max_width: int):
 
 @app.route('/api/render_video', methods=['POST'])
 @app.route('/api/render_video/', methods=['POST'])
-def make_video():
-    data = request.get_json(silent=True) or {}
+def make_video() -> tuple[object, int]:
+    data: dict[str, object] = request.get_json(silent=True) or {}
 
-    map_b64 = data.get('map_file') or ''
-    background_b64 = data.get('background_video') or ''
-    title = (data.get('video_title') or data.get('title') or '').strip()
-    codec = (data.get('codec') or 'libx264').strip()
+    map_b64 = str(data.get('map_file') or '')
+    background_b64 = str(data.get('background_video') or '')
+    title = str(data.get('video_title') or data.get('title') or '').strip()
+    codec = str(data.get('codec') or 'libx264').strip()
+    raw_duration = data.get('duration')
 
     # --- Validation -----------------------------------------------------------
     if not map_b64:
@@ -314,7 +322,12 @@ def make_video():
         return jsonify({"status": "error", "error": str(ve)}), 400
 
     safe_title = re.sub(r'[^\w\-]', '_', title)
-    audio_path = os.path.join(DOWNLOADS, f"{safe_title}.mp3")
+    cut_audio_path = os.path.join(CUT_DIR, f"{safe_title}_cut.mp3")
+    audio_path = (
+        cut_audio_path
+        if os.path.exists(cut_audio_path)
+        else os.path.join(DOWNLOADS, f"{safe_title}.mp3")
+    )
     output_path = os.path.join(RENDER_DIR, f"{safe_title}_final.mp4")
 
     map_path = bg_path = None
@@ -333,8 +346,12 @@ def make_video():
             bg_video_temp.write(bg_bytes)
             bg_path = bg_video_temp.name
 
-        # Target clip length: 8 seconds, but never longer than the source clips.
-        TARGET = 8.0
+        # Target clip length: 1..30 seconds (default 8.0), never longer than the source clips.
+        try:
+            TARGET = float(raw_duration) if raw_duration is not None else 8.0
+        except (TypeError, ValueError):
+            TARGET = 8.0
+        TARGET = max(1.0, min(30.0, TARGET))
 
         background_video = VideoFileClip(bg_path).without_audio()
         bg_duration = min(TARGET, background_video.duration or TARGET)

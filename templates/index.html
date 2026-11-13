@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AutoMap-CLI</title>
+    <title>AutoMap Studio — AI Cartographic Engine & CLI Dashboard</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <!-- Google Fonts: Inter & JetBrains Mono -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Google Fonts: Plus Jakarta Sans, Space Grotesk, Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     
     <script>
         tailwind.config = {
@@ -17,14 +17,15 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
+                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+                        display: ['Space Grotesk', 'Plus Jakarta Sans', 'sans-serif'],
                         mono: ['JetBrains Mono', 'monospace'],
                     },
                     colors: {
                         slate: {
-                            850: '#151e2e',
-                            900: '#0f172a',
-                            950: '#080d1a',
+                            850: '#131c2e',
+                            900: '#0d1424',
+                            950: '#060a12',
                         }
                     }
                 }
@@ -39,22 +40,65 @@
             height: 6px;
         }
         ::-webkit-scrollbar-track {
-            background: rgba(15, 23, 42, 0.6);
+            background: rgba(13, 20, 36, 0.6);
         }
         ::-webkit-scrollbar-thumb {
-            background: rgba(71, 85, 105, 0.8);
+            background: rgba(71, 85, 105, 0.7);
             border-radius: 9999px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: rgba(99, 102, 241, 0.8);
+            background: rgba(99, 102, 241, 0.85);
         }
 
-        /* Grid Pattern for Map Canvas */
+        /* Ambient Aurora Backdrop Animations */
+        @keyframes auroraFloat {
+            0%, 100% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+            33% {
+                transform: translate3d(35px, -25px, 0) scale(1.08);
+            }
+            66% {
+                transform: translate3d(-25px, 20px, 0) scale(0.95);
+            }
+        }
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.45; }
+            50% { opacity: 0.8; }
+        }
+        @keyframes radarSweep {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .aurora-blob-1 {
+            animation: auroraFloat 18s ease-in-out infinite;
+        }
+        .aurora-blob-2 {
+            animation: auroraFloat 24s ease-in-out infinite reverse;
+        }
+        .aurora-blob-3 {
+            animation: auroraFloat 20s ease-in-out 4s infinite;
+        }
+        .radar-spin {
+            animation: radarSweep 4s linear infinite;
+        }
+
+        /* Cartographic Grid Pattern */
         .canvas-grid {
-            background-size: 24px 24px;
+            background-size: 32px 32px, 160px 160px;
             background-image: 
-                linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+                linear-gradient(to right, rgba(99, 102, 241, 0.045) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(99, 102, 241, 0.045) 1px, transparent 1px),
+                linear-gradient(to right, rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+        }
+
+        /* Glassmorphic Card Surface */
+        .cyber-card {
+            background: linear-gradient(165deg, rgba(15, 23, 42, 0.82) 0%, rgba(9, 14, 26, 0.92) 100%);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.7), inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
         }
 
         /* Range Slider Custom Styling */
@@ -63,55 +107,144 @@
             height: 18px;
             width: 18px;
             border-radius: 50%;
-            background: #6366f1;
+            background: linear-gradient(135deg, #818cf8, #6366f1);
             cursor: pointer;
-            box-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
-            transition: transform 0.15s ease;
+            border: 2px solid #e0e7ff;
+            box-shadow: 0 0 14px rgba(99, 102, 241, 0.75);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
         }
         input[type=range]::-webkit-slider-thumb:hover {
-            transform: scale(1.15);
+            transform: scale(1.18);
+            box-shadow: 0 0 20px rgba(129, 140, 248, 0.95);
+        }
+
+        /* Custom Color Picker Input */
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            padding: 0;
+            background: transparent;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 0.5rem;
         }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white overflow-x-hidden">
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white overflow-x-hidden relative">
+
+    <!-- Ambient Animated Aurora Glow Backdrop -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
+        <div class="aurora-blob-1 absolute -top-36 -left-36 w-[540px] h-[540px] rounded-full bg-indigo-600/15 blur-[130px]"></div>
+        <div class="aurora-blob-2 absolute top-1/4 -right-40 w-[500px] h-[500px] rounded-full bg-purple-600/15 blur-[140px]"></div>
+        <div class="aurora-blob-3 absolute -bottom-40 left-1/3 w-[600px] h-[420px] rounded-full bg-cyan-500/10 blur-[150px]"></div>
+        <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.08),transparent_60%)]"></div>
+    </div>
 
     <!-- Top Navigation Bar -->
-    <header class="border-b border-slate-800/80 bg-slate-900/75 backdrop-blur-md sticky top-0 z-30">
-        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+    <header class="border-b border-slate-800/80 bg-slate-950/75 backdrop-blur-xl sticky top-0 z-30">
+        <div class="max-w-[1640px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
             <!-- Brand -->
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-                    <i class="fa-solid fa-earth-europe text-white text-lg"></i>
+            <div class="flex items-center gap-3.5">
+                <div class="relative group">
+                    <div class="absolute -inset-1 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 opacity-60 blur group-hover:opacity-90 transition duration-300"></div>
+                    <div class="relative w-10 h-10 rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center shadow-lg border border-indigo-400/30">
+                        <!-- Custom Stylized AutoMap Vector Brand Mark -->
+                        <svg class="w-7 h-7" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="AutoMap Studio Logo">
+                            <defs>
+                                <linearGradient id="automapMapFoldGrad" x1="4" y1="6" x2="36" y2="34" gradientUnits="userSpaceOnUse">
+                                    <stop offset="0%" stop-color="#818cf8" stop-opacity="0.32" />
+                                    <stop offset="50%" stop-color="#6366f1" stop-opacity="0.16" />
+                                    <stop offset="100%" stop-color="#22d3ee" stop-opacity="0.28" />
+                                </linearGradient>
+                                <linearGradient id="automapStrokeGrad" x1="5" y1="5" x2="35" y2="35" gradientUnits="userSpaceOnUse">
+                                    <stop offset="0%" stop-color="#a5b4fc" />
+                                    <stop offset="50%" stop-color="#818cf8" />
+                                    <stop offset="100%" stop-color="#38bdf8" />
+                                </linearGradient>
+                                <linearGradient id="automapPinGrad" x1="16" y1="6" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                                    <stop offset="0%" stop-color="#38bdf8" />
+                                    <stop offset="100%" stop-color="#c084fc" />
+                                </linearGradient>
+                            </defs>
+                            <!-- Folded Cartographic Map Panels -->
+                            <path d="M5.5 11.5L14.5 7.5L25.5 11.5L34.5 7.5V28.5L25.5 32.5L14.5 28.5L5.5 32.5V11.5Z" fill="url(#automapMapFoldGrad)" stroke="url(#automapStrokeGrad)" stroke-width="1.6" stroke-linejoin="round" />
+                            <path d="M14.5 7.5V28.5M25.5 11.5V32.5" stroke="#818cf8" stroke-width="1.1" stroke-opacity="0.45" stroke-dasharray="2 2" />
+                            <!-- Cartographic Globe & Meridian Ring -->
+                            <circle cx="20" cy="20" r="8.5" fill="#090e1a" fill-opacity="0.78" stroke="url(#automapStrokeGrad)" stroke-width="1.6" />
+                            <ellipse cx="20" cy="20" rx="4.2" ry="8.5" stroke="#38bdf8" stroke-width="1.15" stroke-opacity="0.8" />
+                            <path d="M11.8 20H28.2M13 16.2H27M13 23.8H27" stroke="#a5b4fc" stroke-width="1.05" stroke-opacity="0.65" stroke-linecap="round" />
+                            <!-- Compass Star & Geospatial Node Accent -->
+                            <path d="M20 9.2L21.4 13.2L25.4 14.6L21.4 16L20 20L18.6 16L14.6 14.6L18.6 13.2L20 9.2Z" fill="url(#automapPinGrad)" />
+                            <circle cx="20" cy="14.6" r="1.4" fill="#ffffff" />
+                            <circle cx="15" cy="23.5" r="1.3" fill="#34d399" />
+                            <circle cx="24.8" cy="22.2" r="1.3" fill="#38bdf8" />
+                        </svg>
+                    </div>
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="font-bold text-lg tracking-tight text-white">Map CLI Studio</h1>
-                        <span class="text-[11px] font-mono uppercase px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 font-semibold">Flask UI</span>
+                        <h1 class="font-display font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent">AutoMap Studio</h1>
                     </div>
-                    <p class="text-xs text-slate-400 hidden sm:block">CLI argument configuration & map rendering dashboard</p>
+                    <p class="text-xs text-slate-400 hidden sm:block">AI Cartographic Synthesis &bull; CLI Parameter Studio</p>
                 </div>
             </div>
 
-            <!-- Connection Mode & Actions -->
-            <div class="flex items-center gap-3">
+            <!-- Connection Mode & Quick Studio Actions -->
+            <div class="flex items-center gap-2.5 sm:gap-3">
+                <!-- API Key & System Status Indicator -->
+                <div id="statusIndicator" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-emerald-500/30 text-xs text-emerald-300 transition-all">
+                    <span id="headerApiDot" class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+                    <span id="headerApiText" class="font-mono text-[11px]">System Ready</span>
+                </div>
+
+                <!-- Color Filling Studio Button -->
+                <button type="button" onclick="openFillingStudio()" class="px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 text-slate-200 border border-slate-700/80 hover:border-indigo-500/50 text-xs font-medium transition-all flex items-center gap-2 shadow-sm group">
+                    <span class="flex -space-x-1">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-1 ring-slate-950"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-indigo-400 ring-1 ring-slate-950"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-rose-400 ring-1 ring-slate-950"></span>
+                    </span>
+                    <span class="hidden sm:inline">Color Filling Studio</span>
+                    <code class="text-[10px] font-mono text-indigo-300 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20 hidden lg:inline">filling.json</code>
+                </button>
+
+                <!-- Video Studio Navigation Link -->
+                <a href="/studio" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600/90 to-orange-600/90 hover:from-rose-500 hover:to-orange-500 text-white text-xs font-semibold shadow-lg shadow-rose-600/20 hover:shadow-rose-600/35 border border-white/10 transition-all flex items-center gap-2 group">
+                    <i class="fa-solid fa-clapperboard text-xs transition-transform group-hover:rotate-6"></i>
+                    <span>Video Studio</span>
+                    <i class="fa-solid fa-arrow-right text-[10px] opacity-75 group-hover:translate-x-0.5 transition-transform"></i>
+                </a>
             </div>
         </div>
     </header>
 
     <!-- Main Workspace Layout -->
-    <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <main class="relative z-10 flex-1 max-w-[1640px] w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <!-- LEFT COLUMN: CLI FLAGS & CONFIGURATION (5 Cols on Desktop) -->
         <section class="lg:col-span-5 xl:col-span-4 flex flex-col gap-5">
             
-            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl p-5 shadow-xl">
-                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-sliders text-indigo-400"></i>
-                        <h2 class="font-semibold text-base text-white">Generation Parameters (Flags)</h2>
+            <!-- Main Parameters Card -->
+            <div class="cyber-card border border-slate-800/90 rounded-2xl p-5 shadow-2xl relative overflow-hidden">
+                <!-- Subtle top highlight bar -->
+                <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent"></div>
+
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/80">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-7 h-7 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                            <i class="fa-solid fa-sliders text-xs"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-display font-semibold text-sm sm:text-base text-white leading-tight">Generation Parameters</h2>
+                            <p class="text-[11px] text-slate-400">Configure AI query &amp; cartographic CLI flags</p>
+                        </div>
                     </div>
-                    <button onclick="resetForm()" class="text-xs text-slate-400 hover:text-indigo-400 transition flex items-center gap-1" title="Reset to default values">
-                        <i class="fa-solid fa-rotate-left"></i>
+                    <button type="button" onclick="resetForm()" class="text-xs px-2.5 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-indigo-300 hover:border-indigo-500/40 transition flex items-center gap-1.5" title="Reset to default values">
+                        <i class="fa-solid fa-rotate-left text-[11px]"></i>
                         <span>Reset</span>
                     </button>
                 </div>
@@ -119,100 +252,171 @@
                 <form id="cliForm" onsubmit="handleGenerate(event)" class="space-y-5">
                     
                     <!-- API Key Input: shown only when the server has no .env key -->
-                    <div id="apiKeySection" class="hidden">
+                    <div id="apiKeySection" class="hidden p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/30 transition-colors">
                         <div class="flex justify-between items-center mb-1.5">
-                            <label for="apiKeyInput" class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+                            <label for="apiKeyInput" class="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
                                 <i class="fa-solid fa-key text-amber-400"></i>
                                 Gemini API Key (required — no .env found)
                             </label>
+                            <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">Session Only</span>
                         </div>
                         <div class="relative">
-                            <input type="password" id="apiKeyInput" placeholder="Paste your Gemini API key..."
+                            <input type="password" id="apiKeyInput" placeholder="Paste your Gemini API key (AIza...)..."
                                 autocomplete="off" spellcheck="false"
-                                class="w-full px-3.5 py-2.5 pr-10 bg-slate-950 border border-amber-600/50 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition">
-                            <button type="button" onclick="toggleApiKeyVisibility()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1" title="Show / hide key">
+                                oninput="updateApiKeyIndicator()" onchange="updateApiKeyIndicator()"
+                                class="w-full px-3.5 py-2.5 pr-10 bg-slate-950/90 border border-amber-500/40 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition">
+                            <button type="button" onclick="toggleApiKeyVisibility()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" title="Show / hide key">
                                 <i id="apiKeyEyeIcon" class="fa-solid fa-eye text-xs"></i>
                             </button>
                         </div>
-                        <p class="text-[11px] text-amber-400/80 mt-1">This key is used for this request only and is never stored on the server.</p>
+                        <p class="text-[11px] text-amber-300/75 mt-1.5 flex items-center gap-1">
+                            <i class="fa-solid fa-shield-halved text-[10px]"></i>
+                            <span>Used only for this request and never persisted to disk.</span>
+                        </p>
                     </div>
 
-                    <!-- Optional Topic / Prompt Input (Often passed to Gemini in Map Generators) -->
+                    <!-- Topic / Prompt Input + Interactive Quick Prompt Presets -->
                     <div>
                         <div class="flex justify-between items-center mb-1.5">
-                            <label for="topicInput" class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                                <i class="fa-solid fa-comment-dots text-indigo-400"></i>
-                                Map Topic or Query (Prompt / Args)
+                            <label for="topicInput" class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                <i class="fa-solid fa-wand-magic-sparkles text-indigo-400"></i>
+                                Map Topic or AI Query
                             </label>
+                            <code class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">PROMPT</code>
                         </div>
-                        <input type="text" id="topicInput" placeholder="e.g., How many bears are there in your country?" 
-                            oninput="updateCommandPreview()"
-                            class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition">
+                        <div class="relative group">
+                            <input type="text" id="topicInput" placeholder="e.g., Population of European countries" 
+                                oninput="updateCommandPreview()"
+                                class="w-full pl-3.5 pr-9 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition shadow-inner">
+                            <button type="button" onclick="clearTopicInput()" title="Clear prompt" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1 transition">
+                                <i class="fa-solid fa-xmark text-xs"></i>
+                            </button>
+                        </div>
+
+                        <!-- Quick Prompt Presets Chips -->
+                        <div class="mt-2.5">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                                    <i class="fa-solid fa-bolt text-amber-400 text-[10px]"></i>
+                                    Quick Prompt Presets
+                                </span>
+                                <span class="text-[10px] text-slate-500">1-click auto-config</span>
+                            </div>
+                            <div class="flex flex-wrap gap-1.5" id="presetChipsContainer">
+                                <button type="button" onclick="applyPromptPreset('Population of European countries', 'number', 'default', 'show_most_least')"
+                                    class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-indigo-500/15 text-slate-300 hover:text-indigo-200 border border-slate-800 hover:border-indigo-500/40 transition flex items-center gap-1.5 group">
+                                    <i class="fa-solid fa-users text-[10px] text-indigo-400 group-hover:scale-110 transition-transform"></i>
+                                    <span>Population of Europe</span>
+                                </button>
+                                <button type="button" onclick="applyPromptPreset('Most popular hot drink in Europe', 'text', 'default', 'none')"
+                                    class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-emerald-500/15 text-slate-300 hover:text-emerald-200 border border-slate-800 hover:border-emerald-500/40 transition flex items-center gap-1.5 group">
+                                    <i class="fa-solid fa-mug-hot text-[10px] text-emerald-400 group-hover:scale-110 transition-transform"></i>
+                                    <span>Hot drink in Europe</span>
+                                </button>
+                                <button type="button" onclick="applyPromptPreset('GDP per capita in Europe', 'number', 'flag', 'show_most_least')"
+                                    class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-amber-500/15 text-slate-300 hover:text-amber-200 border border-slate-800 hover:border-amber-500/40 transition flex items-center gap-1.5 group">
+                                    <i class="fa-solid fa-coins text-[10px] text-amber-400 group-hover:scale-110 transition-transform"></i>
+                                    <span>GDP per capita (Flags)</span>
+                                </button>
+                                <button type="button" onclick="applyPromptPreset('Forest coverage percentage by continent', 'number', 'world', 'none')"
+                                    class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-sky-500/15 text-slate-300 hover:text-sky-200 border border-slate-800 hover:border-sky-500/40 transition flex items-center gap-1.5 group">
+                                    <i class="fa-solid fa-tree text-[10px] text-sky-400 group-hover:scale-110 transition-transform"></i>
+                                    <span>Forest coverage (World)</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- 1. Flag: -m, --mode -->
+                    <!-- 1. Flag: -m, --mode (Visual Segmented Cards) -->
                     <div>
                         <div class="flex justify-between items-center mb-2">
-                            <label class="text-xs font-medium text-slate-300">Data Mode</label>
-                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">-m, --mode</code>
+                            <label class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                <i class="fa-solid fa-database text-indigo-400 text-[11px]"></i>
+                                Data Mode
+                            </label>
+                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">-m, --mode</code>
                         </div>
                         <div class="grid grid-cols-2 gap-2.5">
-                            <label class="cursor-pointer">
+                            <label class="cursor-pointer group relative">
                                 <input type="radio" name="mode" value="text" checked onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 peer-checked:text-white text-slate-400 hover:border-slate-700 transition flex items-center gap-2.5">
-                                    <div class="w-8 h-8 rounded-lg bg-slate-800 peer-checked:bg-indigo-500/20 flex items-center justify-center text-indigo-400">
-                                        <i class="fa-solid fa-font"></i>
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-gradient-to-br peer-checked:from-indigo-600/20 peer-checked:to-purple-600/10 peer-checked:border-indigo-500 peer-checked:shadow-[0_0_20px_rgba(99,102,241,0.2)] peer-checked:[&_.mode-dot]:opacity-100 hover:border-slate-700 transition-all flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-indigo-400 shrink-0 shadow-inner">
+                                        <!-- Mini SVG Illustration for Text Mode -->
+                                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7V5h16v2M9 20h6M12 5v15"/>
+                                        </svg>
                                     </div>
-                                    <div>
-                                        <div class="text-sm font-medium text-slate-200">text</div>
-                                        <div class="text-[11px] text-slate-500">Text labels</div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-semibold text-slate-100 font-mono">text</span>
+                                            <span class="mode-dot w-2 h-2 rounded-full bg-indigo-400 opacity-0 transition"></span>
+                                        </div>
+                                        <div class="text-[11px] text-slate-400 truncate">Categories &amp; labels</div>
                                     </div>
                                 </div>
                             </label>
-                            <label class="cursor-pointer">
+                            <label class="cursor-pointer group relative">
                                 <input type="radio" name="mode" value="number" onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 peer-checked:text-white text-slate-400 hover:border-slate-700 transition flex items-center gap-2.5">
-                                    <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-emerald-400">
-                                        <i class="fa-solid fa-hashtag"></i>
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-gradient-to-br peer-checked:from-emerald-600/20 peer-checked:to-teal-600/10 peer-checked:border-emerald-500 peer-checked:shadow-[0_0_20px_rgba(16,185,129,0.2)] peer-checked:[&_.mode-dot]:opacity-100 hover:border-slate-700 transition-all flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+                                        <!-- Mini SVG Illustration for Number Mode -->
+                                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+                                        </svg>
                                     </div>
-                                    <div>
-                                        <div class="text-sm font-medium text-slate-200">number</div>
-                                        <div class="text-[11px] text-slate-500">Numeric values</div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-semibold text-slate-100 font-mono">number</span>
+                                            <span class="mode-dot w-2 h-2 rounded-full bg-emerald-400 opacity-0 transition"></span>
+                                        </div>
+                                        <div class="text-[11px] text-slate-400 truncate">Numeric ranges</div>
                                     </div>
                                 </div>
                             </label>
                         </div>
                     </div>
 
-                    <!-- 2. Flag: -mp, --map-type -->
+                    <!-- 2. Flag: -mp, --map-type (Visual Segmented Cards with SVG Mini-Illustrations) -->
                     <div>
                         <div class="flex justify-between items-center mb-2">
-                            <label class="text-xs font-medium text-slate-300">Map Type</label>
-                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">-mp, --map-type</code>
+                            <label class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                <i class="fa-solid fa-layer-group text-indigo-400 text-[11px]"></i>
+                                Map Canvas Type
+                            </label>
+                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">-mp, --map-type</code>
                         </div>
                         <div class="grid grid-cols-3 gap-2.5">
-                            <label class="cursor-pointer">
+                            <!-- Default Europe Map -->
+                            <label class="cursor-pointer group">
                                 <input type="radio" name="map_type" value="default" checked onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
-                                    <i class="fa-solid fa-map text-indigo-400 mb-1 text-base"></i>
-                                    <div class="text-xs font-semibold text-slate-200">default</div>
-                                    <div class="text-[10px] text-slate-500">Standard</div>
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-gradient-to-b peer-checked:from-indigo-600/20 peer-checked:to-slate-950 peer-checked:border-indigo-500 peer-checked:shadow-[0_0_20px_rgba(99,102,241,0.2)] text-center hover:border-slate-700 transition-all flex flex-col items-center">
+                                    <div class="w-10 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-1.5 text-indigo-400 group-hover:scale-105 transition-transform">
+                                        <i class="fa-solid fa-map text-sm"></i>
+                                    </div>
+                                    <div class="text-xs font-semibold font-mono text-slate-100">default</div>
+                                    <div class="text-[10px] text-slate-400 mt-0.5">Europe Relief</div>
                                 </div>
                             </label>
-                            <label class="cursor-pointer">
+                            <!-- Flag Map -->
+                            <label class="cursor-pointer group">
                                 <input type="radio" name="map_type" value="flag" onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
-                                    <i class="fa-solid fa-flag text-amber-400 mb-1 text-base"></i>
-                                    <div class="text-xs font-semibold text-slate-200">flag</div>
-                                    <div class="text-[10px] text-slate-500">With Flags</div>
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-gradient-to-b peer-checked:from-amber-500/20 peer-checked:to-slate-950 peer-checked:border-amber-500 peer-checked:shadow-[0_0_20px_rgba(245,158,11,0.2)] text-center hover:border-slate-700 transition-all flex flex-col items-center">
+                                    <div class="w-10 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-1.5 text-amber-400 group-hover:scale-105 transition-transform">
+                                        <i class="fa-solid fa-flag text-sm"></i>
+                                    </div>
+                                    <div class="text-xs font-semibold font-mono text-slate-100">flag</div>
+                                    <div class="text-[10px] text-slate-400 mt-0.5">National Flags</div>
                                 </div>
                             </label>
-                            <label class="cursor-pointer">
+                            <!-- World Map -->
+                            <label class="cursor-pointer group">
                                 <input type="radio" name="map_type" value="world" onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="p-2.5 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
-                                    <i class="fa-solid fa-globe text-sky-400 mb-1 text-base"></i>
-                                    <div class="text-xs font-semibold text-slate-200">world</div>
-                                    <div class="text-[10px] text-slate-500">World Map</div>
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-gradient-to-b peer-checked:from-sky-500/20 peer-checked:to-slate-950 peer-checked:border-sky-500 peer-checked:shadow-[0_0_20px_rgba(14,165,233,0.2)] text-center hover:border-slate-700 transition-all flex flex-col items-center">
+                                    <div class="w-10 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center mb-1.5 text-sky-400 group-hover:scale-105 transition-transform">
+                                        <i class="fa-solid fa-globe text-sm"></i>
+                                    </div>
+                                    <div class="text-xs font-semibold font-mono text-slate-100">world</div>
+                                    <div class="text-[10px] text-slate-400 mt-0.5">Continents</div>
                                 </div>
                             </label>
                         </div>
@@ -221,14 +425,17 @@
                     <!-- 3. Flag: -gsm, --global-size-modifier -->
                     <div>
                         <div class="flex justify-between items-center mb-2">
-                            <label for="gsmNumber" class="text-xs font-medium text-slate-300">Global Size Modifier (Integer)</label>
-                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">-gsm, --global-size-modifier</code>
+                            <label for="gsmNumber" class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                <i class="fa-solid fa-text-height text-indigo-400 text-[11px]"></i>
+                                Global Size Modifier
+                            </label>
+                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">-gsm, --global-size-modifier</code>
                         </div>
-                        <div class="flex items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                        <div class="flex items-center gap-3 bg-slate-950/80 p-3 rounded-xl border border-slate-800">
                             <input type="range" id="gsmRange" min="-50" max="100" step="1" value="15" 
                                 oninput="syncGsm(this.value)"
                                 class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
-                            <div class="flex items-center bg-slate-900 border border-slate-700 rounded-lg overflow-hidden shrink-0">
+                            <div class="flex items-center bg-slate-900 border border-slate-700/80 rounded-lg overflow-hidden shrink-0">
                                 <button type="button" onclick="adjustGsm(-1)" class="px-2.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 transition">-</button>
                                 <input type="number" id="gsmNumber" name="gsm" value="15" step="1"
                                     oninput="syncGsm(this.value)"
@@ -241,129 +448,158 @@
                     <!-- 4. Flag: -eop, --extra-option -->
                     <div>
                         <div class="flex justify-between items-center mb-2">
-                            <label for="extraOptionSelect" class="text-xs font-medium text-slate-300">Extra Display Options</label>
-                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">-eop, --extra-option</code>
+                            <label id="extraOptionSelect" class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                <i class="fa-solid fa-sparkles text-indigo-400 text-[11px]"></i>
+                                Extra Display Options
+                            </label>
+                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">-eop, --extra-option</code>
                         </div>
                         <div class="grid grid-cols-3 gap-2">
                             <label class="cursor-pointer">
                                 <input type="radio" name="extra_option" value="none" checked onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
-                                    <div class="text-xs font-mono font-medium text-slate-200">none</div>
-                                    <div class="text-[10px] text-slate-500 mt-0.5">Default</div>
+                                <div class="px-2.5 py-2.5 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-indigo-600/20 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
+                                    <div class="text-xs font-mono font-semibold text-slate-200">none</div>
+                                    <div class="text-[10px] text-slate-400 mt-0.5">Standard</div>
                                 </div>
                             </label>
                             <label class="cursor-pointer">
                                 <input type="radio" name="extra_option" value="show_most_least" onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="px-2 py-2.5 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
-                                    <div class="text-xs font-mono font-medium text-slate-200 truncate">show_most_least</div>
-                                    <div class="text-[10px] text-slate-500 mt-0.5">Min / Max</div>
+                                <div class="px-2 py-2.5 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-indigo-600/20 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
+                                    <div class="text-xs font-mono font-semibold text-slate-200 truncate">show_most_least</div>
+                                    <div class="text-[10px] text-slate-400 mt-0.5">Min / Max HUD</div>
                                 </div>
                             </label>
                             <label class="cursor-pointer">
                                 <input type="radio" name="extra_option" value="short_form" onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950/60 peer-checked:bg-indigo-600/15 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
-                                    <div class="text-xs font-mono font-medium text-slate-200">short_form</div>
-                                    <div class="text-[10px] text-slate-500 mt-0.5">Abbreviated</div>
+                                <div class="px-2.5 py-2.5 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-indigo-600/20 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
+                                    <div class="text-xs font-mono font-semibold text-slate-200">short_form</div>
+                                    <div class="text-[10px] text-slate-400 mt-0.5">Compact (1k/1M)</div>
                                 </div>
                             </label>
                         </div>
+                        <p id="extraOptionHint" class="text-[11px] text-slate-400 mt-1.5 hidden"></p>
                     </div>
 
-                    <!-- 5. Flag: --model -->
-                    <div>
-                        <div class="flex justify-between items-center mb-2">
-                            <label for="modelSelect" class="text-xs font-medium text-slate-300">AI Model (Gemini Model ID)</label>
-                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">--model</code>
-                        </div>
-                        <div class="flex gap-2">
-                            <div class="relative flex-1">
-                                <select id="modelSelect" onchange="updateCommandPreview()" 
-                                    class="w-full appearance-none px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-indigo-500 transition pr-9">
-                                    <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-                                    <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-                                    <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-                                    <option value="gemini-1.5-pro">gemini-1.5-pro</option>
-                                    <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-                                </select>
-                                <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none"></i>
+                    <!-- 5. Flag: --model & 6. Flag: --font in a responsive 2-col or stacked layout -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <!-- Flag: --model -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1.5">
+                                <label for="modelSelect" class="text-xs font-semibold text-slate-200">AI Model</label>
+                                <code class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">--model</code>
                             </div>
-                            <button type="button" onclick="toggleCustomModelInput()" class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium transition shrink-0" title="Add custom Model ID">
-                                <i class="fa-solid fa-plus"></i>
-                            </button>
+                            <div class="flex gap-1.5">
+                                <div class="relative flex-1 min-w-0">
+                                    <select id="modelSelect" onchange="updateCommandPreview()" 
+                                        class="w-full appearance-none px-3 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-indigo-500 transition pr-7 truncate">
+                                        <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                                        <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                                        <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                                        <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                                        <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                                    </select>
+                                    <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 pointer-events-none"></i>
+                                </div>
+                                <button type="button" onclick="toggleCustomModelInput()" class="px-2.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition shrink-0" title="Add custom Model ID">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
+                            <!-- Add custom model input -->
+                            <div id="customModelBox" class="hidden mt-2 flex gap-1.5">
+                                <input type="text" id="newModelInput" placeholder="Custom model ID..."
+                                    onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomModel();}"
+                                    class="flex-1 min-w-0 px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
+                                <button type="button" onclick="addCustomModel()" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium">Add</button>
+                            </div>
                         </div>
-                        <!-- Add custom model input -->
-                        <div id="customModelBox" class="hidden mt-2 flex gap-2">
-                            <input type="text" id="newModelInput" placeholder="Enter new Gemini model ID..." 
-                                class="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
-                            <button type="button" onclick="addCustomModel()" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium">Add</button>
+
+                        <!-- Flag: --font -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1.5">
+                                <label for="fontSelect" class="text-xs font-semibold text-slate-200">Map Font</label>
+                                <code class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">--font</code>
+                            </div>
+                            <div class="flex gap-1.5">
+                                <div class="relative flex-1 min-w-0">
+                                    <select id="fontSelect" onchange="updateCommandPreview()" 
+                                        class="w-full appearance-none px-3 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-indigo-500 transition pr-7 truncate">
+                                        <option value="Bips.ttf">Bips.ttf</option>
+                                        <option value="DIN Condensed.ttf">DIN Condensed.ttf</option>
+                                        <option value="arialroundedmtbold.ttf">arialroundedmtbold.ttf</option>
+                                        <option value="kodchasan.ttf">kodchasan.ttf</option>
+                                    </select>
+                                    <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 pointer-events-none"></i>
+                                </div>
+                                <button type="button" onclick="fetchFontsFromServer()" class="px-2.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition shrink-0 flex items-center justify-center" title="Refresh font list from resources/fonts">
+                                    <i id="fontRefreshIcon" class="fa-solid fa-sync"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- 6. Flag: --font -->
-                    <div>
-                        <div class="flex justify-between items-center mb-2">
-                            <label for="fontSelect" class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                                <span>Font from <span class="font-mono text-slate-400">resources/fonts</span></span>
-                            </label>
-                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">--font</code>
-                        </div>
-                        <div class="flex gap-2">
-                            <div class="relative flex-1">
-                                <select id="fontSelect" onchange="updateCommandPreview()" 
-                                    class="w-full appearance-none px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-mono text-white focus:outline-none focus:border-indigo-500 transition pr-9">
-                                    <option value="Bips.ttf">Bips.ttf</option>
-                                    <option value="DIN Condensed.ttf">DIN Condensed.ttf</option>
-                                    <option value="arialroundedmtbold.ttf">arialroundedmtbold.ttf</option>
-                                    <option value="kodchasan.ttf">kodchasan.ttf</option>
-                                </select>
-                                <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none"></i>
+                    <!-- Color Filling Studio Quick Preview Bar -->
+                    <div class="p-3 rounded-xl bg-slate-950/75 border border-slate-800/90 flex items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-semibold text-slate-200">Color Filling Rules</span>
+                                <span id="fillingSummaryBadge" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">6 rules</span>
                             </div>
-                            <button type="button" onclick="fetchFontsFromServer()" class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium transition shrink-0 flex items-center gap-1.5" title="Refresh font list from resources/fonts">
-                                <i id="fontRefreshIcon" class="fa-solid fa-sync"></i>
+                            <p class="text-[11px] text-slate-400 truncate mt-0.5">Configure <code class="text-slate-300">filling_txt</code> &amp; <code class="text-slate-300">filling_num</code> swatches</p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <div id="miniSwatchPreview" class="flex -space-x-1.5"></div>
+                            <button type="button" onclick="openFillingStudio()" class="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-indigo-600/20 text-indigo-300 border border-slate-700 hover:border-indigo-500/50 text-xs font-medium transition">
+                                Customize
                             </button>
                         </div>
-                        <p class="text-[11px] text-slate-500 mt-1">Auto-discovered by the server from the <code class="text-slate-400">resources/fonts</code> directory</p>
                     </div>
 
                     <!-- Submit / Generate Button -->
-                    <button type="submit" id="generateBtn" class="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/25 hover:shadow-indigo-600/40 transition-all flex items-center justify-center gap-2.5 group">
+                    <button type="submit" id="generateBtn" class="relative w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:via-indigo-400 hover:to-purple-500 text-white font-display font-semibold text-sm shadow-xl shadow-indigo-600/30 hover:shadow-indigo-500/45 border border-white/15 transition-all flex items-center justify-center gap-2.5 group overflow-hidden">
                         <i id="generateBtnIcon" class="fa-solid fa-play transition-transform group-hover:translate-x-0.5"></i>
-                        <span id="generateBtnText">Run CLI & Generate Map</span>
+                        <span id="generateBtnText">Run CLI &amp; Generate Map</span>
                     </button>
                 </form>
             </div>
 
-            <!-- Video Studio Card -->
-            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl p-5 shadow-xl">
-                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-clapperboard text-rose-500"></i>
-                        <h2 class="font-semibold text-base text-white">Video Studio</h2>
-                    </div>
-                    <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700">/studio</code>
-                </div>
-                <a href="/studio" class="w-full py-3 px-5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-semibold text-sm shadow-lg shadow-rose-600/25 hover:shadow-rose-600/40 transition-all flex items-center justify-center gap-2.5 group">
-                    <i class="fa-solid fa-music transition-transform group-hover:translate-x-0.5"></i>
-                    <span>Open Video Studio</span>
-                </a>
-                <p class="text-[11px] text-slate-500 mt-2 text-center">Download music tracks for your videos</p>
-            </div>
-
             <!-- Live CLI Command Builder Preview Card -->
-            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl p-4 shadow-xl">
-                <div class="flex items-center justify-between mb-2">
-                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-300">
+            <div class="cyber-card border border-slate-800/90 rounded-2xl p-4 shadow-xl">
+                <div class="flex items-center justify-between mb-2.5">
+                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-200">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
                         <i class="fa-solid fa-terminal text-emerald-400"></i>
                         <span>Generated CLI Command</span>
                     </div>
-                    <button onclick="copyCliCommand()" class="text-xs px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1.5">
+                    <button type="button" onclick="copyCliCommand()" class="text-xs px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition flex items-center gap-1.5">
                         <i id="copyIcon" class="fa-regular fa-copy"></i>
                         <span id="copyText">Copy</span>
                     </button>
                 </div>
-                <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-400 overflow-x-auto whitespace-nowrap select-all" id="cliCommandDisplay">
-                    python cli.py make "" -m text -mp default -gsm 15 -eop none --model gemini-2.5-flash --font Bips.ttf
+                <div class="p-3 rounded-xl bg-slate-950/95 border border-slate-800/90 font-mono text-xs text-emerald-400 overflow-x-auto whitespace-nowrap select-all shadow-inner" id="cliCommandDisplay">
+                    python cli.py make "" -m text -mp default -gsm 15 -eop none --model gemini-2.5-flash --font "Bips.ttf"
                 </div>
+            </div>
+
+            <!-- Video Studio Card -->
+            <div class="cyber-card border border-slate-800/90 rounded-2xl p-5 shadow-xl relative overflow-hidden group">
+                <div class="absolute -right-10 -bottom-10 w-36 h-36 rounded-full bg-rose-500/10 blur-2xl pointer-events-none group-hover:bg-rose-500/20 transition"></div>
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                            <i class="fa-solid fa-clapperboard text-sm"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-display font-semibold text-sm text-white">Video Production Studio</h2>
+                            <p class="text-[11px] text-slate-400">Audio cutter, soundtrack sync &amp; MP4 renderer</p>
+                        </div>
+                    </div>
+                    <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-rose-300 border border-slate-800">/studio</code>
+                </div>
+                <a href="/studio" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 text-white font-semibold text-xs shadow-lg shadow-rose-600/25 hover:shadow-rose-600/40 transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-film"></i>
+                    <span>Launch Video Studio</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-80"></i>
+                </a>
             </div>
 
         </section>
@@ -371,70 +607,128 @@
         <!-- RIGHT COLUMN: MAP VIEWER & TERMINAL OUTPUT (7 or 8 Cols on Desktop) -->
         <section class="lg:col-span-7 xl:col-span-8 flex flex-col gap-5">
             
-            <!-- Map Preview Card -->
-            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl shadow-xl flex flex-col flex-1 min-h-[480px] overflow-hidden">
+            <!-- Interactive Map Canvas Stage Card -->
+            <div class="cyber-card border border-slate-800/90 rounded-2xl shadow-2xl flex flex-col flex-1 min-h-[520px] overflow-hidden relative">
                 
                 <!-- Map Viewer Toolbar -->
-                <div class="px-5 py-3.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-900/90">
+                <div class="px-5 py-3.5 border-b border-slate-800/90 flex flex-wrap items-center justify-between gap-3 bg-slate-950/60">
                     <div class="flex items-center gap-2.5">
-                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" id="statusIndicator"></span>
-                        <h2 class="font-semibold text-sm sm:text-base text-white">Generated Map Preview</h2>
-                        <span id="mapMetaBadge" class="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700">Ready</span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399] transition-colors" id="stageStatusDot"></span>
+                        <h2 class="font-display font-semibold text-sm sm:text-base text-white">Cartographic Render Stage</h2>
+                        <span id="mapMetaBadge" class="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-900 text-indigo-300 border border-slate-800">Ready</span>
                     </div>
 
-                    <!-- Zoom & Download Controls -->
-                    <div class="flex items-center gap-1.5">
-                        <div class="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5">
-                            <button onclick="zoomMap(-0.2)" class="p-2 text-slate-400 hover:text-white transition" title="Zoom Out">
+                    <!-- Zoom, Pan Reset, Fullscreen & Download Controls -->
+                    <div class="flex items-center gap-2">
+                        <div class="flex items-center bg-slate-950/90 border border-slate-800 rounded-xl p-0.5">
+                            <button type="button" onclick="zoomMap(-0.2)" class="p-2 text-slate-400 hover:text-white transition" title="Zoom Out">
                                 <i class="fa-solid fa-magnifying-glass-minus text-xs"></i>
                             </button>
-                            <span id="zoomLevelText" class="text-xs font-mono px-2 text-slate-300">100%</span>
-                            <button onclick="zoomMap(0.2)" class="p-2 text-slate-400 hover:text-white transition" title="Zoom In">
+                            <span id="zoomLevelText" class="text-xs font-mono px-2 text-slate-200 min-w-[48px] text-center">100%</span>
+                            <button type="button" onclick="zoomMap(0.2)" class="p-2 text-slate-400 hover:text-white transition" title="Zoom In">
                                 <i class="fa-solid fa-magnifying-glass-plus text-xs"></i>
                             </button>
-                            <button onclick="resetZoom()" class="p-2 text-slate-400 hover:text-white transition border-l border-slate-800" title="Reset Zoom">
+                            <button type="button" onclick="resetZoom()" class="p-2 text-slate-400 hover:text-white transition border-l border-slate-800" title="Reset Zoom &amp; Pan">
                                 <i class="fa-solid fa-compress text-xs"></i>
                             </button>
                         </div>
 
-                        <button onclick="toggleFullscreenMap()" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition" title="Toggle Fullscreen">
-                            <i class="fa-solid fa-expand text-xs"></i>
+                        <button type="button" onclick="toggleFullscreenMap()" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 transition" title="Toggle Fullscreen">
+                            <i id="fullscreenIcon" class="fa-solid fa-expand text-xs"></i>
                         </button>
 
-                        <button onclick="downloadCurrentMap()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
+                        <button type="button" onclick="downloadCurrentMap()" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20 border border-white/10">
                             <i class="fa-solid fa-download"></i>
-                            <span class="hidden sm:inline">Download</span>
+                            <span class="hidden sm:inline">Download PNG</span>
                         </button>
                     </div>
                 </div>
 
                 <!-- Map Viewport Area -->
-                <div id="mapViewport" class="relative flex-1 bg-slate-950 canvas-grid flex items-center justify-center overflow-hidden select-none p-4 sm:p-8">
+                <div id="mapViewport" class="relative flex-1 bg-slate-950 canvas-grid flex items-center justify-center overflow-hidden select-none p-4 sm:p-8 cursor-grab active:cursor-grabbing">
                     
-                    <!-- Loading Overlay -->
-                    <div id="loadingOverlay" class="hidden absolute inset-0 bg-slate-950/85 backdrop-blur-sm z-20 flex flex-col items-center justify-center gap-4">
-                        <div class="relative w-16 h-16 flex items-center justify-center">
-                            <div class="absolute inset-0 rounded-full border-4 border-indigo-500/20"></div>
-                            <div class="absolute inset-0 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin"></div>
-                            <i class="fa-solid fa-earth-americas text-indigo-400 text-xl animate-pulse"></i>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-sm font-semibold text-white">Executing CLI script...</div>
-                            <div id="loadingStepText" class="text-xs text-slate-400 mt-1 font-mono">Querying Gemini model and rendering map</div>
+                    <!-- Subtle Cartographic Coordinate HUD Accents -->
+                    <div class="absolute top-3 left-4 pointer-events-none flex items-center gap-3 text-[10px] font-mono text-slate-500/80">
+                        <span>PROJ: MERCATOR-ATLAS</span>
+                        <span>&bull;</span>
+                        <span id="hudCoordsText">LAT 54.5260° N / LON 15.2551° E</span>
+                    </div>
+                    <div class="absolute top-3 right-4 pointer-events-none hidden sm:flex items-center gap-1.5 text-[10px] font-mono text-slate-500/80">
+                        <i class="fa-regular fa-compass text-indigo-400/70"></i>
+                        <span>N 000°</span>
+                    </div>
+
+                    <!-- Multi-Stage Animated Loading Overlay -->
+                    <div id="loadingOverlay" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md z-20 flex flex-col items-center justify-center p-6">
+                        <div class="max-w-md w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center text-center relative overflow-hidden">
+                            <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 animate-pulse"></div>
+                            
+                            <!-- Orbital Radar Spinner -->
+                            <div class="relative w-20 h-20 flex items-center justify-center mb-4">
+                                <div class="absolute inset-0 rounded-full border-2 border-indigo-500/20"></div>
+                                <div class="absolute inset-1 rounded-full border-2 border-dashed border-purple-500/40 radar-spin"></div>
+                                <div class="absolute inset-0 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div>
+                                <div class="w-11 h-11 rounded-full bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center">
+                                    <i class="fa-solid fa-earth-americas text-indigo-400 text-xl animate-pulse"></i>
+                                </div>
+                            </div>
+
+                            <div class="text-base font-display font-bold text-white">Synthesizing Cartographic Layer</div>
+                            <div id="loadingStepText" class="text-xs text-indigo-300 mt-1 font-mono">Querying Gemini model and rendering map</div>
+                            
+                            <!-- Multi-stage Step Progress List -->
+                            <div class="w-full mt-4 space-y-2 text-left bg-slate-950/80 p-3.5 rounded-xl border border-slate-800/80 font-mono text-[11px]">
+                                <div id="loadStage1" class="flex items-center justify-between text-indigo-300">
+                                    <span class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin text-[10px]"></i> 1. AI Geospatial Query</span>
+                                    <span class="text-[10px] opacity-75">Active</span>
+                                </div>
+                                <div id="loadStage2" class="flex items-center justify-between text-slate-500">
+                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> 2. Region Flood-Fill &amp; Palette</span>
+                                    <span class="text-[10px] opacity-75">Pending</span>
+                                </div>
+                                <div id="loadStage3" class="flex items-center justify-between text-slate-500">
+                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> 3. Relief &amp; Typography Composite</span>
+                                    <span class="text-[10px] opacity-75">Pending</span>
+                                </div>
+                            </div>
+
+                            <div class="w-full flex items-center justify-between mt-3 text-[11px] font-mono text-slate-400">
+                                <span>Elapsed Time</span>
+                                <span id="loadingElapsedTimer" class="text-indigo-300">0.0s</span>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Interactive Image Container -->
-                    <div id="mapCanvasWrapper" class="transition-transform duration-200 ease-out origin-center max-w-full max-h-full flex items-center justify-center">
+                    <div id="mapCanvasWrapper" class="transition-transform duration-150 ease-out origin-center max-w-full max-h-full flex items-center justify-center">
                         
                         <!-- Server Image (real generated map returned by Flask as a data URL) -->
-                        <img id="serverMapImage" src="" alt="Generated Map" class="hidden max-h-[520px] w-auto rounded-xl shadow-2xl border border-slate-800 object-contain">
+                        <img id="serverMapImage" src="" alt="Generated Map" draggable="false" class="hidden max-h-[540px] w-auto rounded-xl shadow-[0_25px_70px_rgba(0,0,0,0.85)] border border-slate-700/80 object-contain">
 
                         <!-- Empty-state placeholder shown before the first generation -->
-                        <div id="emptyState" class="w-full max-w-[780px] aspect-[8/5] rounded-xl border border-dashed border-slate-700 bg-slate-900/60 flex flex-col items-center justify-center gap-3 text-center px-6">
-                            <i class="fa-solid fa-map-location-dot text-slate-600 text-4xl"></i>
-                            <p class="text-sm text-slate-400">Configure the flags on the left and click <span class="text-indigo-400 font-medium">Run CLI & Generate Map</span>.</p>
-                            <p class="text-xs text-slate-500">The generated map will appear here.</p>
+                        <div id="emptyState" class="w-full max-w-[740px] rounded-2xl border border-dashed border-slate-700/80 bg-slate-900/50 backdrop-blur-sm p-8 flex flex-col items-center justify-center gap-4 text-center">
+                            <div class="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500/15 via-purple-500/10 to-cyan-500/15 border border-indigo-500/25 flex items-center justify-center shadow-inner">
+                                <i class="fa-solid fa-map-location-dot text-indigo-400 text-3xl"></i>
+                                <span class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center shadow">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                </span>
+                            </div>
+                            <div class="max-w-md space-y-1.5">
+                                <h3 class="font-display font-semibold text-base text-white">Ready to Synthesize Your Map</h3>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    Pick a <span class="text-indigo-300 font-medium">Quick Prompt Preset</span> on the left or type any geographic question, then click <span class="text-indigo-300 font-medium">Run CLI &amp; Generate Map</span>.
+                                </p>
+                            </div>
+                            <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+                                <button type="button" onclick="applyPromptPreset('Population of European countries', 'number', 'default', 'show_most_least')" class="text-xs px-3 py-1.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-bolt text-amber-400 text-[10px]"></i>
+                                    <span>Try Sample: Europe Population</span>
+                                </button>
+                                <button type="button" onclick="openFillingStudio()" class="text-xs px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 border border-slate-700 transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-palette text-purple-400 text-[10px]"></i>
+                                    <span>Inspect Color Palette</span>
+                                </button>
+                            </div>
                         </div>
 
                     </div>
@@ -444,36 +738,43 @@
                         <div id="activeFlagsBadges" class="flex flex-wrap gap-1.5">
                             <!-- Populated by JS -->
                         </div>
-                        <div class="text-[11px] font-mono text-slate-500 bg-slate-900/90 px-2.5 py-1 rounded-lg border border-slate-800">
-                            Use mouse wheel or toolbar buttons to zoom
+                        <div class="text-[11px] font-mono text-slate-400 bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-lg border border-slate-800">
+                            Scroll to zoom &bull; Drag to pan
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- CLI Console Output & History Tabs -->
-            <div class="bg-slate-900 border border-slate-800/90 rounded-2xl shadow-xl overflow-hidden">
-                <div class="px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-                    <div class="flex items-center gap-4">
-                        <button onclick="switchBottomTab('console')" id="tabConsoleBtn" class="text-xs font-semibold text-indigo-400 border-b-2 border-indigo-500 pb-2 -mb-2.5 flex items-center gap-1.5 transition">
+            <div class="cyber-card border border-slate-800/90 rounded-2xl shadow-xl overflow-hidden">
+                <div class="px-4 py-2.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-5">
+                        <button type="button" onclick="switchBottomTab('console')" id="tabConsoleBtn" class="text-xs font-semibold text-indigo-400 border-b-2 border-indigo-500 pb-2 -mb-2.5 flex items-center gap-1.5 transition">
                             <i class="fa-solid fa-terminal"></i>
                             <span>Console Output (stdout / stderr)</span>
                         </button>
-                        <button onclick="switchBottomTab('history')" id="tabHistoryBtn" class="text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-1.5 transition">
+                        <button type="button" onclick="switchBottomTab('history')" id="tabHistoryBtn" class="text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-1.5 transition">
                             <i class="fa-solid fa-clock-rotate-left"></i>
                             <span>Run History</span>
                             <span id="historyCountBadge" class="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px]">0</span>
                         </button>
                     </div>
-                    <button onclick="clearConsole()" class="text-[11px] text-slate-500 hover:text-slate-300 transition">
-                        Clear
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="clearConsoleBtn" onclick="clearConsole()" class="text-[11px] text-slate-400 hover:text-slate-200 transition flex items-center gap-1">
+                            <i class="fa-regular fa-trash-can text-[10px]"></i>
+                            <span>Clear Console</span>
+                        </button>
+                        <button type="button" id="clearHistoryBtn" onclick="clearHistory()" class="hidden text-[11px] text-slate-400 hover:text-slate-200 transition flex items-center gap-1">
+                            <i class="fa-regular fa-trash-can text-[10px]"></i>
+                            <span>Clear History</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Tab 1: Console Logs -->
                 <div id="consoleTabContent" class="p-4 bg-slate-950/90 font-mono text-xs h-40 overflow-y-auto space-y-1.5">
-                    <div class="text-slate-500">[System] Web interface initialized and ready.</div>
-                    <div class="text-slate-400">[Info] Select your desired flags <span class="text-indigo-400">-m, -mp, -gsm, -eop, --model, --font</span> and click "Run CLI & Generate Map".</div>
+                    <div class="text-slate-500">[System] AutoMap Studio initialized and ready.</div>
+                    <div class="text-slate-400">[Info] Select your desired flags <span class="text-indigo-400">-m, -mp, -gsm, -eop, --model, --font</span> and click "Run CLI &amp; Generate Map".</div>
                 </div>
 
                 <!-- Tab 2: Generation History -->
@@ -487,8 +788,138 @@
         </section>
     </main>
 
+    <!-- Polished Color Filling Studio Modal (`filling_txt` & `filling_num`) -->
+    <div id="fillingStudioModal" onclick="if(event.target===this) closeFillingStudio()" class="fixed inset-0 z-50 hidden items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md transition-opacity">
+        <div class="cyber-card border border-slate-700/80 rounded-2xl max-w-4xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+                <div class="flex items-center gap-3.5">
+                    <div class="relative group">
+                        <div class="absolute -inset-1 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-rose-400 opacity-60 blur group-hover:opacity-90 transition duration-300"></div>
+                        <div class="relative w-10 h-10 rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center shadow-lg border border-indigo-400/30">
+                            <!-- Custom Stylized AutoMap Color Filling Studio SVG Icon -->
+                            <svg class="w-7 h-7" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="AutoMap Color Filling Studio Logo">
+                                <defs>
+                                    <linearGradient id="amFillStrokeGrad" x1="4" y1="6" x2="36" y2="34" gradientUnits="userSpaceOnUse">
+                                        <stop offset="0%" stop-color="#a5b4fc" />
+                                        <stop offset="50%" stop-color="#c084fc" />
+                                        <stop offset="100%" stop-color="#fb7185" />
+                                    </linearGradient>
+                                    <linearGradient id="amDropGrad" x1="23" y1="7" x2="34" y2="22" gradientUnits="userSpaceOnUse">
+                                        <stop offset="0%" stop-color="#fb7185" />
+                                        <stop offset="50%" stop-color="#c084fc" />
+                                        <stop offset="100%" stop-color="#6366f1" />
+                                    </linearGradient>
+                                </defs>
+                                <!-- Folded AutoMap Panels Filled with Data Swatch Colors -->
+                                <path d="M5.5 12L14 8.5V28L5.5 31.5V12Z" fill="#34d399" fill-opacity="0.28" />
+                                <path d="M14 8.5L24.5 12V31.5L14 28V8.5Z" fill="#6366f1" fill-opacity="0.32" />
+                                <path d="M24.5 12L33.5 8.5V28L24.5 31.5V12Z" fill="#f59e0b" fill-opacity="0.28" />
+                                <path d="M5.5 12L14 8.5L24.5 12L33.5 8.5V28L24.5 31.5L14 28L5.5 31.5V12Z" stroke="url(#amFillStrokeGrad)" stroke-width="1.6" stroke-linejoin="round" />
+                                <path d="M14 8.5V28M24.5 12V31.5" stroke="#a5b4fc" stroke-width="1.15" stroke-opacity="0.55" stroke-dasharray="2 2" />
+                                <!-- Glowing Color Swatch Nodes on Map Regions -->
+                                <circle cx="9.8" cy="20.5" r="2.1" fill="#34d399" stroke="#090e1a" stroke-width="1" />
+                                <circle cx="19.2" cy="21.5" r="2.1" fill="#818cf8" stroke="#090e1a" stroke-width="1" />
+                                <circle cx="29" cy="22" r="2.1" fill="#fbbf24" stroke="#090e1a" stroke-width="1" />
+                                <!-- Stylized Color Droplet / Brush Prism Badge -->
+                                <path d="M28.5 6.5C28.5 6.5 34 12.6 34 16.2C34 19.24 31.54 21.7 28.5 21.7C25.46 21.7 23 19.24 23 16.2C23 12.6 28.5 6.5 28.5 6.5Z" fill="url(#amDropGrad)" stroke="#ffffff" stroke-width="1.15" stroke-linejoin="round" />
+                                <circle cx="27.2" cy="15.5" r="1.2" fill="#ffffff" fill-opacity="0.85" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-display font-bold text-base text-white">Color Filling Studio</h3>
+                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">map/filling.json</code>
+                        </div>
+                        <p class="text-xs text-slate-400">Interactive rule editor for <code class="text-slate-300">filling_txt</code> (Text categories) &amp; <code class="text-slate-300">filling_num</code> (Numeric intervals)</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeFillingStudio()" class="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6 overflow-y-auto grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+                <!-- Left 7 Cols: Rule Builders -->
+                <div class="lg:col-span-7 space-y-6">
+                    <!-- Section A: filling_txt -->
+                    <div class="bg-slate-950/70 border border-slate-800/90 rounded-xl p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <h4 class="text-xs font-semibold text-white flex items-center gap-2">
+                                    <i class="fa-solid fa-font text-indigo-400"></i>
+                                    <span>Text Category Rules (<code class="font-mono text-indigo-300">filling_txt</code>)</span>
+                                </h4>
+                                <p class="text-[11px] text-slate-400">Case-insensitive exact label match -> RGBA fill color</p>
+                            </div>
+                            <button type="button" onclick="addTextFillingRule()" class="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-medium transition flex items-center gap-1">
+                                <i class="fa-solid fa-plus text-[10px]"></i>
+                                <span>Add Label</span>
+                            </button>
+                        </div>
+                        <div id="fillingTxtList" class="space-y-2 max-h-52 overflow-y-auto pr-1"></div>
+                    </div>
+
+                    <!-- Section B: filling_num -->
+                    <div class="bg-slate-950/70 border border-slate-800/90 rounded-xl p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <h4 class="text-xs font-semibold text-white flex items-center gap-2">
+                                    <i class="fa-solid fa-hashtag text-emerald-400"></i>
+                                    <span>Numeric Range Rules (<code class="font-mono text-emerald-300">filling_num</code>)</span>
+                                </h4>
+                                <p class="text-[11px] text-slate-400">Matches <code class="text-slate-300">low &lt; value &lt;= high</code> -> RGBA fill color</p>
+                            </div>
+                            <button type="button" onclick="addNumFillingRule()" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition flex items-center gap-1">
+                                <i class="fa-solid fa-plus text-[10px]"></i>
+                                <span>Add Range</span>
+                            </button>
+                        </div>
+                        <div id="fillingNumList" class="space-y-2 max-h-52 overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+
+                <!-- Right 5 Cols: Live Swatch Glow Preview & JSON Export -->
+                <div class="lg:col-span-5 flex flex-col gap-4">
+                    <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-4 flex-1 flex flex-col">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                <i class="fa-solid fa-code text-indigo-400"></i>
+                                <span>Live <code class="font-mono">filling.json</code> Output</span>
+                            </span>
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" onclick="copyFillingJson()" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition flex items-center gap-1">
+                                    <i class="fa-regular fa-copy"></i>
+                                    <span>Copy JSON</span>
+                                </button>
+                                <button type="button" onclick="downloadFillingJson()" class="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-1">
+                                    <i class="fa-solid fa-download"></i>
+                                    <span>Download</span>
+                                </button>
+                            </div>
+                        </div>
+                        <pre id="fillingJsonPreview" class="flex-1 p-3 rounded-lg bg-slate-900/90 border border-slate-800 font-mono text-[11px] text-emerald-300 overflow-auto max-h-80 leading-relaxed select-all"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-3.5 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between">
+                <button type="button" onclick="resetFillingDefaults()" class="text-xs text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span>Restore Default Palette</span>
+                </button>
+                <button type="button" onclick="closeFillingStudio(true)" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
+                    Done &amp; Save Preview
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Notification Toast -->
-    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-medium">
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none bg-slate-900/95 backdrop-blur-xl border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-medium">
         <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
         <span id="toastMsg">Operation successful</span>
     </div>
@@ -497,25 +928,134 @@
     <script>
         // --- State ---
         let currentZoom = 1;
+        let panX = 0;
+        let panY = 0;
+        let isDraggingMap = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
         let runHistory = [];
         let apiKeyRequired = false;
+        let loadingTimerInterval = null;
+
+        // Default Color Filling Studio Rules (`filling_txt` & `filling_num`)
+        const DEFAULT_FILLING_TXT = [
+            { key: "yes", hex: "#2ecc71", alpha: 255 },
+            { key: "no", hex: "#e74c3c", alpha: 255 },
+            { key: "tea", hex: "#10b981", alpha: 255 },
+            { key: "coffee", hex: "#f59e0b", alpha: 255 }
+        ];
+        const DEFAULT_FILLING_NUM = [
+            { low: 0, high: 100, hex: "#38bdf8", alpha: 255 },
+            { low: 100, high: 1000, hex: "#6366f1", alpha: 255 },
+            { low: 1000, high: 10000, hex: "#a855f7", alpha: 255 },
+            { low: 10000, high: 100000000, hex: "#f43f5e", alpha: 255 }
+        ];
+
+        let fillingTxtRules = JSON.parse(JSON.stringify(DEFAULT_FILLING_TXT));
+        let fillingNumRules = JSON.parse(JSON.stringify(DEFAULT_FILLING_NUM));
 
         // --- Initialize on Load ---
         window.addEventListener('DOMContentLoaded', () => {
             updateCommandPreview();
+            renderFillingStudio();
             // Discover real fonts from the backend on startup (silent — no toast)
             fetchFontsFromServer(true);
+
+            // Bind live input/change listeners on #apiKeyInput so #statusIndicator updates immediately
+            const apiKeyInputEl = document.getElementById('apiKeyInput');
+            if (apiKeyInputEl) {
+                apiKeyInputEl.addEventListener('input', updateApiKeyIndicator);
+                apiKeyInputEl.addEventListener('change', updateApiKeyIndicator);
+            }
+
             // Ask the server whether an API key from .env is available.
             checkApiKeyStatus();
 
-            // Mouse wheel zoom support on the map viewport
+            // Close modal on Escape key
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    const modal = document.getElementById('fillingStudioModal');
+                    if (modal && !modal.classList.contains('hidden')) {
+                        closeFillingStudio();
+                    }
+                }
+            });
+
+            // Sync fullscreen icon state
+            document.addEventListener('fullscreenchange', () => {
+                const fsIcon = document.getElementById('fullscreenIcon');
+                if (fsIcon) {
+                    fsIcon.className = document.fullscreenElement
+                        ? 'fa-solid fa-compress text-xs'
+                        : 'fa-solid fa-expand text-xs';
+                }
+            });
+
+            // Mouse wheel zoom & drag-to-pan support on the map viewport
             const viewport = document.getElementById('mapViewport');
             viewport.addEventListener('wheel', (e) => {
                 e.preventDefault();
-                const delta = e.deltaY < 0 ? 0.12 : -0.12;
+                const delta = e.deltaY < 0 ? 0.14 : -0.14;
                 zoomMap(delta);
             }, { passive: false });
+
+            viewport.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return;
+                isDraggingMap = true;
+                dragStartX = e.clientX - panX;
+                dragStartY = e.clientY - panY;
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDraggingMap) return;
+                panX = e.clientX - dragStartX;
+                panY = e.clientY - dragStartY;
+                applyZoom();
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDraggingMap = false;
+            });
         });
+
+        // --- Reactive API Key & System Status Indicator ---
+        function updateApiKeyIndicator() {
+            const statusIndicator = document.getElementById('statusIndicator');
+            const headerDot = document.getElementById('headerApiDot');
+            const headerText = document.getElementById('headerApiText');
+            const stageDot = document.getElementById('stageStatusDot');
+            const apiKeyInput = document.getElementById('apiKeyInput');
+            const hasEnteredKey = !!(apiKeyInput && apiKeyInput.value.trim().length > 0);
+            const needsKeyNow = apiKeyRequired && !hasEnteredKey;
+
+            if (needsKeyNow) {
+                if (statusIndicator) {
+                    statusIndicator.className = 'flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/40 text-xs text-amber-300 transition-all';
+                }
+                if (headerDot) {
+                    headerDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_#fbbf24]';
+                }
+                if (headerText) {
+                    headerText.textContent = 'API Key Needed';
+                }
+                if (stageDot) {
+                    stageDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shadow-[0_0_10px_#fbbf24] transition-colors';
+                }
+            } else {
+                if (statusIndicator) {
+                    statusIndicator.className = 'flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-emerald-500/30 text-xs text-emerald-300 transition-all';
+                }
+                if (headerDot) {
+                    headerDot.className = 'w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]';
+                }
+                if (headerText) {
+                    headerText.textContent = apiKeyRequired ? 'API Key Entered' : 'System Ready';
+                }
+                if (stageDot) {
+                    stageDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399] transition-colors';
+                }
+            }
+        }
 
         // --- API key status / input ---
         async function checkApiKeyStatus() {
@@ -531,6 +1071,7 @@
             }
 
             const section = document.getElementById('apiKeySection');
+
             if (apiKeyRequired) {
                 section.classList.remove('hidden');
                 logToConsole('[Info] No .env API key detected — please enter your Gemini API key above.', 'warn');
@@ -538,6 +1079,8 @@
                 section.classList.add('hidden');
                 logToConsole('[Info] Server has a Gemini API key from .env — no key input needed.', 'info');
             }
+
+            updateApiKeyIndicator();
         }
 
         function toggleApiKeyVisibility() {
@@ -550,6 +1093,31 @@
                 input.type = 'password';
                 icon.className = 'fa-solid fa-eye text-xs';
             }
+        }
+
+        // --- Quick Prompt Presets ---
+        function applyPromptPreset(promptText, mode, mapType, extraOption = 'none') {
+            const topicInput = document.getElementById('topicInput');
+            topicInput.value = promptText;
+
+            const modeRadio = document.querySelector(`input[name="mode"][value="${mode}"]`);
+            if (modeRadio) modeRadio.checked = true;
+
+            const mapRadio = document.querySelector(`input[name="map_type"][value="${mapType}"]`);
+            if (mapRadio) mapRadio.checked = true;
+
+            const eopRadio = document.querySelector(`input[name="extra_option"][value="${extraOption}"]`);
+            if (eopRadio) eopRadio.checked = true;
+
+            updateCommandPreview();
+            showToast(`Preset loaded: "${promptText}"`, 'info');
+        }
+
+        function clearTopicInput() {
+            const topicInput = document.getElementById('topicInput');
+            topicInput.value = '';
+            topicInput.focus();
+            updateCommandPreview();
         }
 
         // --- Get Current Form Values ---
@@ -569,15 +1137,16 @@
         // --- Sync Global Size Modifier Slider & Number Input ---
         function syncGsm(val) {
             const parsed = parseInt(val, 10);
-            const safeVal = isNaN(parsed) ? 15 : parsed;
-            document.getElementById('gsmRange').value = Math.max(-50, Math.min(100, safeVal));
+            const safeVal = Math.max(-50, Math.min(100, isNaN(parsed) ? 15 : parsed));
+            document.getElementById('gsmRange').value = safeVal;
             document.getElementById('gsmNumber').value = safeVal;
             updateCommandPreview();
         }
 
         function adjustGsm(delta) {
-            const current = parseInt(document.getElementById('gsmNumber').value, 10) || 0;
-            syncGsm(current + delta);
+            const current = parseInt(document.getElementById('gsmNumber').value, 10);
+            const base = isNaN(current) ? 15 : current;
+            syncGsm(base + delta);
         }
 
         // --- Build & Update Live CLI Command ---
@@ -590,6 +1159,35 @@
 
             document.getElementById('cliCommandDisplay').textContent = cmd;
             updateActiveBadges(state);
+            updateCompatibilityHint(state);
+            updateHudCoords(state);
+        }
+
+        function updateCompatibilityHint(state) {
+            const hint = document.getElementById('extraOptionHint');
+            if (!hint) return;
+            if (state.extra_option === 'show_most_least' && state.mode === 'text') {
+                hint.textContent = 'Note: show_most_least is designed for numeric mode (-m number).';
+                hint.className = 'text-[11px] text-amber-400/90 mt-1.5 block';
+            } else if (state.extra_option === 'show_most_least' && state.map_type === 'world') {
+                hint.textContent = 'Note: show_most_least overlay is supported on Europe maps (default / flag).';
+                hint.className = 'text-[11px] text-amber-400/90 mt-1.5 block';
+            } else if (state.extra_option === 'short_form' && state.mode === 'number') {
+                hint.textContent = 'Note: short_form (1k/1M) works best in text mode (-m text).';
+                hint.className = 'text-[11px] text-amber-400/90 mt-1.5 block';
+            } else {
+                hint.className = 'hidden';
+            }
+        }
+
+        function updateHudCoords(state) {
+            const el = document.getElementById('hudCoordsText');
+            if (!el) return;
+            if (state.map_type === 'world') {
+                el.textContent = 'GLOBAL CONTINENTAL PROJECTION • 0.0000° N / 0.0000° E';
+            } else {
+                el.textContent = 'EUROPE ATLAS SECTOR • LAT 54.5260° N / LON 15.2551° E';
+            }
         }
 
         // --- Update Watermark Badges on Map ---
@@ -601,7 +1199,7 @@
                 { label: `gsm: ${state.gsm}`, color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
                 { label: `eop: ${state.extra_option}`, color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
                 { label: state.model, color: 'bg-sky-500/20 text-sky-300 border-sky-500/30' },
-                { label: state.font, color: 'bg-slate-800 text-slate-300 border-slate-700' }
+                { label: state.font, color: 'bg-slate-900/90 text-slate-300 border-slate-700' }
             ];
 
             container.innerHTML = badges.map(b => 
@@ -621,19 +1219,26 @@
         function addCustomModel() {
             const input = document.getElementById('newModelInput');
             const val = input.value.trim();
-            if (!val) return;
+            if (!val) {
+                showToast('Enter a model ID first', 'warn');
+                input.focus();
+                return;
+            }
 
             const select = document.getElementById('modelSelect');
-            const option = document.createElement('option');
-            option.value = val;
-            option.textContent = val;
-            select.appendChild(option);
+            const existing = Array.from(select.options).find(opt => opt.value === val);
+            if (!existing) {
+                const option = document.createElement('option');
+                option.value = val;
+                option.textContent = val;
+                select.appendChild(option);
+            }
             select.value = val;
 
             input.value = '';
             document.getElementById('customModelBox').classList.add('hidden');
             updateCommandPreview();
-            showToast(`Model "${val}" added to the list`, 'success');
+            showToast(`Model "${val}" selected`, 'success');
         }
 
         // --- Auto-discover Fonts from Flask `/api/fonts` ---
@@ -664,6 +1269,50 @@
             }
         }
 
+        // --- Multi-Stage Loading Animation Helper ---
+        function startLoadingStages() {
+            const stepText = document.getElementById('loadingStepText');
+            const timerEl = document.getElementById('loadingElapsedTimer');
+            const s1 = document.getElementById('loadStage1');
+            const s2 = document.getElementById('loadStage2');
+            const s3 = document.getElementById('loadStage3');
+
+            const startTime = performance.now();
+            clearInterval(loadingTimerInterval);
+
+            if (s1 && s2 && s3) {
+                s1.className = 'flex items-center justify-between text-indigo-300';
+                s1.innerHTML = '<span class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin text-[10px]"></i> 1. AI Geospatial Query</span><span class="text-[10px]">Running</span>';
+                s2.className = 'flex items-center justify-between text-slate-500';
+                s2.innerHTML = '<span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> 2. Region Flood-Fill &amp; Palette</span><span class="text-[10px]">Pending</span>';
+                s3.className = 'flex items-center justify-between text-slate-500';
+                s3.innerHTML = '<span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> 3. Relief &amp; Typography Composite</span><span class="text-[10px]">Pending</span>';
+            }
+
+            loadingTimerInterval = setInterval(() => {
+                const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+                if (timerEl) timerEl.textContent = `${elapsed}s`;
+
+                if (elapsed >= 2.2 && elapsed < 4.8 && s1 && s2) {
+                    stepText.textContent = 'Flood-filling regions and applying palette rules...';
+                    s1.className = 'flex items-center justify-between text-emerald-400';
+                    s1.innerHTML = '<span class="flex items-center gap-2"><i class="fa-solid fa-check text-[10px]"></i> 1. AI Geospatial Query</span><span class="text-[10px]">Done</span>';
+                    s2.className = 'flex items-center justify-between text-indigo-300';
+                    s2.innerHTML = '<span class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin text-[10px]"></i> 2. Region Flood-Fill &amp; Palette</span><span class="text-[10px]">Running</span>';
+                } else if (elapsed >= 4.8 && s2 && s3) {
+                    stepText.textContent = 'Compositing relief shading, borders & custom typography...';
+                    s2.className = 'flex items-center justify-between text-emerald-400';
+                    s2.innerHTML = '<span class="flex items-center gap-2"><i class="fa-solid fa-check text-[10px]"></i> 2. Region Flood-Fill &amp; Palette</span><span class="text-[10px]">Done</span>';
+                    s3.className = 'flex items-center justify-between text-indigo-300';
+                    s3.innerHTML = '<span class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin text-[10px]"></i> 3. Relief &amp; Typography Composite</span><span class="text-[10px]">Running</span>';
+                }
+            }, 150);
+        }
+
+        function stopLoadingStages() {
+            clearInterval(loadingTimerInterval);
+        }
+
         // --- Handle Map Generation (Form Submit) ---
         async function handleGenerate(e) {
             e.preventDefault();
@@ -685,7 +1334,8 @@
             overlay.classList.remove('hidden');
             btn.disabled = true;
             btn.classList.add('opacity-70');
-            metaBadge.textContent = "Running...";
+            metaBadge.textContent = "Synthesizing...";
+            startLoadingStages();
 
             logToConsole(`$ ${cmd}`, 'cmd');
 
@@ -728,26 +1378,29 @@
                 showToast("Map generation failed. Check console logs.", "error");
                 metaBadge.textContent = "Execution Error";
             } finally {
+                stopLoadingStages();
                 overlay.classList.add('hidden');
                 btn.disabled = false;
                 btn.classList.remove('opacity-70');
             }
         }
 
-        // --- Zoom & Fullscreen Controls ---
+        // --- Zoom, Pan & Fullscreen Controls ---
         function zoomMap(delta) {
-            currentZoom = Math.max(0.5, Math.min(2.5, +(currentZoom + delta).toFixed(2)));
+            currentZoom = Math.max(0.5, Math.min(3.0, +(currentZoom + delta).toFixed(2)));
             applyZoom();
         }
 
         function resetZoom() {
             currentZoom = 1;
+            panX = 0;
+            panY = 0;
             applyZoom();
         }
 
         function applyZoom() {
             const wrapper = document.getElementById('mapCanvasWrapper');
-            wrapper.style.transform = `scale(${currentZoom})`;
+            wrapper.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
             document.getElementById('zoomLevelText').textContent = `${Math.round(currentZoom * 100)}%`;
         }
 
@@ -774,9 +1427,162 @@
             showToast("Downloading PNG map...", "success");
         }
 
+        // --- Color Filling Studio (`filling_txt` & `filling_num`) ---
+        function hexToRgbArray(hex, alpha = 255) {
+            const clean = (hex || '#6366f1').replace('#', '');
+            const num = parseInt(clean, 16);
+            const r = (num >> 16) & 255;
+            const g = (num >> 8) & 255;
+            const b = num & 255;
+            return [r, g, b, alpha];
+        }
+
+        function openFillingStudio() {
+            const modal = document.getElementById('fillingStudioModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            renderFillingStudio();
+        }
+
+        function closeFillingStudio(notify = false) {
+            const modal = document.getElementById('fillingStudioModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            if (notify) {
+                showToast("Color filling palette updated", "success");
+            }
+        }
+
+        function renderFillingStudio() {
+            const txtList = document.getElementById('fillingTxtList');
+            const numList = document.getElementById('fillingNumList');
+            const jsonPreview = document.getElementById('fillingJsonPreview');
+            const miniSwatches = document.getElementById('miniSwatchPreview');
+            const summaryBadge = document.getElementById('fillingSummaryBadge');
+
+            if (txtList) {
+                txtList.innerHTML = fillingTxtRules.map((item, idx) => `
+                    <div class="flex items-center gap-2.5 p-2 rounded-xl bg-slate-900/90 border border-slate-800">
+                        <input type="color" value="${item.hex}" onchange="updateTxtRule(${idx}, 'hex', this.value)"
+                            class="w-7 h-7 rounded-lg cursor-pointer shrink-0" style="box-shadow: 0 0 12px ${item.hex}66">
+                        <input type="text" value="${item.key}" oninput="updateTxtRule(${idx}, 'key', this.value)"
+                            placeholder="Label (e.g. yes)"
+                            class="flex-1 min-w-0 px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
+                        <span class="text-[10px] font-mono text-slate-400 hidden sm:inline">[${hexToRgbArray(item.hex, item.alpha).join(', ')}]</span>
+                        <button type="button" onclick="removeTxtRule(${idx})" class="text-slate-500 hover:text-rose-400 p-1 transition" title="Remove">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                `).join('');
+            }
+
+            if (numList) {
+                numList.innerHTML = fillingNumRules.map((item, idx) => `
+                    <div class="flex items-center gap-2 p-2 rounded-xl bg-slate-900/90 border border-slate-800">
+                        <input type="color" value="${item.hex}" onchange="updateNumRule(${idx}, 'hex', this.value)"
+                            class="w-7 h-7 rounded-lg cursor-pointer shrink-0" style="box-shadow: 0 0 12px ${item.hex}66">
+                        <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                            <input type="number" value="${item.low}" oninput="updateNumRule(${idx}, 'low', this.value)"
+                                class="w-20 px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-emerald-500">
+                            <span class="text-xs text-slate-500 font-mono">to</span>
+                            <input type="number" value="${item.high}" oninput="updateNumRule(${idx}, 'high', this.value)"
+                                class="w-24 px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-emerald-500">
+                        </div>
+                        <button type="button" onclick="removeNumRule(${idx})" class="text-slate-500 hover:text-rose-400 p-1 transition" title="Remove">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                `).join('');
+            }
+
+            // Build JSON structure matching map/filling.json
+            const fillingObj = {
+                filling_txt: {},
+                filling_num: {}
+            };
+            fillingTxtRules.forEach(r => {
+                if (r.key && r.key.trim()) {
+                    fillingObj.filling_txt[r.key.trim()] = hexToRgbArray(r.hex, r.alpha);
+                }
+            });
+            fillingNumRules.forEach(r => {
+                fillingObj.filling_num[`(${Number(r.low) || 0}, ${Number(r.high) || 0})`] = hexToRgbArray(r.hex, r.alpha);
+            });
+
+            if (jsonPreview) {
+                jsonPreview.textContent = JSON.stringify(fillingObj, null, 2);
+            }
+
+            const allColors = [...fillingTxtRules.map(r => r.hex), ...fillingNumRules.map(r => r.hex)].slice(0, 6);
+            if (miniSwatches) {
+                miniSwatches.innerHTML = allColors.map(hex =>
+                    `<span class="w-4 h-4 rounded-full border border-slate-950 shadow" style="background:${hex}"></span>`
+                ).join('');
+            }
+            if (summaryBadge) {
+                summaryBadge.textContent = `${fillingTxtRules.length + fillingNumRules.length} rules`;
+            }
+        }
+
+        function updateTxtRule(idx, field, val) {
+            if (!fillingTxtRules[idx]) return;
+            fillingTxtRules[idx][field] = val;
+            renderFillingStudio();
+        }
+
+        function addTextFillingRule() {
+            fillingTxtRules.push({ key: "custom", hex: "#8b5cf6", alpha: 255 });
+            renderFillingStudio();
+        }
+
+        function removeTxtRule(idx) {
+            fillingTxtRules.splice(idx, 1);
+            renderFillingStudio();
+        }
+
+        function updateNumRule(idx, field, val) {
+            if (!fillingNumRules[idx]) return;
+            fillingNumRules[idx][field] = field === 'hex' ? val : Number(val);
+            renderFillingStudio();
+        }
+
+        function addNumFillingRule() {
+            fillingNumRules.push({ low: 1000, high: 50000, hex: "#14b8a6", alpha: 255 });
+            renderFillingStudio();
+        }
+
+        function removeNumRule(idx) {
+            fillingNumRules.splice(idx, 1);
+            renderFillingStudio();
+        }
+
+        function resetFillingDefaults() {
+            fillingTxtRules = JSON.parse(JSON.stringify(DEFAULT_FILLING_TXT));
+            fillingNumRules = JSON.parse(JSON.stringify(DEFAULT_FILLING_NUM));
+            renderFillingStudio();
+            showToast("Default filling palette restored", "info");
+        }
+
+        function copyFillingJson() {
+            const text = document.getElementById('fillingJsonPreview').textContent;
+            copyTextToClipboard(text, () => {
+                showToast("filling.json copied to clipboard!", "success");
+            });
+        }
+
+        function downloadFillingJson() {
+            const text = document.getElementById('fillingJsonPreview').textContent;
+            const blob = new Blob([text], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'filling.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast("Downloaded filling.json", "success");
+        }
+
         // --- Console & History Management ---
-        // Short, human-readable description of a (possibly huge) data URL,
-        // so we never dump the full base64 payload into the console.
         function describeDataUrl(url) {
             if (!url) return 'no image';
             const m = /^data:([^;]+);base64,(.*)$/.exec(url);
@@ -808,6 +1614,14 @@
 
         function clearConsole() {
             document.getElementById('consoleTabContent').innerHTML = '<div class="text-slate-500">[System] Console cleared.</div>';
+            showToast("Console output cleared", "info");
+        }
+
+        function clearHistory() {
+            runHistory = [];
+            document.getElementById('historyCountBadge').textContent = '0';
+            document.getElementById('historyList').innerHTML = '<div class="text-xs text-slate-500 col-span-full text-center py-8">No runs yet. Generate your first map!</div>';
+            showToast("Run history cleared", "info");
         }
 
         function addToHistory(state, cmd) {
@@ -852,17 +1666,23 @@
             const historyTab = document.getElementById('historyTabContent');
             const consoleBtn = document.getElementById('tabConsoleBtn');
             const historyBtn = document.getElementById('tabHistoryBtn');
+            const clearConsoleBtn = document.getElementById('clearConsoleBtn');
+            const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
             if (tab === 'console') {
                 consoleTab.classList.remove('hidden');
                 historyTab.classList.add('hidden');
                 consoleBtn.className = "text-xs font-semibold text-indigo-400 border-b-2 border-indigo-500 pb-2 -mb-2.5 flex items-center gap-1.5 transition";
                 historyBtn.className = "text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-1.5 transition";
+                if (clearConsoleBtn) clearConsoleBtn.classList.remove('hidden');
+                if (clearHistoryBtn) clearHistoryBtn.classList.add('hidden');
             } else {
                 consoleTab.classList.add('hidden');
                 historyTab.classList.remove('hidden');
                 historyBtn.className = "text-xs font-semibold text-indigo-400 border-b-2 border-indigo-500 pb-2 -mb-2.5 flex items-center gap-1.5 transition";
                 consoleBtn.className = "text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-1.5 transition";
+                if (clearConsoleBtn) clearConsoleBtn.classList.add('hidden');
+                if (clearHistoryBtn) clearHistoryBtn.classList.remove('hidden');
             }
         }
 
@@ -876,11 +1696,24 @@
             document.getElementById('fontSelect').selectedIndex = 0;
             document.getElementById('topicInput').value = '';
             updateCommandPreview();
+            updateApiKeyIndicator();
             showToast("Settings reset to defaults", "info");
         }
 
         // --- Clipboard Helpers ---
         function copyTextToClipboard(text, onSuccess) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    if (onSuccess) onSuccess();
+                }).catch(() => {
+                    fallbackCopyText(text, onSuccess);
+                });
+            } else {
+                fallbackCopyText(text, onSuccess);
+            }
+        }
+
+        function fallbackCopyText(text, onSuccess) {
             const textarea = document.createElement('textarea');
             textarea.value = text;
             document.body.appendChild(textarea);
