@@ -43,7 +43,7 @@ os.makedirs(CUT_DIR, exist_ok=True)
 from dotenv import dotenv_values
 from map.auto_map import auto_map
 
-from flask import Flask, request, jsonify, send_file, render_template
+from flask import Flask, request, jsonify, send_file, render_template, Response
 
 FONTS_DIR = BASE_DIR / "resources" / "fonts"
 
@@ -78,7 +78,24 @@ def main():
 @app.route('/studio')
 def studio():
     """Serve the dedicated Video Studio page (music downloader)."""
-    return render_template("video.html")
+    return render_template("video.html", title_fonts=_available_fonts())
+
+
+@app.route('/api/video_title_preview', methods=['POST'])
+def video_title_preview():
+    import requests
+
+    data = request.get_json(silent=True) or {}
+    try:
+        response = requests.post(
+            'http://yt-dlp-worker:8080/api/video_title_preview',
+            json={key: data[key] for key in ('video_title', 'title_font', 'title_font_size') if key in data},
+            timeout=15,
+        )
+    except requests.RequestException:
+        return jsonify(error='Title preview is unavailable. Please try again.'), 502
+    return Response(response.content, status=response.status_code,
+                    content_type=response.headers.get('Content-Type', 'application/json'))
 
 @app.route('/api/fonts/')
 @app.route('/api/fonts')
@@ -311,6 +328,8 @@ def make_video() -> tuple[object, int]:
                 "video_title": title,
                 "codec": codec,
                 "duration": duration,
+                "title_font": data.get('title_font', 'DIN Condensed.ttf'),
+                "title_font_size": data.get('title_font_size', 100),
             },
             # Video rendering (moviepy/ffmpeg) can take a while - allow more time.
             timeout=300,

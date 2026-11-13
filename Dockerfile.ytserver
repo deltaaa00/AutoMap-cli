@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 
 COPY yt-dlp_serv.py .
+COPY resources/fonts/ resources/fonts/
 
 EXPOSE 8080
 

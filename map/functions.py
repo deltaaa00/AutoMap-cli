@@ -74,14 +74,10 @@ def ai_request(prompt: str, mode: str, ai_model: str, api_key: str | None = None
         json_style = request.strip().replace("```json", "").replace("```", "").strip()
         country_dict = json.loads(json_style)
 
-        return country_dict
     except json.JSONDecodeError:
         try:
             json_style = request.strip().replace("```python", "").replace("```", "").strip()
             country_dict = json.loads(json_style)
-
-
-            return country_dict
 
         except json.JSONDecodeError:
             _error(f"Failed to convert into dictionary. Result {json_style}")
@@ -90,6 +86,12 @@ def ai_request(prompt: str, mode: str, ai_model: str, api_key: str | None = None
     except (AttributeError, TypeError) as e:
         _error("AI response parsing error", str(e))
         return None
+
+    if not isinstance(country_dict, dict):
+        _error("AI response parsing error", "expected a JSON object mapping regions to values")
+        return None
+
+    return country_dict
 
 
 

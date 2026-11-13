@@ -36,3 +36,11 @@ result.png
 !example.env
 
 .ruff_cache/
+
+# Test and coverage reports
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+test-results/
+playwright-report/

@@ -223,10 +223,10 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         info = str(info)
 
         if map_type == 'flag' or map_type == 'default':
-            if len(info) >= 2:
-                x -= 30
-            elif len(info) >= 4:
+            if len(info) >= 4:
                 x -= 70
+            elif len(info) >= 2:
+                x -= 30
             # number in countries
 
             if name in ['cyprus', 'kosovo', 'montenegro']:

@@ -131,6 +131,35 @@
             animation: timelineScan 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
         }
 
+        .video-preview-stage {
+            width: min(100%, 315px);
+            aspect-ratio: 9 / 16;
+            container-type: inline-size;
+        }
+
+        .stage-scrim {
+            background: linear-gradient(to bottom, rgba(0,0,0,.65), rgba(0,0,0,.27) 50%, rgba(0,0,0,.65));
+        }
+
+        #stageCompositeBox {
+            position: absolute;
+            inset: 0 auto auto 0;
+            width: 1080px;
+            height: 1920px;
+            transform-origin: top left;
+            gap: 64px;
+            padding: 72px;
+        }
+
+        #stageTitleBanner {
+            width: 936px;
+            flex: none;
+        }
+
+        #stageTitleBanner img { display: block; width: 936px; }
+        #stageMapPreview { flex: none; max-width: none; max-height: none; }
+        #stageEmptyPlaceholder { transform: scale(3); max-width: 260px; }
+
         /* Custom Audio Control Styling */
         audio {
             height: 36px;
@@ -618,15 +647,29 @@
                                     </label>
                                     <span class="text-[10px] font-mono text-slate-500">Burn-in Caption</span>
                                 </div>
-                                <input type="text" id="videoTitleInput" placeholder="My awesome map video"
+                                <input type="text" id="videoTitleInput" placeholder="My awesome map video" maxlength="1000"
                                     autocomplete="off" spellcheck="false"
                                     oninput="updateStageTitlePreview(this.value)"
                                     class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition">
                             </div>
-                            <div class="flex items-center justify-between text-[11px] text-slate-500 font-mono pt-1">
-                                <span><i class="fa-solid fa-layer-group text-emerald-400/80 mr-1"></i>Top-centered title card</span>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label for="titleFontSelect" class="text-xs text-slate-300">Title font
+                                    <select id="titleFontSelect" onchange="updateTitleStyle()" class="mt-1 w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white">
+                                        {% for font in title_fonts %}
+                                        <option value="{{ font }}" {% if font == 'DIN Condensed.ttf' %}selected{% endif %}>{{ font.rsplit('.', 1)[0] }}{% if font in ['kodchasan.ttf', 'arialroundedmtbold.ttf'] %} (Latin){% endif %}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label for="titleFontSize" class="text-xs text-slate-300">Size · <output id="titleFontSizeValue">100 px</output>
+                                    <input id="titleFontSize" type="range" min="48" max="144" step="4" value="100" oninput="updateTitleStyle()" class="mt-3 w-full accent-emerald-400">
+                                </label>
+                            </div>
+                            <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1 gap-2">
+                                <button type="button" onclick="resetTitleStyle()" class="text-emerald-400 hover:text-emerald-300">Reset · DIN / 100 px</button>
                                 <span id="titleCharCount">0 chars</span>
                             </div>
+                            <p class="text-[10px] text-slate-500">Size at 1080×1920. Long titles shrink automatically to fit.</p>
+                            <p id="titlePreviewStatus" role="status" aria-live="polite" class="text-[11px] text-slate-400"></p>
                         </div>
 
                         <!-- Codec Selection (Synced Visual Cards + Original Select) -->
@@ -681,8 +724,8 @@
                         <!-- Ambient Cinema Glow -->
                         <div class="cinema-ambient pointer-events-none absolute -inset-10 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-rose-500/10 blur-2xl"></div>
 
-                        <div class="relative z-10 flex items-center justify-between mb-3">
-                            <div class="flex items-center gap-2">
+                        <div class="relative z-10 flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <div class="flex flex-wrap items-center gap-2">
                                 <span class="w-2 h-2 rounded-full bg-rose-500"></span>
                                 <span class="text-xs font-display font-semibold text-slate-200 uppercase tracking-wider">Video Preview</span>
                                 <span id="stageModeLabel" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">Live Frame Composite</span>
@@ -694,16 +737,15 @@
                         </div>
 
                         <!-- Stage Screen -->
-                        <div class="relative z-10 aspect-video max-h-[260px] w-full mx-auto rounded-xl bg-slate-950 border border-slate-800/90 shadow-2xl overflow-hidden flex items-center justify-center">
+                        <div class="video-preview-stage relative z-10 mx-auto rounded-xl bg-slate-950 border border-slate-800/90 shadow-2xl overflow-hidden flex items-center justify-center">
                             <!-- Background video live preview (when user selects bgFileInput) -->
-                            <video id="stageBgPreview" class="hidden absolute inset-0 w-full h-full object-cover opacity-55" muted loop playsinline></video>
+                            <video id="stageBgPreview" class="hidden absolute inset-0 w-full h-full object-cover" muted loop playsinline></video>
+                            <div class="stage-scrim absolute inset-0 pointer-events-none"></div>
 
                             <!-- Composite Foreground (Title + Map preview before final render) -->
-                            <div id="stageCompositeBox" class="relative z-10 flex flex-col items-center justify-center p-4 text-center w-full h-full">
-                                <div id="stageTitleBanner" class="mb-2 px-3 py-1 rounded-lg bg-slate-950/80 border border-white/10 text-xs font-display font-bold text-white shadow-lg hidden">
-                                    My awesome map video
-                                </div>
-                                <img id="stageMapPreview" src="" alt="Map frame preview" class="hidden max-h-[165px] rounded-lg border border-white/15 shadow-2xl object-contain">
+                            <div id="stageCompositeBox" class="relative z-10 flex flex-col items-center justify-center text-center w-full h-full">
+                                <div id="stageTitleBanner" class="text-white hidden"></div>
+                                <img id="stageMapPreview" alt="Map frame preview" class="hidden object-contain">
                                 <div id="stageEmptyPlaceholder" class="flex flex-col items-center gap-2 text-slate-500">
                                     <div class="w-12 h-12 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-center text-slate-400 shadow-inner">
                                         <i class="fa-solid fa-photo-film text-xl text-indigo-400/80"></i>
@@ -714,7 +756,7 @@
                             </div>
 
                             <!-- Rendered Final Video Player (revealed when /api/render_video succeeds) -->
-                            <video id="renderedVideoPlayer" class="hidden relative z-20 w-full h-full object-contain bg-black" controls playsinline></video>
+                            <video id="renderedVideoPlayer" class="hidden absolute inset-0 z-20 w-full h-full object-contain bg-black" controls playsinline></video>
                         </div>
                     </div>
 
@@ -1268,18 +1310,105 @@
         }
 
         // --- Interactive Stage & Codec Helpers ---
-        function updateStageTitlePreview(val) {
-            const banner = document.getElementById('stageTitleBanner');
-            const countEl = document.getElementById('titleCharCount');
-            const trimmed = (val || '').trim();
-            if (countEl) countEl.textContent = `${trimmed.length} chars`;
-            if (!banner) return;
-            if (trimmed) {
-                banner.textContent = trimmed;
-                banner.classList.remove('hidden');
+        let titlePreviewTimer;
+        let titlePreviewRequest;
+        let titlePreviewVersion = 0;
+        let titlePreviewUrl;
+        const materialPreviewUrls = {};
+        let previewVisible = true;
+
+        function titleSettings() {
+            return {
+                title_font: document.getElementById('titleFontSelect').value,
+                title_font_size: Number(document.getElementById('titleFontSize').value),
+            };
+        }
+
+        function updatePreviewPlayback() {
+            const bg = document.getElementById('stageBgPreview');
+            const player = document.getElementById('renderedVideoPlayer');
+            if (previewVisible && !document.hidden && player.classList.contains('hidden') && bg.getAttribute('src')) {
+                bg.play().catch(() => {});
             } else {
-                banner.classList.add('hidden');
+                bg.pause();
             }
+        }
+
+        function showLiveComposite() {
+            const player = document.getElementById('renderedVideoPlayer');
+            player.pause();
+            player.classList.add('hidden');
+            document.getElementById('stageModeLabel').textContent = 'Live Frame Composite';
+            updatePreviewPlayback();
+        }
+
+        function updateTitleStyle() {
+            document.getElementById('titleFontSizeValue').textContent = `${titleSettings().title_font_size} px`;
+            updateStageTitlePreview(document.getElementById('videoTitleInput').value);
+        }
+
+        function resetTitleStyle() {
+            document.getElementById('titleFontSelect').value = 'DIN Condensed.ttf';
+            document.getElementById('titleFontSize').value = '100';
+            updateTitleStyle();
+        }
+
+        function updateStageTitlePreview(val) {
+            const title = (val || '').trim();
+            const banner = document.getElementById('stageTitleBanner');
+            const status = document.getElementById('titlePreviewStatus');
+            document.getElementById('titleCharCount').textContent = `${title.length} chars`;
+            clearTimeout(titlePreviewTimer);
+            if (titlePreviewRequest) titlePreviewRequest.abort();
+            const version = ++titlePreviewVersion;
+            showLiveComposite();
+            if (!title) {
+                banner.replaceChildren();
+                banner.classList.add('hidden');
+                if (titlePreviewUrl) URL.revokeObjectURL(titlePreviewUrl);
+                titlePreviewUrl = null;
+                status.textContent = '';
+                return;
+            }
+            status.textContent = 'Updating preview…';
+            // Use the same title rasterizer as the final render, including wrapping,
+            // font metrics, shadows and automatic fitting. Debounce quick edits.
+            titlePreviewTimer = setTimeout(async () => {
+                const controller = new AbortController();
+                titlePreviewRequest = controller;
+                let url;
+                try {
+                    const response = await fetch('/api/video_title_preview', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ video_title: title, ...titleSettings() }),
+                        signal: controller.signal,
+                    });
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Title preview is unavailable.');
+                    }
+                    url = URL.createObjectURL(await response.blob());
+                    const image = new Image();
+                    image.alt = title;
+                    image.src = url;
+                    await image.decode();
+                    if (version !== titlePreviewVersion) {
+                        URL.revokeObjectURL(url);
+                        return;
+                    }
+                    banner.replaceChildren(image);
+                    banner.classList.remove('hidden');
+                    if (titlePreviewUrl) URL.revokeObjectURL(titlePreviewUrl);
+                    titlePreviewUrl = url;
+                    status.textContent = 'Preview matches rendered title';
+                } catch (error) {
+                    if (url) URL.revokeObjectURL(url);
+                    if (version === titlePreviewVersion && error.name !== 'AbortError') {
+                        status.textContent = error.message;
+                        banner.classList.add('hidden');
+                    }
+                }
+            }, 180);
         }
 
         function selectCodecCard(codec) {
@@ -1416,20 +1545,19 @@
             const emptyHint = document.getElementById('stageEmptyPlaceholder');
             const mapThumb = document.getElementById('mapThumbPreview');
             const mapThumbIcon = document.getElementById('mapThumbIcon');
-            const player = document.getElementById('renderedVideoPlayer');
-            const stageModeLabel = document.getElementById('stageModeLabel');
-
-            // When user updates frame materials, switch stage back to live composite preview
-            if (player && !player.classList.contains('hidden')) {
-                player.pause();
-                player.classList.add('hidden');
-                if (stageModeLabel) stageModeLabel.textContent = 'Live Frame Composite';
-            }
+            showLiveComposite();
+            if (materialPreviewUrls[inputId]) URL.revokeObjectURL(materialPreviewUrls[inputId]);
+            materialPreviewUrls[inputId] = file ? URL.createObjectURL(file) : null;
 
             if (inputId === 'mapFileInput') {
                 if (file) {
-                    const url = URL.createObjectURL(file);
+                    const url = materialPreviewUrls[inputId];
                     if (stageMap) {
+                        stageMap.onload = () => {
+                            const scale = Math.min(936 / stageMap.naturalWidth, 820 / stageMap.naturalHeight);
+                            stageMap.style.width = `${stageMap.naturalWidth * scale}px`;
+                            stageMap.style.height = `${stageMap.naturalHeight * scale}px`;
+                        };
                         stageMap.src = url;
                         stageMap.classList.remove('hidden');
                     }
@@ -1451,13 +1579,14 @@
                 }
             } else if (inputId === 'bgFileInput') {
                 if (file && stageBg) {
-                    const url = URL.createObjectURL(file);
+                    const url = materialPreviewUrls[inputId];
                     stageBg.src = url;
                     stageBg.classList.remove('hidden');
-                    stageBg.play().catch(() => {});
+                    updatePreviewPlayback();
                 } else if (stageBg) {
                     stageBg.pause();
-                    stageBg.src = '';
+                    stageBg.removeAttribute('src');
+                    stageBg.load();
                     stageBg.classList.add('hidden');
                 }
             }
@@ -1537,6 +1666,7 @@
                     video_title: title,
                     codec: codec,
                     duration: parseInt(durationSecs, 10),
+                    ...titleSettings(),
                 };
 
                 const response = await fetch('/api/render_video', {
@@ -1573,6 +1703,7 @@
                     const streamUrl = result.download_url || `/api/download_video?path=${encodeURIComponent(filePath)}`;
                     player.src = streamUrl;
                     player.classList.remove('hidden');
+                    updatePreviewPlayback();
                     if (stageModeLabel) stageModeLabel.textContent = 'Master MP4 Output';
                 }
 
@@ -1616,6 +1747,24 @@
         document.addEventListener('DOMContentLoaded', () => {
             setupDropzone('mapDropzone');
             setupDropzone('bgDropzone');
+            const stage = document.querySelector('.video-preview-stage');
+            const composite = document.getElementById('stageCompositeBox');
+            new ResizeObserver(() => {
+                composite.style.transform = `scale(${stage.clientWidth / 1080})`;
+            }).observe(stage);
+            new IntersectionObserver(([entry]) => {
+                previewVisible = entry.isIntersecting;
+                updatePreviewPlayback();
+            }).observe(stage);
+            document.addEventListener('visibilitychange', updatePreviewPlayback);
+            window.addEventListener('pagehide', (event) => {
+                // Keep blob URLs alive when the browser caches this page for Back.
+                if (event.persisted) return;
+                if (titlePreviewRequest) titlePreviewRequest.abort();
+                clearTimeout(titlePreviewTimer);
+                Object.values(materialPreviewUrls).forEach(url => url && URL.revokeObjectURL(url));
+                if (titlePreviewUrl) URL.revokeObjectURL(titlePreviewUrl);
+            });
         });
 
         // --- Toast ---

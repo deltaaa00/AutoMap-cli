@@ -6,16 +6,17 @@ build-backend = "setuptools.build_meta"
 name = "AutoMap"
 version = "0.1.0"
 dependencies = [
-    "pillow>=12.0.0",
+    "pillow>=9.2.0,<12.0.0",
     "click>=8.0.0",
     "google-genai>=1.56.0",
     "python-dotenv>=1.0.0",
     "rich>=13.0.0",
     "flask>=3.1.0",
     "pytest>=9.0.0",
-    "yt-dlp>=2026.10.26",
-    "requests>=2.34.0",
-    "pydub>=0.25.0",
+    "yt-dlp>=2024.12.0",
+    "requests>=2.31.0",
+    "pydub>=0.25.1",
+    "moviepy>=2.0.0",
 ]
 
 [project.scripts]
@@ -31,3 +32,4 @@ map = ["filling.json", "filling.template.json"]
 [tool.pytest.ini_options]
 pythonpath = "."
 testpaths = ["tests"]
+markers = ["browser: offline Chromium interaction tests (requires Playwright browser)"]

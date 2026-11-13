@@ -1,4 +1,5 @@
 import base64
+import io
 import os
 import re
 import shutil
@@ -216,63 +217,108 @@ def cut_audio() -> tuple[object, int]:
             "error": str(e)
         }), 500
 
-# Fonts to try (in order) for the title overlay. First one that loads wins.
-_TITLE_FONT_CANDIDATES = (
-    "DejaVu-Sans-Bold",
-    "DejaVuSans-Bold",
-    "Arial-Bold",
-    "Arial",
-    "Liberation-Sans-Bold",
-    "FreeSansBold",
+TITLE_FONT_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "resources", "fonts", "DIN Condensed.ttf",
 )
 
 
-def _build_title_clip(title: str, duration: float, max_width: int):
-    """Return a positioned title TextClip, or None if text rendering is unavailable.
-
-    ``max_width`` caps the text width (pass the video width, e.g. 1080). Longer
-    titles wrap onto multiple lines instead of overflowing the frame.
-
-    Tries a list of common fonts, then Pillow's default font, then gives up.
-    The title is decorative, so a failure must never break the render.
-    """
-    from moviepy import TextClip
-
-    def _make(font=None, use_caption=False):
-        kwargs = dict(text=title, font_size=110, color="white",
-                      stroke_color="black", stroke_width=2)
-        if use_caption:
-            # Caption mode wraps text to the given width.
-            kwargs["method"] = "caption"
-            kwargs["size"] = (max_width, None)
-        if font:
-            kwargs["font"] = font
-        return (TextClip(**kwargs)
-                .with_position(("center", 60))
-                .with_duration(duration))
-
-    # 1) Try explicit known fonts, wrapping text to the video width (caption mode).
-    for font in _TITLE_FONT_CANDIDATES:
-        try:
-            return _make(font, use_caption=True)
-        except Exception:  # noqa: BLE001 - try the next candidate
-            continue
-
-    # 2) Fall back to Pillow's bundled default font (caption mode).
+def _title_settings(data):
+    font_name = str(data.get('title_font') or 'DIN Condensed.ttf')
+    font_dir = os.path.dirname(TITLE_FONT_PATH)
+    fonts = {name for name in os.listdir(font_dir) if name.lower().endswith(('.ttf', '.otf'))}
+    if font_name not in fonts:
+        raise ValueError('Unknown title font.')
+    raw_size = data.get('title_font_size', 100)
+    if isinstance(raw_size, bool):
+        raise ValueError('Title size must be a number between 48 and 144.')
     try:
-        return _make(None, use_caption=True)
-    except Exception:  # noqa: BLE001 - caption mode may not support the font
-        pass
+        size = int(raw_size)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError('Title size must be a number between 48 and 144.')
+    if not 48 <= size <= 144:
+        raise ValueError('Title size must be between 48 and 144.')
+    return os.path.join(font_dir, font_name), size
 
-    # 3) Last resort: label mode (no wrapping) so the title still appears.
-    for font in _TITLE_FONT_CANDIDATES + (None,):
-        try:
-            return _make(font, use_caption=False)
-        except Exception:  # noqa: BLE001 - try the next candidate
-            continue
 
-    app.logger.warning("Title overlay disabled (no usable font).")
-    return None
+def _title_image(title: str, max_width: int, font_path=TITLE_FONT_PATH, font_size=100):
+    """Lay out a centered, wrapped title with safe margins and a soft shadow."""
+    import numpy as np
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+    padding = 24
+    text_width = max_width - padding * 2
+    measure = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    # Shrink long titles to keep the map visible. Character wrapping also handles
+    # URLs and words that are wider than the available space.
+    for fitted_size in range(font_size, 19, -4):
+        font = ImageFont.truetype(font_path, fitted_size)
+        lines = []
+        for paragraph in title.splitlines() or [title]:
+            line = ""
+            for word in paragraph.split():
+                candidate = f"{line} {word}".strip()
+                if measure.textlength(candidate, font=font) <= text_width:
+                    line = candidate
+                    continue
+                if line:
+                    lines.append(line)
+                line = ""
+                for char in word:
+                    if line and measure.textlength(line + char, font=font) > text_width:
+                        lines.append(line)
+                        line = ""
+                    line += char
+            lines.append(line)
+        text = "\n".join(lines)
+        spacing = round(fitted_size * 0.22)
+        bounds = measure.multiline_textbbox((0, 0), text, font=font,
+                                            spacing=spacing, align="center", stroke_width=1)
+        height = bounds[3] - bounds[1]
+        if height <= 360:
+            break
+    if height > 360:
+        raise ValueError("Video title is too long. Please shorten it.")
+
+    size = (max_width, height + padding * 2)
+    shadow = Image.new("RGBA", size)
+    xy = (max_width / 2, padding - bounds[1])
+    ImageDraw.Draw(shadow).multiline_text(
+        (xy[0], xy[1] + 5), text, font=font, anchor="ma", align="center",
+        spacing=spacing, fill=(0, 0, 0, 230), stroke_width=3,
+    )
+    image = shadow.filter(ImageFilter.GaussianBlur(8))
+    ImageDraw.Draw(image).multiline_text(
+        xy, text, font=font, anchor="ma", align="center", spacing=spacing,
+        fill="white", stroke_width=1, stroke_fill=(255, 255, 255, 220),
+    )
+    return np.array(image)
+
+
+def _build_title_clip(title: str, duration: float, max_width: int,
+                      font_path=TITLE_FONT_PATH, font_size=100):
+    from moviepy import ImageClip
+
+    return ImageClip(_title_image(title, max_width, font_path, font_size)).with_duration(duration)
+
+
+@app.route('/api/video_title_preview', methods=['POST'])
+def video_title_preview():
+    from PIL import Image
+
+    data = request.get_json(silent=True) or {}
+    title = str(data.get('video_title') or '').strip()
+    if not title or len(title) > 1000:
+        return jsonify(error='Enter a title of up to 1000 characters.'), 400
+    try:
+        font_path, font_size = _title_settings(data)
+        image = _title_image(title, 936, font_path, font_size)
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
+    output = io.BytesIO()
+    Image.fromarray(image).save(output, format='PNG')
+    output.seek(0)
+    return send_file(output, mimetype='image/png')
 
 
 @app.route('/api/render_video', methods=['POST'])
@@ -293,6 +339,12 @@ def make_video() -> tuple[object, int]:
         return jsonify({"status": "error", "error": "Missing 'background_video'."}), 400
     if not title:
         return jsonify({"status": "error", "error": "Missing 'video_title'."}), 400
+    if len(title) > 1000:
+        return jsonify(status='error', error='Title must be at most 1000 characters.'), 400
+    try:
+        font_path, font_size = _title_settings(data)
+    except ValueError as error:
+        return jsonify(status='error', error=str(error)), 400
     if codec not in ALLOWED_CODECS:
         return jsonify({"status": "error",
                         "error": f"Unsupported codec '{codec}'. "
@@ -332,7 +384,7 @@ def make_video() -> tuple[object, int]:
 
     map_path = bg_path = None
     try:
-        from moviepy import (VideoFileClip, TextClip, CompositeVideoClip,
+        from moviepy import (VideoFileClip, CompositeVideoClip,
                              ImageClip, AudioFileClip)
 
         os.makedirs(RENDER_DIR, exist_ok=True)
@@ -357,25 +409,32 @@ def make_video() -> tuple[object, int]:
         bg_duration = min(TARGET, background_video.duration or TARGET)
         background_video = background_video.subclipped(0, bg_duration)
 
-        # Scale the background to a 1280x720 frame (letterbox-free: stretch then
-        # optionally crop). Keeping sizes consistent avoids compositing errors.
+        # Fill the portrait frame without stretching the source footage.
         canvas_w, canvas_h = 1080, 1920
-        background_video = background_video.resized((canvas_w, canvas_h))
+        bg_scale = max(canvas_w / background_video.w, canvas_h / background_video.h)
+        background_video = background_video.resized(bg_scale).cropped(
+            x_center=background_video.w * bg_scale / 2,
+            y_center=background_video.h * bg_scale / 2,
+            width=canvas_w, height=canvas_h,
+        )
 
-        # Map overlay: fit inside the frame while preserving aspect ratio.
+        # Darken the edges and the area behind the title for readable white text.
+        import numpy as np
+        shade = np.zeros((canvas_h, canvas_w, 4), dtype=np.uint8)
+        y = np.linspace(-1, 1, canvas_h)
+        shade[:, :, 3] = (70 + 95 * np.abs(y) ** 1.5).astype(np.uint8)[:, None]
+        scrim = ImageClip(shade).with_duration(bg_duration)
+
+        # Center the title and map together, with generous portrait safe margins.
+        title_clip = _build_title_clip(title, bg_duration, canvas_w - 144, font_path, font_size)
         map_clip = ImageClip(map_path).with_duration(bg_duration)
-        max_map_w, max_map_h = canvas_w, canvas_h // 2
-        scale = min(max_map_w / map_clip.w, max_map_h / map_clip.h, 1.0)
-        map_clip = (map_clip.resized(scale)
-                            .with_position("center")
-                            .with_duration(bg_duration))
-
-        # Title text overlay near the top. Try a few common fonts, then fall back
-        # to Pillow's default font; if all fail, render without the title.
-        clips = [background_video, map_clip]
-        title_clip = _build_title_clip(title, bg_duration, canvas_w)
-        if title_clip is not None:
-            clips.append(title_clip)
+        scale = min((canvas_w - 144) / map_clip.w, 820 / map_clip.h)
+        map_clip = map_clip.resized(scale)
+        gap = 64
+        group_top = (canvas_h - title_clip.h - gap - map_clip.h) / 2
+        title_clip = title_clip.with_position(("center", group_top))
+        map_clip = map_clip.with_position(("center", group_top + title_clip.h + gap))
+        clips = [background_video, scrim, map_clip, title_clip]
 
         final_clip = CompositeVideoClip(clips, size=(canvas_w, canvas_h))
 

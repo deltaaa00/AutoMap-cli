@@ -1,0 +1,158 @@
+import importlib
+import io
+from pathlib import Path
+from unittest.mock import Mock
+
+import pytest
+from PIL import Image, ImageDraw
+
+renderer = importlib.import_module('map.auto_map')
+ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture
+def scene(monkeypatch, tmp_path):
+    """Small real Pillow images keep compositing tests quick and deterministic."""
+    monkeypatch.chdir(ROOT)
+    monkeypatch.setattr(renderer, '__file__', str(tmp_path / 'map' / 'auto_map.py'))
+    base = Image.new('RGBA', (640, 640), 'white')
+    draw = ImageDraw.Draw(base)
+    draw.line((210, 0, 210, 639), fill='black')
+    draw.line((420, 0, 420, 639), fill='black')
+    real_open = Image.open
+
+    def open_image(path, *args, **kwargs):
+        if isinstance(path, (str, Path)) and str(path).endswith('.png'):
+            if Path(path).name in ('default_map.png', 'flag_map.png', 'world_map.png'):
+                return base.copy()
+            return Image.new('RGBA', base.size)
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Image, 'open', open_image)
+    coords = {'one': [(80, 80)], 'two': [(290, 80)], 'three': [(500, 80)]}
+    monkeypatch.setattr(renderer, 'europe_coords', coords)
+    monkeypatch.setattr(renderer, 'world_coords', coords)
+    answer = Mock(return_value={'one': 'Yes', 'two': 'no', 'three': 'yes'})
+    monkeypatch.setattr(renderer, 'ai_request', answer)
+    monkeypatch.setattr(renderer, 'load_filling', lambda: (
+        {'YES': (255, 0, 0, 255), ' no ': (0, 0, 255, 255)},
+        {(0, 10): (0, 255, 0, 255), (10, 20): (255, 255, 0, 255)},
+    ))
+    random = Mock(return_value=160)
+    monkeypatch.setattr(renderer.random, 'randint', random)
+    return answer, random, real_open
+
+
+def render(**changes):
+    args = dict(prompt='topic', mode='text', map_type='default', size_mod=0,
+                optional_feature=None, model='mock-model', font_name='Bips.ttf',
+                show_result=False, io_res=True, api_key='request-key')
+    args.update(changes)
+    return renderer.auto_map(**args)
+
+
+@pytest.mark.parametrize('map_type', ['default', 'flag', 'world'])
+def test_render_map_types(scene, map_type):
+    answer, _, real_open = scene
+    output = render(map_type=map_type)
+    assert isinstance(output, io.BytesIO)
+    assert output.tell() == 0
+    image = real_open(output)
+    assert image.format == 'PNG' and image.size == (640, 640)
+    assert image.getpixel((80, 600)) == ((255, 255, 255, 255) if map_type == 'flag' else (255, 0, 0, 255))
+    answer.assert_called_once_with('topic', map_type, 'mock-model', 'request-key')
+
+
+def test_text_colors_ignore_case_and_whitespace(scene):
+    answer, _, real_open = scene
+    answer.return_value = {'one': ' YES ', 'two': ' NO ', 'three': ''}
+    image = real_open(render())
+    assert image.getpixel((80, 600)) == (255, 0, 0, 255)
+    assert image.getpixel((290, 600)) == (0, 0, 255, 255)
+    assert image.getpixel((500, 600)) == (255, 255, 255, 255)
+
+
+@pytest.mark.parametrize('map_type', ['default', 'flag'])
+@pytest.mark.parametrize('label,expected_x', [('A', 80), ('AB', 50), ('ABC', 50), ('ABCD', 10), ('ABCDE', 10)])
+def test_label_offset_for_short_and_long_text(scene, monkeypatch, map_type, label, expected_x):
+    scene[0].return_value = {'one': label}
+    draw_text = Mock()
+    monkeypatch.setattr(ImageDraw.ImageDraw, 'text', draw_text)
+    render(map_type=map_type)
+    assert draw_text.call_count == 1
+    assert draw_text.call_args.args[0][0] == expected_x
+    assert draw_text.call_args.args[1] == label
+
+
+def test_unknown_text_reuses_color(scene):
+    answer, random, real_open = scene
+    answer.return_value = {'one': 'unknown', 'two': 'unknown'}
+    image = real_open(render())
+    assert image.getpixel((80, 600)) == image.getpixel((290, 600)) == (160, 160, 160, 255)
+    assert random.call_count == 3
+
+
+@pytest.mark.parametrize('value,expected', [
+    (0, (160, 160, 160, 255)), (1, (0, 255, 0, 255)),
+    ('10', (0, 255, 0, 255)), (11, (255, 255, 0, 255)),
+    (20, (255, 255, 0, 255)), (21, (160, 160, 160, 255)),
+    ('unknown', (160, 160, 160, 255)), (None, (160, 160, 160, 255)),
+])
+def test_numeric_ranges_use_exclusive_low_inclusive_high(scene, value, expected):
+    answer, _, real_open = scene
+    answer.return_value = {'one': value}
+    assert real_open(render(mode='number')).getpixel((80, 600)) == expected
+
+
+def test_short_form_changes_ai_prompt(scene):
+    answer, _, _ = scene
+    render(optional_feature='short_form')
+    assert '1000000=1M' in answer.call_args.args[0]
+
+
+@pytest.mark.parametrize('mode,map_type,feature', [
+    ('number', 'default', 'short_form'), ('text', 'default', 'show_most_least'),
+    ('number', 'world', 'show_most_least'),
+])
+def test_incompatible_options_are_disabled(scene, monkeypatch, mode, map_type, feature):
+    warning = Mock()
+    monkeypatch.setattr(renderer, 'showwarning', warning)
+    assert render(mode=mode, map_type=map_type, optional_feature=feature)
+    warning.assert_called()
+    assert scene[0].call_args.args[0] == 'topic'
+
+
+@pytest.mark.parametrize('answer', [{'one': '2', 'two': '100'}, {'one': 'unknown'}])
+def test_numeric_extrema_overlay_and_no_numeric_data(scene, answer):
+    scene[0].return_value = answer
+    assert render(mode='number', optional_feature='show_most_least')
+
+
+def test_ai_failure_returns_no_image(scene):
+    scene[0].return_value = None
+    assert render() is None
+
+
+@pytest.mark.parametrize('changes', [{'map_type': 'unknown'}, {'mode': 'unknown'}])
+def test_unknown_modes_return_no_image(scene, changes):
+    assert render(**changes) is None
+
+
+@pytest.mark.parametrize('show', [False, True])
+def test_disk_output_and_optional_viewer(scene, monkeypatch, tmp_path, show):
+    viewer = Mock()
+    monkeypatch.setattr(Image.Image, 'show', viewer)
+    output = render(io_res=False, show_result=show)
+    assert output == tmp_path / 'result.png'
+    assert output.read_bytes().startswith(b'\x89PNG')
+    if show:
+        viewer.assert_called_once_with('Map')
+    else:
+        viewer.assert_not_called()
+
+
+def test_font_objects_are_cached_within_render(scene, monkeypatch):
+    load_font = Mock(wraps=renderer.ImageFont.truetype)
+    monkeypatch.setattr(renderer.ImageFont, 'truetype', load_font)
+    render()
+    assert load_font.call_count == 1
