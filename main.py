@@ -221,20 +221,11 @@ def music_download():
 
 @app.route('/api/music_cut', methods=['POST'])
 @app.route('/api/music_cut/', methods=['POST'])
-def cut_audio():
+def cut_audio() -> tuple[object, int]:
     """Cut a previously downloaded track via the downstream render service.
 
     Request JSON:
-        { "start_time": "00:01:30", "title": "<song title>" }
-
-    Response JSON (passthrough from the downstream service):
-        { "status": "success", "file": "<base64 mp3>", "title": "<song title>" }
-        { "status": "error", "error": "<message>" }
-    """
-    """Cut a previously downloaded track via the downstream render service.
-
-    Request JSON:
-        { "start_time": "00:01:30", "title": "<song title>" }
+        { "start_time": "00:01:30", "title": "<song title>", "duration": 8 }
 
     Response JSON (passthrough from the downstream service):
         { "status": "success", "file": "<base64 mp3>", "title": "<song title>" }
@@ -242,17 +233,28 @@ def cut_audio():
     """
     import requests
 
-    data = request.get_json(silent=True) or {}
-    start_time = (data.get('start_time') or '').strip()
-    title = (data.get('title') or '').strip()
+    data: dict[str, object] = request.get_json(silent=True) or {}
+    start_time = str(data.get('start_time') or '').strip()
+    title = str(data.get('title') or '').strip()
     if not title:
         return jsonify({"status": "error", "error": "Missing 'title' in request body."}), 400
+
+    raw_duration = data.get('duration', 8)
+    try:
+        duration = int(raw_duration) if raw_duration is not None else 8
+    except (TypeError, ValueError):
+        duration = 8
+    duration = max(1, min(30, duration))
 
     # Another service downloads music from YouTube and converts it to mp3.
     try:
         response = requests.post(
             "http://yt-dlp-worker:8080/api/music_cut/",
-            json={"start_time": start_time, "title": title},
+            json={
+                "start_time": start_time,
+                "title": title,
+                "duration": duration,
+            },
             timeout=40,
         )
 
@@ -269,9 +271,10 @@ def cut_audio():
     # Pass the downstream payload/status straight through.
     return jsonify(payload), response.status_code
 
+
 @app.route('/api/render_video', methods=['POST'])
 @app.route('/api/render_video/', methods=['POST'])
-def make_video():
+def make_video() -> tuple[object, int]:
     """Render a video via the downstream render service.
 
     Request JSON:
@@ -279,7 +282,8 @@ def make_video():
             "map_file": "<base64 / data URL>",
             "background_video": "<base64 / data URL>",
             "video_title": "<title>",
-            "codec": "libx264"
+            "codec": "libx264",
+            "duration": 8
         }
 
     Response JSON (passthrough from the downstream service):
@@ -288,14 +292,15 @@ def make_video():
     """
     import requests
 
-    data = request.get_json(silent=True) or {}
+    data: dict[str, object] = request.get_json(silent=True) or {}
 
     # The frontend sends base64 strings; keep them as-is (default to empty string).
     map_b64 = data.get('map_file') or ''
     background_b64 = data.get('background_video') or ''
     # Frontend field is "video_title"; accept legacy "title" as a fallback.
-    title = (data.get('video_title') or data.get('title') or '').strip()
-    codec = (data.get('codec') or 'libx264').strip()
+    title = str(data.get('video_title') or data.get('title') or '').strip()
+    codec = str(data.get('codec') or 'libx264').strip()
+    duration = data.get('duration')
 
     try:
         response = requests.post(
@@ -305,6 +310,7 @@ def make_video():
                 "background_video": background_b64,
                 "video_title": title,
                 "codec": codec,
+                "duration": duration,
             },
             # Video rendering (moviepy/ffmpeg) can take a while - allow more time.
             timeout=300,
