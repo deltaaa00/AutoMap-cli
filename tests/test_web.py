@@ -128,10 +128,13 @@ def test_render_forwards_title_style_and_legacy_title(web, monkeypatch):
     monkeypatch.setattr(requests, 'post', post)
     web.app.test_client().post('/api/render_video', json={
         'title': ' Legacy ', 'title_font': 'Bips.ttf', 'title_font_size': 72,
+        'title_first_line_color': '#ff6600', 'title_other_lines_color': '#3366ff',
     })
     assert post.call_args.kwargs['json']['video_title'] == 'Legacy'
     assert post.call_args.kwargs['json']['title_font'] == 'Bips.ttf'
     assert post.call_args.kwargs['json']['title_font_size'] == 72
+    assert post.call_args.kwargs['json']['title_first_line_color'] == '#ff6600'
+    assert post.call_args.kwargs['json']['title_other_lines_color'] == '#3366ff'
 
 
 @pytest.mark.parametrize('status', [200, 400])
@@ -140,10 +143,13 @@ def test_title_preview_proxy_preserves_content(web, monkeypatch, status):
     post = Mock(return_value=upstream)
     monkeypatch.setattr(requests, 'post', post)
     response = web.app.test_client().post('/api/video_title_preview', json={
-        'video_title': 'Title', 'title_font': 'Bips.ttf', 'title_font_size': 72, 'ignore': True})
+        'video_title': 'Title', 'title_font': 'Bips.ttf', 'title_font_size': 72, 'ignore': True,
+        'title_first_line_color': '#ff6600', 'title_other_lines_color': '#3366ff'})
     assert response.status_code == status and response.data == b'png-or-error'
     assert response.mimetype == 'image/png'
     assert 'ignore' not in post.call_args.kwargs['json']
+    assert post.call_args.kwargs['json']['title_first_line_color'] == '#ff6600'
+    assert post.call_args.kwargs['json']['title_other_lines_color'] == '#3366ff'
 
 
 def test_title_preview_unavailable(web, monkeypatch):

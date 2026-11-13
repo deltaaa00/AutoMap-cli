@@ -89,7 +89,8 @@ def video_title_preview():
     try:
         response = requests.post(
             'http://yt-dlp-worker:8080/api/video_title_preview',
-            json={key: data[key] for key in ('video_title', 'title_font', 'title_font_size') if key in data},
+            json={key: data[key] for key in ('video_title', 'title_font', 'title_font_size',
+                                            'title_first_line_color', 'title_other_lines_color') if key in data},
             timeout=15,
         )
     except requests.RequestException:
@@ -330,6 +331,8 @@ def make_video() -> tuple[object, int]:
                 "duration": duration,
                 "title_font": data.get('title_font', 'DIN Condensed.ttf'),
                 "title_font_size": data.get('title_font_size', 100),
+                "title_first_line_color": data.get('title_first_line_color', '#ffffff'),
+                "title_other_lines_color": data.get('title_other_lines_color', '#a7f3d0'),
             },
             # Video rendering (moviepy/ffmpeg) can take a while - allow more time.
             timeout=300,

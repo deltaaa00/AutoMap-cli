@@ -147,8 +147,9 @@
             width: 1080px;
             height: 1920px;
             transform-origin: top left;
-            gap: 64px;
-            padding: 72px;
+            justify-content: flex-start;
+            gap: 48px;
+            padding: 120px 36px 160px;
         }
 
         #stageTitleBanner {
@@ -157,8 +158,16 @@
         }
 
         #stageTitleBanner img { display: block; width: 936px; }
+        #stageMapArea {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            align-items: flex-start;
+            justify-content: center;
+        }
         #stageMapPreview { flex: none; max-width: none; max-height: none; }
-        #stageEmptyPlaceholder { transform: scale(3); max-width: 260px; }
+        #stageEmptyPlaceholder { align-self: center; transform: scale(3); max-width: 260px; }
 
         /* Custom Audio Control Styling */
         audio {
@@ -647,10 +656,10 @@
                                     </label>
                                     <span class="text-[10px] font-mono text-slate-500">Burn-in Caption</span>
                                 </div>
-                                <input type="text" id="videoTitleInput" placeholder="My awesome map video" maxlength="1000"
+                                <textarea id="videoTitleInput" rows="2" placeholder="My awesome map video" maxlength="1000"
                                     autocomplete="off" spellcheck="false"
                                     oninput="updateStageTitlePreview(this.value)"
-                                    class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition">
+                                    class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition"></textarea>
                             </div>
                             <div class="grid grid-cols-2 gap-3">
                                 <label for="titleFontSelect" class="text-xs text-slate-300">Title font
@@ -664,11 +673,20 @@
                                     <input id="titleFontSize" type="range" min="48" max="144" step="4" value="100" oninput="updateTitleStyle()" class="mt-3 w-full accent-emerald-400">
                                 </label>
                             </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label for="titleFirstLineColor" class="text-xs text-slate-300">First line
+                                    <input id="titleFirstLineColor" type="color" value="#ffffff" oninput="updateTitleStyle()" class="mt-1 block w-full h-9 p-1 bg-slate-950 border border-slate-700 rounded-lg cursor-pointer">
+                                </label>
+                                <label for="titleOtherLinesColor" class="text-xs text-slate-300">Lower lines
+                                    <input id="titleOtherLinesColor" type="color" value="#a7f3d0" oninput="updateTitleStyle()" class="mt-1 block w-full h-9 p-1 bg-slate-950 border border-slate-700 rounded-lg cursor-pointer">
+                                </label>
+                            </div>
                             <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1 gap-2">
-                                <button type="button" onclick="resetTitleStyle()" class="text-emerald-400 hover:text-emerald-300">Reset · DIN / 100 px</button>
+                                <button type="button" onclick="resetTitleStyle()" class="text-emerald-400 hover:text-emerald-300">Reset to defaults</button>
                                 <span id="titleCharCount">0 chars</span>
                             </div>
                             <p class="text-[10px] text-slate-500">Size at 1080×1920. Long titles shrink automatically to fit.</p>
+                            <p class="text-[10px] text-slate-500">Enter starts a new line. Colors also apply to automatically wrapped lines.</p>
                             <p id="titlePreviewStatus" role="status" aria-live="polite" class="text-[11px] text-slate-400"></p>
                         </div>
 
@@ -745,13 +763,15 @@
                             <!-- Composite Foreground (Title + Map preview before final render) -->
                             <div id="stageCompositeBox" class="relative z-10 flex flex-col items-center justify-center text-center w-full h-full">
                                 <div id="stageTitleBanner" class="text-white hidden"></div>
-                                <img id="stageMapPreview" alt="Map frame preview" class="hidden object-contain">
-                                <div id="stageEmptyPlaceholder" class="flex flex-col items-center gap-2 text-slate-500">
-                                    <div class="w-12 h-12 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-center text-slate-400 shadow-inner">
-                                        <i class="fa-solid fa-photo-film text-xl text-indigo-400/80"></i>
+                                <div id="stageMapArea">
+                                    <img id="stageMapPreview" alt="Map frame preview" class="hidden object-contain">
+                                    <div id="stageEmptyPlaceholder" class="flex flex-col items-center gap-2 text-slate-500">
+                                        <div class="w-12 h-12 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-center text-slate-400 shadow-inner">
+                                            <i class="fa-solid fa-photo-film text-xl text-indigo-400/80"></i>
+                                        </div>
+                                        <p class="text-xs font-medium text-slate-400">Drop a Map Slide &amp; Background Video above to preview frame layout</p>
+                                        <p class="text-[10px] font-mono text-slate-600">Rendered MP4 will appear here for instant cinema playback</p>
                                     </div>
-                                    <p class="text-xs font-medium text-slate-400">Drop a Map Slide &amp; Background Video above to preview frame layout</p>
-                                    <p class="text-[10px] font-mono text-slate-600">Rendered MP4 will appear here for instant cinema playback</p>
                                 </div>
                             </div>
 
@@ -1321,7 +1341,18 @@
             return {
                 title_font: document.getElementById('titleFontSelect').value,
                 title_font_size: Number(document.getElementById('titleFontSize').value),
+                title_first_line_color: document.getElementById('titleFirstLineColor').value,
+                title_other_lines_color: document.getElementById('titleOtherLinesColor').value,
             };
+        }
+
+        function fitStageMap() {
+            const map = document.getElementById('stageMapPreview');
+            const area = document.getElementById('stageMapArea');
+            if (!map.naturalWidth || !map.naturalHeight) return;
+            const scale = Math.min(area.clientWidth / map.naturalWidth, area.clientHeight / map.naturalHeight);
+            map.style.width = `${map.naturalWidth * scale}px`;
+            map.style.height = `${map.naturalHeight * scale}px`;
         }
 
         function updatePreviewPlayback() {
@@ -1350,6 +1381,8 @@
         function resetTitleStyle() {
             document.getElementById('titleFontSelect').value = 'DIN Condensed.ttf';
             document.getElementById('titleFontSize').value = '100';
+            document.getElementById('titleFirstLineColor').value = '#ffffff';
+            document.getElementById('titleOtherLinesColor').value = '#a7f3d0';
             updateTitleStyle();
         }
 
@@ -1553,11 +1586,7 @@
                 if (file) {
                     const url = materialPreviewUrls[inputId];
                     if (stageMap) {
-                        stageMap.onload = () => {
-                            const scale = Math.min(936 / stageMap.naturalWidth, 820 / stageMap.naturalHeight);
-                            stageMap.style.width = `${stageMap.naturalWidth * scale}px`;
-                            stageMap.style.height = `${stageMap.naturalHeight * scale}px`;
-                        };
+                        stageMap.onload = fitStageMap;
                         stageMap.src = url;
                         stageMap.classList.remove('hidden');
                     }
@@ -1752,6 +1781,7 @@
             new ResizeObserver(() => {
                 composite.style.transform = `scale(${stage.clientWidth / 1080})`;
             }).observe(stage);
+            new ResizeObserver(fitStageMap).observe(document.getElementById('stageMapArea'));
             new IntersectionObserver(([entry]) => {
                 previewVisible = entry.isIntersecting;
                 updatePreviewPlayback();

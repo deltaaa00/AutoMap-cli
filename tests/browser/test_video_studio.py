@@ -89,7 +89,7 @@ def test_font_size_reset_and_mobile_frame(studio):
     assert previews[-1]['title_font_size'] == 72
     assert page.locator('#titleFontSizeValue').inner_text() == '72 px'
     assert page.locator('#stageTitleBanner img').evaluate('el => el.naturalWidth') == 936
-    page.get_by_role('button', name='Reset · DIN / 100 px').click()
+    page.get_by_role('button', name='Reset to defaults').click()
     wait_for_title(page)
     assert previews[-1]['title_font'] == 'DIN Condensed.ttf'
     assert previews[-1]['title_font_size'] == 100
@@ -125,13 +125,58 @@ def test_map_fit_replacement_and_removal_release_blob_urls(studio, tmp_path):
     image = tmp_path / 'map.png'
     Image.new('RGB', (800, 400), 'green').save(image)
     page.locator('#mapFileInput').set_input_files(str(image))
-    page.wait_for_function("document.querySelector('#stageMapPreview').style.width === '936px'")
-    assert page.locator('#stageMapPreview').evaluate('el => el.style.height') == '468px'
+    page.wait_for_function("document.querySelector('#stageMapPreview').style.width === '1008px'")
+    assert page.locator('#stageMapPreview').evaluate('el => el.style.height') == '504px'
     original = page.locator('#stageMapPreview').get_attribute('src')
     replacement = tmp_path / 'replacement.png'
     Image.new('RGB', (400, 800), 'blue').save(replacement)
     page.locator('#mapFileInput').set_input_files(str(replacement))
     page.wait_for_function('(url) => window.revokedUrls.includes(url)', arg=original)
+    page.wait_for_function("parseFloat(document.querySelector('#stageMapPreview').style.height) > 1200")
+    page.locator('#videoTitleInput').fill('Найкрасивіші країни Європи')
+    wait_for_title(page)
+    page.wait_for_function("document.querySelector('#stageMapPreview').getBoundingClientRect().top >= document.querySelector('#stageTitleBanner').getBoundingClientRect().bottom + 10")
+    layout = page.evaluate('''() => {
+        const stage = document.querySelector('.video-preview-stage').getBoundingClientRect();
+        const title = document.querySelector('#stageTitleBanner').getBoundingClientRect();
+        const map = document.querySelector('#stageMapPreview').getBoundingClientRect();
+        return {titleTop: (title.top-stage.top)/stage.height, mapHeight: map.height/stage.height, mapBottom: (map.bottom-stage.top)/stage.height};
+    }''')
+    assert layout['titleTop'] == pytest.approx(120/1920, abs=.002)
+    assert layout['mapHeight'] > .62
+    assert layout['mapBottom'] <= 1761/1920
     page.locator('#mapDropzone .dropzone-clear').click()
     assert page.locator('#stageMapPreview').is_hidden()
     assert page.evaluate('window.revokedUrls.length') == 2
+
+
+def test_title_color_pickers_preview_and_reset(studio):
+    page, previews = studio
+    assert page.locator('#titleFirstLineColor').input_value() == '#ffffff'
+    assert page.locator('#titleOtherLinesColor').input_value() == '#a7f3d0'
+    page.locator('#videoTitleInput').fill('Перший рядок\nДругий рядок')
+    wait_for_title(page)
+    page.locator('#titleFirstLineColor').evaluate("el => {el.value='#ff6600'; el.dispatchEvent(new Event('input'));}")
+    page.locator('#titleOtherLinesColor').evaluate("el => {el.value='#3366ff'; el.dispatchEvent(new Event('input'));}")
+    wait_for_title(page)
+    assert previews[-1]['title_first_line_color'] == '#ff6600'
+    assert previews[-1]['title_other_lines_color'] == '#3366ff'
+    assert previews[-1]['video_title'] == 'Перший рядок\nДругий рядок'
+    colors = page.locator('#stageTitleBanner img').evaluate("""image => {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+        const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+        const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let orange = 0, blue = 0;
+        for (let i=0; i<pixels.length; i+=4) {
+            if (pixels[i+3] < 240) continue;
+            if (pixels[i]===255 && pixels[i+1]===102 && pixels[i+2]===0) orange++;
+            if (pixels[i]===51 && pixels[i+1]===102 && pixels[i+2]===255) blue++;
+        }
+        return {orange, blue};
+    }""")
+    assert colors['orange'] > 100 and colors['blue'] > 100
+    page.get_by_role('button', name='Reset to defaults').click()
+    wait_for_title(page)
+    assert previews[-1]['title_first_line_color'] == '#ffffff'
+    assert previews[-1]['title_other_lines_color'] == '#a7f3d0'

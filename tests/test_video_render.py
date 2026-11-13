@@ -68,12 +68,13 @@ def test_default_preview_matches_default_render_title(worker):
 
 
 @pytest.mark.parametrize('font,size', [('DIN Condensed.ttf', 100), ('Bips.ttf', 72)])
-def test_portrait_render_with_centered_title_and_map(worker, tmp_path, font, size):
+@pytest.mark.parametrize('map_size', [(800, 400), (400, 800), (600, 600)])
+def test_portrait_render_with_centered_title_and_map(worker, tmp_path, font, size, map_size):
     background = tmp_path / 'background.mp4'
     with ColorClip((640, 360), color=(50, 100, 150), duration=1) as clip:
         clip.write_videofile(str(background), fps=30, codec='libx264', logger=None)
     map_file = tmp_path / 'map.png'
-    Image.new('RGB', (800, 400), (0, 255, 0)).save(map_file)
+    Image.new('RGB', map_size, (0, 255, 0)).save(map_file)
     response = worker.app.test_client().post('/api/render_video', json={
         'map_file': base64.b64encode(map_file.read_bytes()).decode(),
         'background_video': base64.b64encode(background.read_bytes()).decode(),
@@ -89,10 +90,21 @@ def test_portrait_render_with_centered_title_and_map(worker, tmp_path, font, siz
     green = (frame[:, :, 1] > 220) & (frame[:, :, 0] < 30)
     ys, xs = np.where(green)
     assert abs((xs.min() + xs.max()) / 2 - 540) < 2
-    assert (xs.max() - xs.min()) / (ys.max() - ys.min()) == pytest.approx(2, abs=.03)
+    assert (xs.max() - xs.min()) / (ys.max() - ys.min()) == pytest.approx(map_size[0] / map_size[1], abs=.03)
+    assert ys.max() <= 1761
+    if map_size[1] > map_size[0]:
+        assert ys.max() - ys.min() > 1200
+    else:
+        assert xs.max() - xs.min() >= 1000
     white = np.all(frame > 220, axis=2)
     title_y, title_x = np.where(white)
-    assert title_y.max() < ys.min() - 40
+    assert 120 <= title_y.min() < 200
+    mint = ((frame[:, :, 0] > 140) & (frame[:, :, 0] < 195)
+            & (frame[:, :, 1] > 215) & (frame[:, :, 2] > 175))
+    mint_y, _ = np.where(mint)
+    assert len(mint_y) > 100
+    assert mint_y.min() > title_y.max()
+    assert 40 < ys.min() - mint_y.max() < 100
     assert abs((title_x.min() + title_x.max()) / 2 - 540) < 8
 
 
@@ -121,3 +133,49 @@ def test_render_attaches_audio_and_limits_duration(worker, tmp_path):
         # buffer bug, so read scalar frames without crossing chunk boundaries.
         samples = np.array([result.audio.get_frame(float(t)) for t in np.linspace(.05, .25, 64)])
         assert np.max(np.abs(samples)) > .05
+
+
+@pytest.mark.parametrize('first,other', [('#ffffff', '#a7f3d0'), ('#ff6600', '#3366ff')])
+def test_line_colors_follow_displayed_rows(worker, first, other):
+    from PIL import ImageColor
+
+    image = worker._title_image('First line\nSecond line\nThird line', 936,
+                                first_line_color=first, other_lines_color=other)
+    visible = image[:, :, 3] > 240
+    first_y, _ = np.where(np.all(image[:, :, :3] == ImageColor.getrgb(first), axis=2) & visible)
+    other_y, _ = np.where(np.all(image[:, :, :3] == ImageColor.getrgb(other), axis=2) & visible)
+    assert len(first_y) > 100 and len(other_y) > 100
+    assert first_y.max() < other_y.min()
+    assert other_y.max() - other_y.min() > 100
+
+
+def test_wrapped_lines_use_secondary_color(worker):
+    image = worker._title_image('A long title about the most beautiful countries in Europe', 936)
+    alpha = image[:, :, 3] > 240
+    assert np.any(np.all(image[:, :, :3] == (255, 255, 255), axis=2) & alpha)
+    assert np.any(np.all(image[:, :, :3] == (167, 243, 208), axis=2) & alpha)
+
+
+@pytest.mark.parametrize('field', ['title_first_line_color', 'title_other_lines_color'])
+@pytest.mark.parametrize('value', ['red', '#fff', '#12345g', 'ffffff', '', None, 123])
+def test_invalid_colors_are_rejected(worker, field, value):
+    data = {'video_title': 'First\nSecond', field: value}
+    client = worker.app.test_client()
+    assert client.post('/api/video_title_preview', json=data).status_code == 400
+    data.update(map_file='eA==', background_video='eA==')
+    assert client.post('/api/render_video', json=data).status_code == 400
+
+
+def test_preview_and_clip_share_custom_colors(worker):
+    colors = {'title_first_line_color': '#ff6600', 'title_other_lines_color': '#3366ff'}
+    response = worker.app.test_client().post('/api/video_title_preview', json={
+        'video_title': 'First\nSecond', **colors,
+    })
+    assert response.status_code == 200
+    expected = worker._title_image('First\nSecond', 936,
+                                  first_line_color='#ff6600', other_lines_color='#3366ff')
+    np.testing.assert_array_equal(np.array(Image.open(io.BytesIO(response.data))), expected)
+    clip = worker._build_title_clip('First\nSecond', 1, 936,
+                                    first_line_color='#ff6600', other_lines_color='#3366ff')
+    np.testing.assert_array_equal(clip.get_frame(0), expected[:, :, :3])
+    clip.close()

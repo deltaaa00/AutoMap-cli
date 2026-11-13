@@ -241,10 +241,19 @@ def _title_settings(data):
     return os.path.join(font_dir, font_name), size
 
 
-def _title_image(title: str, max_width: int, font_path=TITLE_FONT_PATH, font_size=100):
+def _title_colors(data):
+    colors = (data.get('title_first_line_color', '#ffffff'),
+              data.get('title_other_lines_color', '#a7f3d0'))
+    if any(not isinstance(color, str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', color) for color in colors):
+        raise ValueError('Title colors must use #RRGGBB format.')
+    return colors
+
+
+def _title_image(title: str, max_width: int, font_path=TITLE_FONT_PATH, font_size=100,
+                 first_line_color='#ffffff', other_lines_color='#a7f3d0'):
     """Lay out a centered, wrapped title with safe margins and a soft shadow."""
     import numpy as np
-    from PIL import Image, ImageDraw, ImageFilter, ImageFont
+    from PIL import Image, ImageColor, ImageDraw, ImageFilter, ImageFont
 
     padding = 24
     text_width = max_width - padding * 2
@@ -288,18 +297,29 @@ def _title_image(title: str, max_width: int, font_path=TITLE_FONT_PATH, font_siz
         spacing=spacing, fill=(0, 0, 0, 230), stroke_width=3,
     )
     image = shadow.filter(ImageFilter.GaussianBlur(8))
-    ImageDraw.Draw(image).multiline_text(
-        xy, text, font=font, anchor="ma", align="center", spacing=spacing,
-        fill="white", stroke_width=1, stroke_fill=(255, 255, 255, 220),
-    )
+    draw = ImageDraw.Draw(image)
+    first_rgb = ImageColor.getrgb(first_line_color)
+    other_rgb = ImageColor.getrgb(other_lines_color)
+    # Preserve the same baseline and line spacing as the shadow, including
+    # automatic wrapping. A blank first line reserves its place for the headline.
+    if len(lines) > 1:
+        draw.multiline_text(
+            xy, '\n' + '\n'.join(lines[1:]), font=font, anchor='ma',
+            align='center', spacing=spacing, fill=other_rgb + (255,),
+            stroke_width=1, stroke_fill=other_rgb + (220,),
+        )
+    draw.text(xy, lines[0], font=font, anchor='ma', fill=first_rgb + (255,),
+              stroke_width=1, stroke_fill=first_rgb + (220,))
     return np.array(image)
 
 
 def _build_title_clip(title: str, duration: float, max_width: int,
-                      font_path=TITLE_FONT_PATH, font_size=100):
+                      font_path=TITLE_FONT_PATH, font_size=100,
+                      first_line_color='#ffffff', other_lines_color='#a7f3d0'):
     from moviepy import ImageClip
 
-    return ImageClip(_title_image(title, max_width, font_path, font_size)).with_duration(duration)
+    return ImageClip(_title_image(title, max_width, font_path, font_size,
+                                 first_line_color, other_lines_color)).with_duration(duration)
 
 
 @app.route('/api/video_title_preview', methods=['POST'])
@@ -312,7 +332,8 @@ def video_title_preview():
         return jsonify(error='Enter a title of up to 1000 characters.'), 400
     try:
         font_path, font_size = _title_settings(data)
-        image = _title_image(title, 936, font_path, font_size)
+        first_color, other_color = _title_colors(data)
+        image = _title_image(title, 936, font_path, font_size, first_color, other_color)
     except ValueError as error:
         return jsonify(error=str(error)), 400
     output = io.BytesIO()
@@ -343,6 +364,7 @@ def make_video() -> tuple[object, int]:
         return jsonify(status='error', error='Title must be at most 1000 characters.'), 400
     try:
         font_path, font_size = _title_settings(data)
+        first_color, other_color = _title_colors(data)
     except ValueError as error:
         return jsonify(status='error', error=str(error)), 400
     if codec not in ALLOWED_CODECS:
@@ -425,15 +447,17 @@ def make_video() -> tuple[object, int]:
         shade[:, :, 3] = (70 + 95 * np.abs(y) ** 1.5).astype(np.uint8)[:, None]
         scrim = ImageClip(shade).with_duration(bg_duration)
 
-        # Center the title and map together, with generous portrait safe margins.
-        title_clip = _build_title_clip(title, bg_duration, canvas_w - 144, font_path, font_size)
+        # Anchor the headline near the top and let the map fill the space below.
+        title_clip = _build_title_clip(title, bg_duration, canvas_w - 144, font_path,
+                                       font_size, first_color, other_color)
         map_clip = ImageClip(map_path).with_duration(bg_duration)
-        scale = min((canvas_w - 144) / map_clip.w, 820 / map_clip.h)
+        title_top, gap, bottom_margin = 120, 48, 160
+        map_top = title_top + title_clip.h + gap
+        map_area_height = canvas_h - map_top - bottom_margin
+        scale = min((canvas_w - 72) / map_clip.w, map_area_height / map_clip.h)
         map_clip = map_clip.resized(scale)
-        gap = 64
-        group_top = (canvas_h - title_clip.h - gap - map_clip.h) / 2
-        title_clip = title_clip.with_position(("center", group_top))
-        map_clip = map_clip.with_position(("center", group_top + title_clip.h + gap))
+        title_clip = title_clip.with_position(("center", title_top))
+        map_clip = map_clip.with_position(("center", map_top))
         clips = [background_video, scrim, map_clip, title_clip]
 
         final_clip = CompositeVideoClip(clips, size=(canvas_w, canvas_h))
