@@ -43,6 +43,8 @@ GitHub Actions runs the complete suite and uploads `coverage.xml`.
   timeouts and invalid upstream responses.
 - Worker: metadata/downloads, audio slices, expiry cleanup, validation, safe
   downloads, title fitting, real FFmpeg portrait rendering and audio attachment.
+  Audio checks cover song titles independent of video headlines and inline cut
+  fragments after worker files are lost.
 - Browser: font/size/reset controls, exact title PNGs, debounce, responsive
   preview scaling, map replacement/removal and blob URL cleanup; automatic map
   transfer between studios, persistent settings and uploaded materials, large-map

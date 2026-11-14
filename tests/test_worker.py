@@ -81,11 +81,29 @@ def test_download_requires_url(worker, payload):
     assert worker.app.test_client().post('/api/music_download', json=payload).status_code == 400
 
 
+def test_download_moves_audio_across_filesystems(worker, monkeypatch, tmp_path):
+    import errno
+
+    download = tmp_path / 'temporary-download'
+    download.mkdir()
+    monkeypatch.setattr(worker.tempfile, 'mkdtemp', lambda **kwargs: str(download))
+    monkeypatch.setattr(worker.subprocess, 'run', Mock(
+        side_effect=lambda *args, **kwargs: (download / 'track.mp3').write_bytes(b'audio-data')))
+    monkeypatch.setattr(worker, '_get_song_title', lambda url: 'Selected_song')
+    monkeypatch.setattr(worker.os, 'rename', Mock(side_effect=OSError(errno.EXDEV, 'Invalid cross-device link')))
+    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://example.test/song'})
+    assert response.status_code == 200, response.json
+    assert (Path(worker.DOWNLOADS) / 'Selected_song.mp3').read_bytes() == b'audio-data'
+    assert base64.b64decode(response.json['file']) == b'audio-data'
+    assert not download.exists()
+
+
 @pytest.mark.parametrize('raw,expected', [(None, 8), ('invalid', 8), (0, 1), (100, 30), (12, 12)])
 def test_audio_cut_slices_correct_milliseconds(worker, monkeypatch, raw, expected):
     from pydub import AudioSegment
 
     audio = MagicMock()
+    audio.__len__.return_value = 180000
     cut = audio.__getitem__.return_value
     cut.export.side_effect = lambda path, **kwargs: Path(path).write_bytes(b'cut-audio')
     read = Mock(return_value=audio)
@@ -216,3 +234,35 @@ def test_render_rejects_unavailable_hardware_codec(worker, monkeypatch):
     })
     assert response.status_code == 400
     assert 'unavailable' in response.json['error']
+
+
+@pytest.mark.parametrize('changes', [
+    {'audio_title': '../unsafe'}, {'audio_title': 'missing-song'}, {'audio_file': 'a'},
+])
+def test_render_rejects_missing_or_invalid_selected_audio(worker, changes):
+    response = worker.app.test_client().post('/api/render_video', json={
+        'map_file': 'eA==', 'background_video': 'eA==', 'video_title': 'Different headline', **changes,
+    })
+    assert response.status_code == 400, response.json
+
+
+def test_cut_rejects_start_beyond_track(worker, monkeypatch):
+    from pydub import AudioSegment
+
+    audio = MagicMock()
+    audio.__len__.return_value = 10000
+    monkeypatch.setattr(AudioSegment, 'from_file', Mock(return_value=audio))
+    response = worker.app.test_client().post('/api/music_cut', json={
+        'title': 'song', 'start_time': '01:00', 'duration': 8,
+    })
+    assert response.status_code == 400
+    audio.__getitem__.assert_not_called()
+
+
+def test_render_requires_audio_when_music_is_enabled(worker):
+    response = worker.app.test_client().post('/api/render_video', json={
+        'map_file': 'eA==', 'background_video': 'eA==', 'video_title': 'Headline',
+        'audio_title': '', 'include_audio': True,
+    })
+    assert response.status_code == 400
+    assert 'Selected audio is missing' in response.json['error']

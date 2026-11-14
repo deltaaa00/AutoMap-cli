@@ -96,6 +96,7 @@ def test_json_proxy_passes_response(web, monkeypatch, path, payload, timeout, st
     if path.endswith('render_video'):
         assert post.call_args.kwargs['json']['title_font'] == 'DIN Condensed.ttf'
         assert post.call_args.kwargs['json']['title_font_size'] == 100
+        assert post.call_args.kwargs['json']['include_audio'] is False
 
 
 @pytest.mark.parametrize('path,payload,timeout', PROXIES)
@@ -132,6 +133,8 @@ def test_render_forwards_title_style_and_legacy_title(web, monkeypatch):
         'watermark_image': 'base64-logo', 'watermark_text': 'Channel',
         'watermark_color': '#a4e9ee', 'visual_effects': False,
         'watermark_font': 'arialroundedmtbold.ttf',
+        'audio_title': 'selected-song', 'audio_file': 'data:audio/mpeg;base64,YXVkaW8=',
+        'include_audio': False,
     })
     assert post.call_args.kwargs['json']['video_title'] == 'Legacy'
     assert post.call_args.kwargs['json']['title_font'] == 'Bips.ttf'
@@ -141,6 +144,9 @@ def test_render_forwards_title_style_and_legacy_title(web, monkeypatch):
     assert post.call_args.kwargs['json']['watermark_image'] == 'base64-logo'
     assert post.call_args.kwargs['json']['watermark_text'] == 'Channel'
     assert post.call_args.kwargs['json']['watermark_font'] == 'arialroundedmtbold.ttf'
+    assert post.call_args.kwargs['json']['audio_title'] == 'selected-song'
+    assert post.call_args.kwargs['json']['include_audio'] is True
+    assert post.call_args.kwargs['json']['audio_file'] == 'data:audio/mpeg;base64,YXVkaW8='
     assert post.call_args.kwargs['json']['visual_effects'] is False
 
 

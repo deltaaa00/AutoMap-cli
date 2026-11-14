@@ -151,7 +151,9 @@ def music_download():
         with open(mp3_path, "rb") as fh:
             base64_audio = base64.b64encode(fh.read()).decode("utf-8")
             new_mp3_path = os.path.join(DOWNLOADS, f"{title}.mp3")
-            os.rename(mp3_path, new_mp3_path)
+            # Temporary downloads and persistent storage may be separate mounts.
+            # shutil.move falls back to copying when an atomic rename is unavailable.
+            shutil.move(mp3_path, new_mp3_path)
 
         return jsonify({
             "status": "success",
@@ -209,7 +211,8 @@ def cut_audio() -> tuple[object, int]:
 
         os.makedirs(CUT_DIR, exist_ok=True)
 
-        # Parsing time
+        if not re.fullmatch(r'\d+:[0-5]\d', time):
+            return jsonify(status='error', error='Start time must use MM:SS format.'), 400
         minutes, seconds = time.split(":")
         minutes, seconds = int(minutes), int(seconds)
 
@@ -222,6 +225,8 @@ def cut_audio() -> tuple[object, int]:
         from pydub import AudioSegment
 
         audio = AudioSegment.from_file(os.path.join(DOWNLOADS, f"{filename}.mp3"))
+        if start_ms >= len(audio):
+            return jsonify(status='error', error='Start time is beyond the end of the track.'), 400
 
         cut = audio[start_ms:end_ms]
 
@@ -498,16 +503,30 @@ def make_video() -> tuple[object, int]:
         return jsonify({"status": "error", "error": str(ve)}), 400
 
     safe_title = re.sub(r'[^\w\-]', '_', title)
-    cut_audio_path = os.path.join(CUT_DIR, f"{safe_title}_cut.mp3")
+    # The video headline and the selected song are independent identifiers.
+    audio_title = data.get('audio_title', '')
+    if not isinstance(audio_title, str) or (audio_title and not re.fullmatch(r'[\w\-]+', audio_title)):
+        return jsonify(status='error', error='Invalid audio track title.'), 400
+    try:
+        audio_bytes = _decode_material(str(data['audio_file']), 'audio_file') if data.get('audio_file') else None
+    except ValueError as error:
+        return jsonify(status='error', error=str(error)), 400
+    cut_audio_path = os.path.join(CUT_DIR, f"{audio_title}_cut.mp3")
     # Prefer an edited track; fall back to the full download if no cut exists.
     audio_path = (
         cut_audio_path
         if os.path.exists(cut_audio_path)
-        else os.path.join(DOWNLOADS, f"{safe_title}.mp3")
+        else os.path.join(DOWNLOADS, f"{audio_title}.mp3")
     )
-    output_path = os.path.join(RENDER_DIR, f"{safe_title}_final.mp4")
+    if 'audio_title' in data and audio_title and not audio_bytes and not os.path.isfile(audio_path):
+        return jsonify(status='error', error='Selected audio is no longer available. Download and cut the track again.'), 400
+    if data.get('include_audio') is True and not audio_bytes and not (audio_title and os.path.isfile(audio_path)):
+        return jsonify(status='error', error='Selected audio is missing. Reload Video Studio and download the track again.'), 400
+    # A fresh URL prevents the player from reusing an older, silent render.
+    output_path = os.path.join(RENDER_DIR, f"{safe_title}_{uuid.uuid4().hex[:12]}_final.mp4")
 
-    map_path = bg_path = None
+    map_path = bg_path = audio_temp_path = None
+    media_resources = []
     try:
         from moviepy import (VideoFileClip, CompositeVideoClip,
                              ImageClip, AudioFileClip)
@@ -523,6 +542,12 @@ def make_video() -> tuple[object, int]:
             bg_video_temp.write(bg_bytes)
             bg_path = bg_video_temp.name
 
+        if audio_bytes:
+            with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as audio_temp:
+                audio_temp.write(audio_bytes)
+                audio_temp_path = audio_temp.name
+                audio_path = audio_temp_path
+
         # Target clip length: 1..30 seconds (default 8.0), never longer than the source clips.
         try:
             TARGET = float(raw_duration) if raw_duration is not None else 8.0
@@ -530,7 +555,9 @@ def make_video() -> tuple[object, int]:
             TARGET = 8.0
         TARGET = max(1.0, min(30.0, TARGET))
 
-        background_video = VideoFileClip(bg_path).without_audio()
+        background_video = VideoFileClip(bg_path)
+        media_resources.append(background_video)
+        background_video = background_video.without_audio()
         bg_duration = min(TARGET, background_video.duration or TARGET)
         background_video = background_video.subclipped(0, bg_duration)
 
@@ -593,10 +620,12 @@ def make_video() -> tuple[object, int]:
             clips.append(branding.with_position(('center', 1740)))
 
         final_clip = CompositeVideoClip(clips, size=(canvas_w, canvas_h))
+        media_resources.append(final_clip)
 
         # Attach the selected cut or full track when available; otherwise render silently.
-        if os.path.exists(audio_path):
+        if audio_bytes or (audio_title and os.path.isfile(audio_path)):
             audio_clip = AudioFileClip(audio_path)
+            media_resources.append(audio_clip)
             audio_duration = min(bg_duration, audio_clip.duration or bg_duration)
             final_clip = final_clip.with_audio(audio_clip.subclipped(0, audio_duration))
             final_clip = final_clip.with_duration(audio_duration)
@@ -614,15 +643,22 @@ def make_video() -> tuple[object, int]:
         return jsonify({
             "status": "success",
             "file_path": output_path,
-            "download_url": f"/api/download_video?path={output_path}"
+            "download_url": f"/api/download_video?path={output_path}",
+            "has_audio": final_clip.audio is not None,
         }), 200
     
     except Exception as e:
         return jsonify({"status": "error", "error": f"Error processing video: {str(e)}"}), 500
 
     finally:
+        # Release FFmpeg readers before removing their input files.
+        for resource in reversed(media_resources):
+            try:
+                resource.close()
+            except Exception:
+                pass
         # Always clean up the temp input files.
-        for p in (map_path, bg_path):
+        for p in (map_path, bg_path, audio_temp_path):
             if p and os.path.exists(p):
                 try:
                     os.remove(p)

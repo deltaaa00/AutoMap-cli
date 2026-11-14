@@ -799,6 +799,7 @@
                             </div>
                             <p id="codecStatus" role="status" aria-live="polite" class="text-[11px] text-slate-400">Checking encoders on the render worker…</p>
                             <p id="studioSaveStatus" role="status" class="text-[11px] text-slate-500">Settings and selected files are saved automatically on this device.</p>
+                            <p id="renderAudioStatus" role="status" class="text-[11px] text-amber-300">No music uploaded · video will be silent.</p>
                         </div>
 
                     </div>
@@ -969,9 +970,10 @@
             setCutDuration(document.getElementById('cutDurationInput').value);
             updateVisualEffects();
             try {
-                const [latest, selected, background, logo] = await Promise.all([
+                const [latest, selected, background, logo, cutAudio] = await Promise.all([
                     StudioStorage.getAsset('latest-map'), StudioStorage.getAsset('video-map'),
                     StudioStorage.getAsset('video-background'), StudioStorage.getAsset('video-watermark'),
+                    StudioStorage.getAsset('video-cut-audio'),
                 ]);
                 // A newer generated map wins. A manually selected or removed map
                 // remains the user's choice until another map is generated.
@@ -986,6 +988,19 @@
                     acceptFile('bgFileInput', background.file, false);
                 }
                 if (logo?.file && watermarkUploadVersion === 0) await selectWatermark(logo.file, false);
+                if (cutAudio?.file && audioSelectionVersion === 0) {
+                    const restoredAudio = await fileToDataUrl(cutAudio.file);
+                    if (audioSelectionVersion !== 0) return;
+                    cutAudioFile = cutAudio.file;
+                    cutDataUrl = restoredAudio;
+                    cutFileName = cutAudioFile.name.replace(/\.mp3$/i, '');
+                    const preview = document.getElementById('cutPreview');
+                    preview.src = cutDataUrl;
+                    preview.classList.remove('hidden');
+                    document.getElementById('cutResult').classList.remove('hidden');
+                    document.getElementById('cutResultText').textContent = cutAudioFile.name;
+                }
+                updateRenderAudioStatus();
             } catch (error) {
                 document.getElementById('studioSaveStatus').textContent = 'Saved files could not be restored. You can upload them again.';
             }
@@ -1022,8 +1037,10 @@
 
         // localStorage key holding the last downloaded track's title (cross-tab / reload persistence).
         const MUSIC_TITLE_KEY = 'automap_music_title';
+        let currentMusicTitle = '';
 
         function saveMusicTitle(title) {
+            currentMusicTitle = title || '';
             try {
                 if (title) localStorage.setItem(MUSIC_TITLE_KEY, title);
                 else localStorage.removeItem(MUSIC_TITLE_KEY);
@@ -1033,6 +1050,7 @@
         }
 
         function loadMusicTitle() {
+            if (currentMusicTitle) return currentMusicTitle;
             try {
                 return localStorage.getItem(MUSIC_TITLE_KEY) || '';
             } catch (e) {
@@ -1178,6 +1196,16 @@
                 const trackTitle = (result.title || '').trim();
                 saveMusicTitle(trackTitle);
                 updateCutTitleHint(trackTitle);
+                audioSelectionVersion++;
+                cutAudioFile = null;
+                cutDataUrl = null;
+                document.getElementById('cutResult').classList.add('hidden');
+                const oldCutPreview = document.getElementById('cutPreview');
+                oldCutPreview.pause();
+                oldCutPreview.removeAttribute('src');
+                oldCutPreview.load();
+                await rememberVideoAsset('video-cut-audio', null);
+                updateRenderAudioStatus();
 
                 logToConsole(`[Success] Music file received "${musicFileName}.mp3" (${describeDataUrl(musicDataUrl)})`, 'success');
 
@@ -1224,6 +1252,19 @@
         let cutDuration = 8;  // configurable segment length: 1..30s (default 8s)
         let cutDataUrl = null;
         let cutFileName = 'music_cut';
+        let cutAudioFile = null;
+        let audioSelectionVersion = 0;
+
+        function updateRenderAudioStatus() {
+            const status = document.getElementById('renderAudioStatus');
+            if (cutAudioFile) {
+                status.textContent = `Audio: cut fragment · ${cutAudioFile.name}`;
+            } else if (loadMusicTitle()) {
+                status.textContent = `Audio: downloaded track · ${loadMusicTitle()}`;
+            } else {
+                status.textContent = 'No music uploaded · video will be silent.';
+            }
+        }
 
         function getCutDuration() {
             const numInput = document.getElementById('cutDurationInput');
@@ -1423,6 +1464,11 @@
                 const titleHint = sanitizeFileName(result.title || trackTitle || '');
                 const stamp = `${formatSecondsToTime(startSecs).replace(':', '-')}_${durationSecs}s`;
                 cutFileName = titleHint ? `${titleHint}_${stamp}` : `music_cut_${stamp}`;
+                const cutBlob = await (await fetch(cutDataUrl)).blob();
+                cutAudioFile = new File([cutBlob], `${cutFileName}.mp3`, {type: 'audio/mpeg'});
+                audioSelectionVersion++;
+                await rememberVideoAsset('video-cut-audio', cutAudioFile);
+                updateRenderAudioStatus();
 
                 logToConsole(`[Success] Cut ${durationSecs}s segment ${formatSecondsToTime(startSecs)} -> ${endLabel} (${describeDataUrl(cutDataUrl)})`, 'success');
 
@@ -2014,6 +2060,7 @@
             const title = document.getElementById('videoTitleInput').value.trim();
             const codec = document.getElementById('codecSelect').value;
             const durationSecs = getCutDuration();
+            const includeAudio = Boolean(cutAudioFile || loadMusicTitle());
 
             if (!mapFile) {
                 showToast("Please upload a map file first.", 'warn');
@@ -2050,9 +2097,10 @@
 
             try {
                 // Encode both materials as base64 data URLs.
-                const [mapB64, bgB64, watermarkB64] = await Promise.all([
+                const [mapB64, bgB64, watermarkB64, audioB64] = await Promise.all([
                     fileToDataUrl(mapFile), fileToDataUrl(bgFile),
                     watermarkFile ? fileToDataUrl(watermarkFile) : '',
+                    includeAudio && cutAudioFile ? fileToDataUrl(cutAudioFile) : '',
                 ]);
 
                 // Everything (files as base64 + user args + selected duration) goes in a single JSON body.
@@ -2060,6 +2108,9 @@
                     map_file: mapB64,               // data URL string (base64)
                     background_video: bgB64,        // data URL string (base64)
                     video_title: title,
+                    audio_title: includeAudio ? loadMusicTitle() : '',
+                    audio_file: audioB64,
+                    include_audio: includeAudio,
                     codec: codec,
                     duration: parseInt(durationSecs, 10),
                     ...titleSettings(),
@@ -2100,6 +2151,9 @@
                 if (player && filePath && filePath !== '(unknown path)') {
                     const streamUrl = result.download_url || `/api/download_video?path=${encodeURIComponent(filePath)}`;
                     player.src = streamUrl;
+                    player.muted = false;
+                    player.volume = 1;
+                    player.load();
                     player.classList.remove('hidden');
                     updatePreviewPlayback();
                     if (stageModeLabel) stageModeLabel.textContent = 'Master MP4 Output';
@@ -2107,10 +2161,10 @@
 
                 logToConsole(`[Success] Video rendered: ${filePath}`, 'success');
                 metaBadge.textContent = `Done (${new Date().toLocaleTimeString()})`;
-                showToast("Video rendered! Click Download video.", 'success');
+                showToast(result.has_audio ? 'Video rendered with music! Click Download video.' : 'Video rendered without music.', 'success');
             } catch (error) {
                 logToConsole(`[API Error] ${error.message}`, 'error');
-                showToast("Video render failed. Check console logs.", 'error');
+                showToast(error.message || "Video render failed. Check console logs.", 'error');
                 metaBadge.textContent = "Error";
             } finally {
                 overlay.classList.add('hidden');

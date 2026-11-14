@@ -80,11 +80,13 @@ def test_portrait_render_with_centered_title_and_map(worker, tmp_path, font, siz
         'background_video': base64.b64encode(background.read_bytes()).decode(),
         'video_title': 'Найкрасивіші країни Європи',
         'title_font': font, 'title_font_size': size,
-        'duration': 1,
+        'duration': 1, 'include_audio': False,
     })
     assert response.status_code == 200, response.json
     with VideoFileClip(response.json['file_path']) as result:
         assert result.size == [1080, 1920]
+        assert result.audio is None
+        assert response.json['has_audio'] is False
         assert result.duration == pytest.approx(1, abs=.05)
         frame = result.get_frame(.5)
     green = (frame[:, :, 1] > 220) & (frame[:, :, 0] < 30)
@@ -107,26 +109,34 @@ def test_portrait_render_with_centered_title_and_map(worker, tmp_path, font, siz
     assert abs((title_x.min() + title_x.max()) / 2 - 540) < 8
 
 
-def test_render_attaches_audio_and_limits_duration(worker, tmp_path):
+@pytest.mark.parametrize('inline_audio', [False, True])
+def test_render_attaches_audio_and_limits_duration(worker, tmp_path, inline_audio):
     from pathlib import Path
     from moviepy import AudioClip
 
     background = tmp_path / 'background.mp4'
     with ColorClip((180, 320), color=(50, 100, 150), duration=1) as clip:
         clip.write_videofile(str(background), fps=30, codec='libx264', logger=None)
-    track = Path(worker.CUT_DIR) / 'Audio_title_cut.mp3'
+    track = Path(worker.CUT_DIR) / 'Selected_song_cut.mp3'
     with AudioClip(lambda t: .2 * np.sin(2 * np.pi * 440 * t), duration=.4, fps=44100) as audio:
         audio.write_audiofile(str(track), logger=None)
+    audio_b64 = base64.b64encode(track.read_bytes()).decode() if inline_audio else ''
+    if inline_audio:
+        # The browser's saved fragment must work even after worker storage is lost.
+        track.unlink()
     map_file = tmp_path / 'map.png'
     Image.new('RGB', (100, 50), 'green').save(map_file)
     response = worker.app.test_client().post('/api/render_video', json={
         'map_file': base64.b64encode(map_file.read_bytes()).decode(),
         'background_video': base64.b64encode(background.read_bytes()).decode(),
         'video_title': 'Audio title', 'duration': 'invalid',
+        'audio_title': 'Selected_song', 'audio_file': audio_b64,
+        'include_audio': False,  # An old checkbox preference must not mute selected music.
     })
     assert response.status_code == 200, response.json
     with VideoFileClip(response.json['file_path']) as result:
         assert result.audio is not None
+        assert response.json['has_audio'] is True
         assert .35 <= result.duration <= .55
         # Sample inside the clip: MoviePy's bulk reader has a short-clip
         # buffer bug, so read scalar frames without crossing chunk boundaries.

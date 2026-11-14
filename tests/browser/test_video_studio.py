@@ -242,6 +242,7 @@ def test_watermark_upload_text_effects_and_render_payload(studio, tmp_path):
     assert payloads[0]['watermark_font'] == 'Bips.ttf'
     assert payloads[0]['watermark_image'].startswith('data:image/png;base64,')
     assert payloads[0]['visual_effects'] is True
+    assert payloads[0]['include_audio'] is False
     page.get_by_role('button', name='Remove logo').click()
     assert page.locator('#stageWatermarkImage').is_hidden()
     assert page.locator('#watermarkThumbPreview').is_hidden()
@@ -438,3 +439,75 @@ def test_restore_does_not_overwrite_a_new_manual_map(studio):
         await restoring;
     }''')
     assert page.evaluate('renderFiles.mapFileInput.name') == 'manual.png'
+
+
+def test_cut_audio_is_restored_and_sent_independently_of_video_title(studio, tmp_path):
+    import base64
+    import json
+
+    page, _ = studio
+    page.evaluate('async () => { await window.videoStudioReady; }')
+    page.route('**/api/music_download', lambda route: route.fulfill(
+        content_type='application/json', body=json.dumps({
+            'status': 'success', 'title': 'Selected_song',
+            'file': base64.b64encode(b'full-track').decode(),
+        })))
+    cut_requests = []
+    def cut(route):
+        cut_requests.append(route.request.post_data_json)
+        route.fulfill(content_type='application/json', body=json.dumps({
+            'status': 'successfull', 'file': base64.b64encode(b'cut-fragment').decode(),
+        }))
+    page.route('**/api/music_cut', cut)
+    page.locator('#musicUrlInput').fill('https://music.youtube.com/watch?v=example')
+    page.evaluate('handleMusicDownload({preventDefault(){}})')
+    page.locator('#cutStartInput').fill('00:02')
+    page.evaluate('handleMusicCut({preventDefault(){}})')
+    assert cut_requests[0]['title'] == 'Selected_song'
+    assert cut_requests[0]['start_time'] == '00:02'
+    assert page.evaluate('cutAudioFile.size') == len(b'cut-fragment')
+    reopen_studio(page)
+    assert page.locator('#cutResult').is_visible()
+    assert 'cut fragment' in page.locator('#renderAudioStatus').inner_text()
+    map_file = tmp_path / 'map.png'
+    Image.new('RGB', (80, 80), 'green').save(map_file)
+    page.locator('#mapFileInput').set_input_files(str(map_file))
+    page.locator('#bgFileInput').set_input_files({
+        'name': 'background.mp4', 'mimeType': 'video/mp4', 'buffer': b'video',
+    })
+    page.locator('#videoTitleInput').fill('A completely different headline')
+    payloads = []
+    def capture(route):
+        payloads.append(route.request.post_data_json)
+        route.fulfill(status=400, content_type='application/json', body='{"error":"Test render captured"}')
+    page.route('**/api/render_video', capture)
+    page.evaluate('handleRenderVideo({preventDefault(){}})')
+    assert payloads[0]['audio_title'] == 'Selected_song'
+    assert payloads[0]['include_audio'] is True
+    assert payloads[0]['video_title'] == 'A completely different headline'
+    assert base64.b64decode(payloads[0]['audio_file'].split(',')[1]) == b'cut-fragment'
+
+
+def test_music_is_automatic_when_selected_and_optional_when_absent(studio, tmp_path):
+    page, _ = studio
+    page.evaluate('async () => { await window.videoStudioReady; }')
+    image = tmp_path / 'map.png'
+    Image.new('RGB', (80, 80), 'green').save(image)
+    page.locator('#mapFileInput').set_input_files(str(image))
+    page.locator('#bgFileInput').set_input_files({
+        'name': 'background.mp4', 'mimeType': 'video/mp4', 'buffer': b'video',
+    })
+    page.locator('#videoTitleInput').fill('Headline')
+    requests = []
+    def capture(route):
+        requests.append(route.request.post_data_json)
+        route.fulfill(status=400, content_type='application/json', body='{"error":"Test render captured"}')
+    page.route('**/api/render_video', capture)
+    page.evaluate('handleRenderVideo({preventDefault(){}})')
+    assert requests[0]['include_audio'] is False
+    assert requests[0]['audio_file'] == ''
+    assert 'No music uploaded' in page.locator('#renderAudioStatus').inner_text()
+    page.evaluate("saveMusicTitle('Selected_song'); updateRenderAudioStatus()")
+    page.evaluate('handleRenderVideo({preventDefault(){}})')
+    assert requests[1]['include_audio'] is True
+    assert requests[1]['audio_title'] == 'Selected_song'
