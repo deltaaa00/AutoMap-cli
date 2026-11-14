@@ -189,8 +189,14 @@ def test_auto_fill_from_ai_detects_numbers_and_words():
 def test_auto_map_applies_request_color_and_label_overrides(scene, monkeypatch):
     answer, _, real_open = scene
     answer.return_value = {'one': 'CustomLabel', 'two': 'OtherLabel', 'three': ''}
-    draw_text = Mock(wraps=ImageDraw.ImageDraw.text)
-    monkeypatch.setattr(ImageDraw.ImageDraw, 'text', draw_text)
+    orig_text = ImageDraw.ImageDraw.text
+    text_calls = []
+
+    def spy_text(self, *args, **kwargs):
+        text_calls.append((args, kwargs))
+        return orig_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(ImageDraw.ImageDraw, 'text', spy_text)
 
     buf = render(
         filling_txt_override={'CustomLabel': [12, 34, 56, 255], 'OtherLabel': [65, 43, 21, 255]},
@@ -201,11 +207,33 @@ def test_auto_map_applies_request_color_and_label_overrides(scene, monkeypatch):
     image = real_open(buf)
     assert image.getpixel((80, 600)) == (12, 34, 56, 255)
     assert image.getpixel((290, 600)) == (65, 43, 21, 255)
-    assert draw_text.call_args.kwargs['fill'] == (255, 17, 34, 255)
-    assert draw_text.call_args.kwargs['stroke_fill'] == (1, 2, 3, 255)
-    assert draw_text.call_args.kwargs['stroke_width'] == 9
+    assert len(text_calls) == 2
+    assert text_calls[0][1]['fill'] == (255, 17, 34, 255)
+    assert text_calls[0][1]['stroke_fill'] == (1, 2, 3, 255)
+    assert text_calls[0][1]['stroke_width'] == 9
     assert buf.map_meta['label_style']['text_color'] == '#ff1122'
     assert buf.map_meta['used_txt']['CustomLabel'] == [12, 34, 56, 255]
+
+
+def test_numeric_auto_style_ignores_untouched_four_ui_defaults(scene):
+    answer, _, real_open = scene
+    answer.return_value = {'one': 1, 'two': 50, 'three': 99}
+    untouched_ui_num = {
+        '(0, 100)': [56, 189, 248, 255],
+        '(100, 1000)': [99, 102, 241, 255],
+        '(1000, 10000)': [168, 85, 247, 255],
+        '(10000, 100000000)': [244, 63, 94, 255],
+    }
+    buf = render(
+        mode='number',
+        filling_num_override=untouched_ui_num,
+        auto_style=True,
+        palette_theme='auto',
+    )
+    image = real_open(buf)
+    assert len(buf.map_meta['used_num']) == 3
+    assert image.getpixel((80, 600)) != image.getpixel((290, 600))
+    assert image.getpixel((290, 600)) != image.getpixel((500, 600))
 
 
 def test_auto_map_restyle_override_skips_ai_request(scene):

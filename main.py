@@ -260,8 +260,8 @@ def _inspect_uploaded_map_image(
     image_data: object,
     map_type: str = "default",
     palette_theme: str = "auto",
-) -> tuple[dict[str, object], dict[str, object]]:
-    """Decode and inspect an uploaded map image's region fill colors."""
+) -> dict[str, object]:
+    """Decode an uploaded map image and extract its sampled region color palette."""
     if not isinstance(image_data, str) or not image_data.strip():
         raise ValueError("Empty image data.")
     raw_b64 = image_data.strip()
@@ -298,14 +298,15 @@ def _inspect_uploaded_map_image(
 
     px = img.load()
     clusters: list[tuple[int, int, int, int]] = []
-    region_values: dict[str, str] = {}
     rule_colors: dict[str, tuple[int, int, int, int]] = {}
+    sampled_regions = 0
     scale_x = width / max(1, ref_w)
     scale_y = height / max(1, ref_h)
 
-    for name, points in ref_coords.items():
+    for points in ref_coords.values():
         if not points:
             continue
+        sampled_regions += 1
         px_x, px_y = points[0]
         sx = max(0, min(width - 1, int(round(px_x * scale_x))))
         sy = max(0, min(height - 1, int(round(px_y * scale_y))))
@@ -338,20 +339,37 @@ def _inspect_uploaded_map_image(
             matched = avg
 
         hex_label = f"#{matched[0]:02x}{matched[1]:02x}{matched[2]:02x}"
-        region_values[name] = hex_label
         rule_colors.setdefault(hex_label, matched)
 
-    meta = {
-        "resolved_theme": palette_theme if palette_theme and palette_theme != "auto" else "inspected",
-        "used_txt": {k: list(v) for k, v in rule_colors.items()},
+    ui_txt_rules = [
+        {"key": k, "hex": k, "alpha": c[3]}
+        for k, c in rule_colors.items()
+    ]
+    return {
+        "detected_type": "palette",
+        "resolved_mode": "palette",
+        "resolved_theme": palette_theme if palette_theme and palette_theme != "auto" else "sampled",
+        "inspection_only": True,
+        "filling_txt": {k: list(c) for k, c in rule_colors.items()},
+        "filling_num": {},
+        "ui_txt_rules": ui_txt_rules,
+        "ui_num_rules": [],
+        "label_style": {
+            "text_color": "#ffffff",
+            "stroke_color": "#090d16",
+            "stroke_width": 15,
+            "auto_fit": True,
+            "recommended_font": "Bips.ttf",
+            "recommended_gsm": 15,
+        },
+        "stats": {
+            "total_regions": sampled_regions,
+            "unique_values": len(rule_colors),
+            "min_value": None,
+            "max_value": None,
+            "sample_values": [],
+        },
     }
-    analysis = _build_analysis_from_ai(
-        region_values,
-        mode="text",
-        palette_theme=palette_theme,
-        render_meta=meta,
-    )
-    return region_values, analysis
 
 
 def _parse_render_params(data: dict[str, object]) -> tuple[str, str | None, int]:
@@ -541,7 +559,7 @@ def api_analyze_map():
 
     if image_data is not None and (not isinstance(map_values, dict) or not map_values):
         try:
-            inspected_values, analysis = _inspect_uploaded_map_image(
+            analysis = _inspect_uploaded_map_image(
                 image_data,
                 map_type=map_type,
                 palette_theme=palette_theme,
@@ -550,9 +568,9 @@ def api_analyze_map():
             return jsonify({"status": "error", "error": str(err)}), 400
         return jsonify({
             "status": "success",
-            "source": "image_inspection",
+            "source": "palette_inspection",
             "topic": topic,
-            "map_values": inspected_values,
+            "map_values": None,
             "analysis": analysis,
         })
 

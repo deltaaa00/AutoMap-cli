@@ -74,6 +74,21 @@ _PALETTE_THEMES: dict[str, tuple[tuple[int, int, int, int], ...]] = {
         (51, 65, 85, 255), (71, 85, 105, 255), (100, 116, 139, 255),
         (148, 163, 184, 255), (203, 213, 225, 255),
     ),
+    "heatmap": (
+        (37, 99, 235, 255), (16, 185, 129, 255), (245, 158, 11, 255),
+        (239, 68, 68, 255), (185, 28, 28, 255),
+    ),
+    "emerald_gold": (
+        (244, 63, 94, 255), (245, 158, 11, 255), (234, 179, 8, 255),
+        (16, 185, 129, 255), (5, 150, 105, 255),
+    ),
+    "oceanic": (
+        (56, 189, 248, 255), (14, 165, 233, 255), (37, 99, 235, 255),
+        (99, 102, 241, 255), (139, 92, 246, 255),
+    ),
+    "categorical": _AUTO_PALETTE + (
+        (14, 165, 233, 255), (132, 204, 22, 255),
+    ),
 }
 
 _SEMANTIC_COLORS: dict[str, tuple[int, int, int, int]] = {
@@ -84,7 +99,7 @@ _SEMANTIC_COLORS: dict[str, tuple[int, int, int, int]] = {
 }
 
 _DEFAULT_UI_TXT_KEYS = {"yes", "no", "tea", "coffee"}
-_DEFAULT_UI_NUM_BOUNDS = {(0, 100), (100, 1000)}
+_DEFAULT_UI_NUM_BOUNDS = {(0, 100), (100, 1000), (1000, 10000), (10000, 100000000)}
 _RELIEF_ALPHA_LUT: list[int] = [int(p * 0.3) for p in range(256)]
 
 _EUROPE_LABEL_SIZES: dict[str, int] = {
@@ -232,13 +247,18 @@ def _auto_fill_from_ai(
                 nums.append(int(round(parsed)))
         if nums:
             nums.sort()
+            unique_nums = sorted(set(nums))
             low_start = min(0, nums[0] - 1) if nums[0] <= 10 else nums[0] - 1
-            buckets = min(5, max(1, len(set(nums))))
-            bounds = [low_start]
-            for i in range(1, buckets):
-                q = nums[int(round((len(nums) - 1) * (i / buckets)))]
-                bounds.append(max(bounds[-1] + 1, q))
-            bounds.append(max(bounds[-1] + 1, nums[-1]))
+            if len(unique_nums) <= 5:
+                bounds = [low_start] + unique_nums
+                buckets = len(unique_nums)
+            else:
+                buckets = 5
+                bounds = [low_start]
+                for i in range(1, buckets):
+                    q = nums[int(round((len(nums) - 1) * (i / buckets)))]
+                    bounds.append(max(bounds[-1] + 1, q))
+                bounds.append(max(bounds[-1] + 1, nums[-1]))
             for i in range(buckets):
                 auto_num[(bounds[i], bounds[i + 1])] = palette[i % len(palette)]
     else:

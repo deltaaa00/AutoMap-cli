@@ -293,8 +293,26 @@ def test_analyze_map_validates_and_inspects_uploaded_image(web):
         'prefer_cached': False,
     })
     assert ok_res.status_code == 200
-    assert ok_res.json['source'] == 'image_inspection'
+    assert ok_res.json['source'] == 'palette_inspection'
+    assert ok_res.json['map_values'] is None
+    assert ok_res.json['analysis']['detected_type'] == 'palette'
+    assert ok_res.json['analysis']['inspection_only'] is True
+    assert ok_res.json['analysis']['stats']['sample_values'] == []
     assert '#14b45a' in ok_res.json['analysis']['filling_txt']
+
+
+@pytest.mark.parametrize('theme', ['auto', 'viridis', 'heatmap', 'emerald_gold', 'festive', 'oceanic', 'categorical'])
+def test_analyze_map_supports_every_ui_palette_theme(web, theme):
+    client = web.app.test_client()
+    res = client.post('/api/analyze_map', json={
+        'topic': 'Population',
+        'mode': 'number',
+        'palette_theme': theme,
+        'map_values': {'germany': 84, 'france': 68, 'estonia': 1},
+    })
+    assert res.status_code == 200
+    expected = 'viridis' if theme == 'auto' else theme
+    assert res.json['analysis']['resolved_theme'] == expected
 
 
 def test_analyze_map_prefer_cached_false_does_not_leak_previous_state(web):

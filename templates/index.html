@@ -1650,7 +1650,9 @@
         function applyAnalysisToFillingStudio(analysis, mapValues = null, notifyToast = true) {
             if (!analysis) return;
             lastMapAnalysis = analysis;
-            if (mapValues && typeof mapValues === 'object') {
+            if (analysis.inspection_only || !mapValues || typeof mapValues !== 'object') {
+                lastMapValues = null;
+            } else {
                 lastMapValues = mapValues;
             }
             if (Array.isArray(analysis.ui_txt_rules) && analysis.ui_txt_rules.length > 0) {
@@ -1693,7 +1695,11 @@
 
             renderFillingStudio();
             if (notifyToast) {
-                showToast(`Detected ${analysis.detected_type} map values -> applied ${analysis.resolved_theme} palette & style!`, 'success');
+                if (analysis.inspection_only) {
+                    showToast(`Extracted ${analysis.ui_txt_rules?.length || 0} palette colors from uploaded map (palette-only inspection).`, 'success');
+                } else {
+                    showToast(`Detected ${analysis.detected_type} map values -> applied ${analysis.resolved_theme} palette & style!`, 'success');
+                }
             }
         }
 
@@ -1753,7 +1759,7 @@
                 }
                 if (emptyEl) emptyEl.classList.add('hidden');
 
-                showToast(`Inspecting "${file.name}" for numbers, words & colors...`, 'info');
+                showToast(`Extracting color palette from "${file.name}"...`, 'info');
                 const state = getFormState();
                 try {
                     const res = await fetch('/api/analyze_map', {
@@ -1775,7 +1781,7 @@
                         throw new Error(data.error || 'Map image inspection failed');
                     }
                     applyAnalysisToFillingStudio(data.analysis, data.map_values, true);
-                    logToConsole(`[Map Inspector] Analyzed uploaded map "${file.name}" -> detected ${data.analysis?.detected_type} values & "${data.analysis?.resolved_theme}" theme`, 'success');
+                    logToConsole(`[Map Inspector] Extracted ${data.analysis?.ui_txt_rules?.length || 0} palette colors from "${file.name}" (palette-only)`, 'success');
                 } catch (err) {
                     showToast(err.message || 'Could not inspect map image', 'error');
                 } finally {
@@ -1786,6 +1792,10 @@
         }
 
         async function restyleCurrentMapFromStudio() {
+            if (!lastMapValues || lastMapAnalysis?.inspection_only) {
+                showToast('Generate a map first to re-paint it live (uploaded images only extract palette colors).', 'warn');
+                return;
+            }
             const state = getFormState();
             const btn = document.getElementById('restyleCurrentMapBtn');
             if (btn) btn.disabled = true;
