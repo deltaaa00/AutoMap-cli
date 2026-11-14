@@ -327,3 +327,70 @@ def test_analyze_map_prefer_cached_false_does_not_leak_previous_state(web):
     assert res.json['map_values']['ukraine'] == '6 Dec'
 
 
+def test_generate_returns_request_values_and_effective_style(web, monkeypatch, generation_request):
+    output = io.BytesIO(b'png')
+    output.map_meta = {
+        'ai_answer': {'ukraine': 38}, 'resolved_theme': 'oceanic',
+        'used_num': {'(0, 100)': [56, 189, 248, 255]},
+        'label_style': {'text_color': '#abcdef'},
+    }
+    generate = Mock(return_value=output)
+    monkeypatch.setattr(web, 'auto_map', generate)
+    style = {'filling_txt': {}, 'filling_num': {'(0, 100)': '#38bdf8'},
+             'label_style': {'text_color': '#abcdef'}, 'auto_style': False,
+             'palette_theme': 'oceanic'}
+    response = web.app.test_client().post('/api/generate', json={**generation_request, **style})
+    assert response.status_code == 200
+    assert response.json['map_values'] == {'ukraine': 38}
+    assert response.json['analysis']['ui_num_rules'] == [
+        {'low': 0, 'high': 100, 'hex': '#38bdf8', 'alpha': 255}]
+    assert response.json['analysis']['label_style']['text_color'] == '#abcdef'
+    kwargs = generate.call_args.kwargs
+    assert kwargs['filling_txt_override'] == {}
+    assert kwargs['filling_num_override'] == style['filling_num']
+    for key in ('auto_style', 'palette_theme', 'label_style'):
+        assert kwargs[key] == style[key]
+
+
+@pytest.mark.parametrize('failure', [None, RuntimeError('repaint failed')])
+def test_restyle_reports_renderer_failure(web, monkeypatch, failure):
+    generate = Mock(side_effect=failure) if failure else Mock(return_value=None)
+    monkeypatch.setattr(web, 'auto_map', generate)
+    response = web.app.test_client().post('/api/restyle_map', json={'map_values': {'ukraine': 'Yes'}})
+    assert response.status_code == 500
+    assert response.json['status'] == 'error'
+    assert 'image_url' not in response.json
+
+
+@pytest.mark.parametrize('image_data,error', [
+    ('', 'Empty image data'),
+    ('data:text/plain;base64,YQ==', 'Unsupported data URL media type'),
+    ('data:image/png;base64,', 'Decoded image payload is empty'),
+    ('data:image/png;base64,YQ==', 'not a valid image'),
+])
+def test_palette_inspection_rejects_invalid_uploads(web, image_data, error):
+    response = web.app.test_client().post('/api/analyze_map', json={'image_data': image_data})
+    assert response.status_code == 400
+    assert error in response.json['error']
+    assert 'map_values' not in response.json
+
+
+def test_palette_inspection_rejects_images_too_small_for_sampling(web):
+    from PIL import Image
+    output = io.BytesIO()
+    Image.new('RGB', (7, 7)).save(output, format='PNG')
+    response = web.app.test_client().post('/api/analyze_map', json={
+        'image_data': base64.b64encode(output.getvalue()).decode('ascii')})
+    assert response.status_code == 400
+    assert 'too small' in response.json['error']
+
+
+@pytest.mark.parametrize('mode', ['text', 'number'])
+def test_topic_preview_is_explicitly_identified_as_sample_data(web, mode):
+    response = web.app.test_client().post('/api/analyze_map', json={'topic': 'Example', 'mode': mode})
+    assert response.status_code == 200
+    assert response.json['source'] == 'topic_preview'
+    assert response.json['analysis']['detected_type'] == mode
+    assert response.json['map_values']
+
+

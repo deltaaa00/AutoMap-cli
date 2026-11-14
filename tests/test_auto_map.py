@@ -249,4 +249,55 @@ def test_auto_map_restyle_override_skips_ai_request(scene):
     assert image.getpixel((290, 600)) == (200, 10, 100, 255)
 
 
+@pytest.mark.parametrize('theme', ['auto', 'oceanic'])
+def test_auto_style_preserves_explicit_text_rule_case_insensitively(scene, theme):
+    scene[0].return_value = {'one': 'Yes', 'two': 'Other', 'three': 'yes'}
+    output = render(auto_style=True, palette_theme=theme,
+                    filling_txt_override={' YES ': '#123456'})
+    image = scene[2](output)
+    assert image.getpixel((80, 600)) == (18, 52, 86, 255)
+    assert image.getpixel((500, 600)) == (18, 52, 86, 255)
+    assert image.getpixel((290, 600)) != (18, 52, 86, 255)
+
+
+def test_explicit_theme_replaces_untouched_default_text_rules(scene):
+    scene[0].return_value = {'one': 'Yes', 'two': 'No', 'three': 'Tea'}
+    defaults = {'yes': '#2ecc71', 'no': '#e74c3c', 'tea': '#10b981', 'coffee': '#f59e0b'}
+    output = render(auto_style=True, palette_theme='oceanic', filling_txt_override=defaults)
+    image = scene[2](output)
+    assert image.getpixel((80, 600)) == (56, 189, 248, 255)
+    assert image.getpixel((290, 600)) == (14, 165, 233, 255)
+
+
+def test_numeric_auto_style_keeps_manual_range_and_fills_unmatched_values(scene):
+    scene[0].return_value = {'one': 1, 'two': 50, 'three': 99}
+    output = render(mode='number', auto_style=True,
+                    filling_num_override={'(0, 10)': '#123456'})
+    image = scene[2](output)
+    assert image.getpixel((80, 600)) == (18, 52, 86, 255)
+    assert image.getpixel((290, 600)) != (160, 160, 160, 255)
+    assert image.getpixel((500, 600)) != (160, 160, 160, 255)
+    assert len(output.map_meta['used_num']) == 3
+
+
+@pytest.mark.parametrize('stroke,expected', [('bad', 15), (None, 15), (-1, 0), (100, 40)])
+def test_label_stroke_validation_keeps_rendering_usable(scene, stroke, expected):
+    output = render(label_style={'stroke_width': stroke})
+    assert scene[2](output).format == 'PNG'
+    assert output.map_meta['label_style']['stroke_width'] == expected
+
+
+@pytest.mark.parametrize('map_type', ['default', 'world'])
+def test_long_labels_auto_fit_without_changing_their_text(scene, monkeypatch, map_type):
+    label = 'A very long region label'
+    scene[0].return_value = {'one': label}
+    text = Mock()
+    monkeypatch.setattr(ImageDraw.ImageDraw, 'text', text)
+    render(map_type=map_type, label_style={'auto_fit': False})
+    original_size = text.call_args.kwargs['font'].size
+    render(map_type=map_type, label_style={'auto_fit': True})
+    assert text.call_args.args[1] == label
+    assert text.call_args.kwargs['font'].size < original_size
+
+
 
