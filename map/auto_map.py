@@ -15,6 +15,7 @@
 import random
 import io
 import math
+from collections import Counter
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -22,6 +23,111 @@ from PIL import Image, ImageDraw, ImageFont
 from .constants import europe_coords, world_coords
 from .functions import ai_request, load_filling, _warning as showwarning, _error as showerror
 from . import log
+
+
+LAST_GENERATED_MAP_STATE: dict[str, object] = {}
+
+_AUTO_PALETTE: tuple[tuple[int, int, int, int], ...] = (
+    (56, 189, 248, 255),   # #38bdf8 Sky
+    (99, 102, 241, 255),   # #6366f1 Indigo
+    (16, 185, 129, 255),   # #10b981 Emerald
+    (245, 158, 11, 255),   # #f59e0b Amber
+    (244, 63, 94, 255),    # #f43f5e Rose
+    (168, 85, 247, 255),   # #a855f7 Purple
+    (20, 184, 166, 255),   # #14b8a6 Teal
+    (236, 72, 153, 255),   # #ec4899 Pink
+    (234, 179, 8, 255),    # #eab308 Gold
+    (249, 115, 22, 255),   # #f97316 Orange
+)
+
+_SEMANTIC_COLORS: dict[str, tuple[int, int, int, int]] = {
+    "yes": (46, 204, 113, 255), "так": (46, 204, 113, 255), "true": (46, 204, 113, 255),
+    "no": (231, 76, 60, 255), "ні": (231, 76, 60, 255), "false": (231, 76, 60, 255),
+    "tea": (16, 185, 129, 255), "coffee": (245, 158, 11, 255), "coffe": (245, 158, 11, 255),
+    "beer": (234, 179, 8, 255), "wine": (225, 29, 72, 255),
+}
+
+
+def _parse_short_number(val: object) -> float | None:
+    """Parse plain numbers or short-form numbers like '10k', '2.5M', '1B'."""
+    if isinstance(val, bool) or val is None:
+        return None
+    s = str(val).replace(",", "").replace(" ", "").strip()
+    if not s:
+        return None
+    mult = 1.0
+    low = s.lower()
+    if low.endswith("k"):
+        mult, s = 1_000.0, s[:-1]
+    elif low.endswith("m"):
+        mult, s = 1_000_000.0, s[:-1]
+    elif low.endswith("b"):
+        mult, s = 1_000_000_000.0, s[:-1]
+    try:
+        num = float(s) * mult
+    except ValueError:
+        return None
+    return num if math.isfinite(num) else None
+
+
+def _auto_fill_from_ai(
+    ai_answer: dict[str, object],
+    mode: str,
+) -> tuple[dict[str, tuple[int, int, int, int]], dict[tuple[int, int], tuple[int, int, int, int]]]:
+    """Inspect AI response values (numbers, short-form numbers, or words) and pick colors."""
+    auto_txt: dict[str, tuple[int, int, int, int]] = {}
+    auto_num: dict[tuple[int, int], tuple[int, int, int, int]] = {}
+
+    if mode == "number":
+        nums: list[int] = []
+        for val in ai_answer.values():
+            parsed = _parse_short_number(val)
+            if parsed is not None:
+                nums.append(int(round(parsed)))
+        if nums:
+            nums.sort()
+            low_start = min(0, nums[0] - 1) if nums[0] <= 10 else nums[0] - 1
+            buckets = min(5, max(1, len(set(nums))))
+            bounds = [low_start]
+            for i in range(1, buckets):
+                q = nums[int(round((len(nums) - 1) * (i / buckets)))]
+                bounds.append(max(bounds[-1] + 1, q))
+            bounds.append(max(bounds[-1] + 1, nums[-1]))
+            for i in range(buckets):
+                auto_num[(bounds[i], bounds[i + 1])] = _AUTO_PALETTE[i % len(_AUTO_PALETTE)]
+    else:
+        labels = [str(v).strip() for v in ai_answer.values() if v is not None and str(v).strip()]
+        parsed_pairs = [(lbl, _parse_short_number(lbl)) for lbl in labels]
+        numeric_vals = sorted(num for _, num in parsed_pairs if num is not None)
+
+        # In text mode with short_form (e.g. '10k', '2.5M'), group numeric labels into
+        # gradient buckets instead of giving every distinct number its own random color.
+        if numeric_vals and len(numeric_vals) >= max(2, int(len(labels) * 0.6)):
+            buckets = min(5, max(1, len(set(numeric_vals))))
+            thresholds = [
+                numeric_vals[int(round((len(numeric_vals) - 1) * (i / buckets)))]
+                for i in range(1, buckets)
+            ]
+            for lbl, num in parsed_pairs:
+                if num is not None:
+                    b_idx = sum(1 for t in thresholds if num > t)
+                    auto_txt[lbl] = _AUTO_PALETTE[b_idx % len(_AUTO_PALETTE)]
+                else:
+                    auto_txt.setdefault(lbl, _SEMANTIC_COLORS.get(lbl.lower(), _AUTO_PALETTE[5]))
+        else:
+            canonical: dict[str, str] = {}
+            for lbl in labels:
+                canonical.setdefault(lbl.lower(), lbl)
+            idx = 0
+            for low_lbl, _ in Counter(lbl.lower() for lbl in labels).most_common():
+                orig = canonical[low_lbl]
+                if low_lbl in _SEMANTIC_COLORS:
+                    auto_txt[orig] = _SEMANTIC_COLORS[low_lbl]
+                else:
+                    auto_txt[orig] = _AUTO_PALETTE[idx % len(_AUTO_PALETTE)]
+                    idx += 1
+
+    return auto_txt, auto_num
 
 
 def _numeric_extrema(values):
@@ -135,6 +241,21 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         return
 
     log.success(f"Got information from AI ({len(ai_answer)} entries)")
+
+    # Auto-pick colors based on the numbers or words returned by AI when filling.json has no rules
+    auto_txt, auto_num = _auto_fill_from_ai(ai_answer, mode)
+    if not filling_txt and auto_txt:
+        filling_txt = auto_txt
+        filling_txt_ci = {str(k).strip().lower(): v for k, v in filling_txt.items()}
+    if not filling_num and auto_num:
+        filling_num = auto_num
+
+    LAST_GENERATED_MAP_STATE.clear()
+    LAST_GENERATED_MAP_STATE.update({
+        "ai_answer": dict(ai_answer),
+        "filling_txt": {str(k): list(v) for k, v in (filling_txt or auto_txt).items()},
+        "filling_num": {f"({lo}, {hi})": list(v) for (lo, hi), v in (filling_num or auto_num).items()},
+    })
 
     most_least = None
     extrema = _numeric_extrema(ai_answer) if optional_feature == "show_most_least" else None

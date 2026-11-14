@@ -41,7 +41,11 @@ os.makedirs(STORAGE_DIR, exist_ok=True)
 os.makedirs(CUT_DIR, exist_ok=True)
 
 from dotenv import dotenv_values
-from map.auto_map import auto_map
+from map.auto_map import (
+    auto_map,
+    _auto_fill_from_ai,
+    LAST_GENERATED_MAP_STATE,
+)
 
 from flask import Flask, request, jsonify, send_file, render_template, Response
 
@@ -86,14 +90,28 @@ def video_title_preview():
     import requests
 
     data = request.get_json(silent=True) or {}
+    allowed_keys = (
+        'video_title',
+        'title_font',
+        'title_font_size',
+        'title_first_line_color',
+        'title_other_lines_color',
+        'title_uppercase',
+        'visual_effects',
+        'preview_kind',
+        'watermark_text',
+        'watermark_color',
+        'watermark_font',
+        'subscribe_text',
+        'sticker_kind',
+        'sticker_side',
+        'allow_remote_stickers',
+    )
     try:
         # Preview and final rendering share the worker's title styling options.
         response = requests.post(
             'http://yt-dlp-worker:8080/api/video_title_preview',
-            json={key: data[key] for key in ('video_title', 'title_font', 'title_font_size',
-                                            'title_first_line_color', 'title_other_lines_color',
-                                            'visual_effects', 'preview_kind', 'watermark_text',
-                                            'watermark_color', 'watermark_font') if key in data},
+            json={key: data[key] for key in allowed_keys if key in data},
             timeout=15,
         )
     except requests.RequestException:
@@ -134,6 +152,60 @@ def api_status():
         { "needs_api_key": true }  -> the UI must ask the user for a key
     """
     return jsonify({"needs_api_key": needs_api_key})
+
+
+def _build_analysis_from_ai(
+    ai_answer: dict[str, object],
+    mode: str = "auto",
+) -> dict[str, object]:
+    """Build UI-friendly color rules and stats directly from AI map values."""
+    vals = [v for v in ai_answer.values() if v is not None and str(v).strip() != ""]
+    num_vals: list[int] = []
+    for v in vals:
+        if isinstance(v, bool):
+            continue
+        try:
+            num_vals.append(int(float(str(v).replace(",", "").strip())))
+        except (ValueError, TypeError):
+            pass
+
+    resolved_mode = mode if mode in ("number", "text") else (
+        "number" if vals and len(num_vals) >= max(1, int(len(vals) * 0.6)) else "text"
+    )
+    auto_txt, auto_num = _auto_fill_from_ai(ai_answer, resolved_mode)
+
+    ui_txt_rules = [
+        {"key": str(k), "hex": f"#{c[0]:02x}{c[1]:02x}{c[2]:02x}", "alpha": c[3]}
+        for k, c in auto_txt.items()
+    ]
+    ui_num_rules = [
+        {"low": lo, "high": hi, "hex": f"#{c[0]:02x}{c[1]:02x}{c[2]:02x}", "alpha": c[3]}
+        for (lo, hi), c in auto_num.items()
+    ]
+    return {
+        "detected_type": resolved_mode,
+        "resolved_mode": resolved_mode,
+        "resolved_theme": "auto",
+        "filling_txt": {str(k): list(c) for k, c in auto_txt.items()},
+        "filling_num": {f"({lo}, {hi})": list(c) for (lo, hi), c in auto_num.items()},
+        "ui_txt_rules": ui_txt_rules,
+        "ui_num_rules": ui_num_rules,
+        "label_style": {
+            "text_color": "#ffffff",
+            "stroke_color": "#090d16",
+            "stroke_width": 15,
+            "auto_fit": True,
+            "recommended_font": "Bips.ttf" if resolved_mode == "number" else "DIN Condensed.ttf",
+            "recommended_gsm": 15,
+        },
+        "stats": {
+            "total_regions": len(vals),
+            "unique_values": len({str(v).strip().lower() for v in vals}),
+            "min_value": min(num_vals) if num_vals else None,
+            "max_value": max(num_vals) if num_vals else None,
+            "sample_values": [str(v) for v in vals[:8]],
+        },
+    }
 
 
 @app.route('/api/generate/', methods=['POST'])
@@ -207,10 +279,67 @@ def generate():
     # Encode the PNG buffer as a data URL the browser can load directly.
     encoded = base64.b64encode(buffer.getvalue()).decode('ascii')
 
-    return jsonify({
+    resp_payload: dict[str, object] = {
         "status": "success",
         "command": command,
         "image_url": f"data:image/png;base64,{encoded}",
+    }
+    ai_vals = LAST_GENERATED_MAP_STATE.get("ai_answer")
+    if isinstance(ai_vals, dict) and ai_vals:
+        resp_payload["map_values"] = ai_vals
+        resp_payload["analysis"] = _build_analysis_from_ai(ai_vals, str(data.get("mode") or "auto"))
+
+    return jsonify(resp_payload)
+
+
+@app.route('/api/analyze_map/', methods=['POST'])
+@app.route('/api/analyze_map', methods=['POST'])
+def api_analyze_map():
+    """Inspect AI map values (or topic sample) and auto-determine colors for numbers or words."""
+    data = request.get_json(silent=True) or {}
+    mode = str(data.get('mode') or 'auto')
+    topic = str(data.get('topic') or '').strip()
+
+    map_values = data.get('map_values')
+    if not isinstance(map_values, dict) or not map_values:
+        cached = LAST_GENERATED_MAP_STATE.get("ai_answer")
+        if isinstance(cached, dict) and cached:
+            map_values = cached
+
+    if isinstance(map_values, dict) and map_values:
+        analysis = _build_analysis_from_ai(map_values, mode=mode)
+        return jsonify({
+            "status": "success",
+            "source": "ai_answer",
+            "topic": topic,
+            "map_values": map_values,
+            "analysis": analysis,
+        })
+
+    t_low = topic.lower()
+    if any(w in t_low for w in ("nicholas", "christmas", "santa", "holiday", "dec")):
+        sample_values: dict[str, object] = {
+            "ukraine": "6 Dec", "poland": "6 Dec", "germany": "6 Dec", "france": "6 Dec",
+            "netherlands": "5 Dec", "russia": "19 Dec", "serbia": "19 Dec", "spain": "6 Jan",
+        }
+    elif mode == "text":
+        sample_values = {
+            "ukraine": "Yes", "poland": "Yes", "germany": "Yes", "france": "No",
+            "spain": "Yes", "italy": "Partial", "united_kingdom": "No",
+        }
+    else:
+        sample_values = {
+            "germany": 84, "france": 68, "italy": 59, "spain": 48, "ukraine": 38,
+            "poland": 37, "romania": 19, "netherlands": 18, "sweden": 10, "estonia": 1,
+        }
+
+    analysis = _build_analysis_from_ai(sample_values, mode=mode)
+    return jsonify({
+        "status": "success",
+        "source": "topic_preview",
+        "topic": topic,
+        "map_values": sample_values,
+        "analysis": analysis,
     })
 
 
@@ -353,11 +482,23 @@ def make_video() -> tuple[object, int]:
                 "title_font_size": data.get('title_font_size', 100),
                 "title_first_line_color": data.get('title_first_line_color', '#ffffff'),
                 "title_other_lines_color": data.get('title_other_lines_color', '#ffe735'),
+                "title_uppercase": data.get('title_uppercase', True),
                 "visual_effects": data.get('visual_effects', True),
                 "watermark_image": data.get('watermark_image', ''),
                 "watermark_text": data.get('watermark_text', ''),
                 "watermark_color": data.get('watermark_color', '#a4e9ee'),
                 "watermark_font": data.get('watermark_font', 'DIN Condensed.ttf'),
+                "watermark_stars": data.get('watermark_stars', False),
+                "watermark_stars_image": data.get('watermark_stars_image', ''),
+                "top_left_sticker": data.get('top_left_sticker', 'none'),
+                "top_right_sticker": data.get('top_right_sticker', 'none'),
+                "top_left_sticker_image": data.get('top_left_sticker_image', ''),
+                "top_right_sticker_image": data.get('top_right_sticker_image', ''),
+                "subscribe_badge": data.get('subscribe_badge', False),
+                "subscribe_image": data.get('subscribe_image', ''),
+                "subscribe_text": data.get('subscribe_text', 'Subscribe!'),
+                "subscribe_delay": data.get('subscribe_delay', 2.5),
+                "intro_fade": data.get('intro_fade', False),
             },
             # Video rendering (moviepy/ffmpeg) can take a while - allow more time.
             timeout=300,

@@ -204,3 +204,19 @@ def test_codec_proxy_failure(web, monkeypatch, failure):
     response.json.side_effect = failure
     monkeypatch.setattr(requests, 'get', Mock(return_value=response))
     assert web.app.test_client().get('/api/codecs').status_code == 502
+
+
+def test_analyze_map_endpoint_returns_rules_and_style(web):
+    client = web.app.test_client()
+    res = client.post('/api/analyze_map', json={
+        'topic': 'When is Saint Nicholas Day',
+        'mode': 'text',
+        'map_values': {'ukraine': '6 Dec', 'serbia': '19 Dec', 'netherlands': '5 Dec'},
+    })
+    assert res.status_code == 200
+    data = res.json
+    assert data['status'] == 'success'
+    assert data['analysis']['detected_type'] == 'text'
+    assert len(data['analysis']['ui_txt_rules']) == 3
+    assert 'recommended_font' in data['analysis']['label_style']
+

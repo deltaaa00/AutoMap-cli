@@ -156,7 +156,24 @@
             gap: 16px;
             padding: 70px 20px 160px;
         }
+        #stageCompositeBox.has-top-stickers { padding-top: 175px; }
         #stageCompositeBox.has-branding { padding-bottom: 470px; }
+
+        #stageTopLeftSticker, #stageTopRightSticker {
+            position: absolute;
+            top: 16px;
+            width: 188px;
+            height: 188px;
+            pointer-events: none;
+        }
+        #stageTopLeftSticker { left: 145px; }
+        #stageTopRightSticker { right: 145px; }
+        #stageTopLeftSticker img, #stageTopRightSticker img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
 
         #stageTitleBanner {
             width: 1040px;
@@ -164,6 +181,14 @@
         }
 
         #stageTitleBanner img { display: block; width: 1040px; }
+        #stageSubscribeBanner {
+            display: flex;
+            justify-content: center;
+            width: 1040px;
+            flex: none;
+            margin-top: -8px;
+        }
+        #stageSubscribeBanner img { display: block; max-width: 680px; max-height: 150px; width: auto; height: auto; object-fit: contain; }
         #stageWatermarkImage {
             position: absolute; left: 50%; top: 1470px;
             width: 230px; height: 230px; object-fit: cover; border-radius: 50%; transform: translateX(-50%);
@@ -174,8 +199,19 @@
             background: repeating-conic-gradient(#334155 0% 25%, #1e293b 0% 50%) 50% / 16px 16px;
         }
         #watermarkDropzone.has-logo { border-style: solid; border-color: #34d399; }
-        #stageWatermarkText { position: absolute; left: 72px; top: 1740px; width: 936px; }
+        #stageWatermarkText { position: absolute; left: 72px; top: 1740px; width: 936px; transition: top .15s ease; }
+        #stageCompositeBox.has-stars #stageWatermarkText { top: 1695px; }
         #stageWatermarkText img { display: block; width: 936px; }
+        #stageWatermarkStars {
+            position: absolute;
+            left: 50%;
+            top: 1805px;
+            transform: translateX(-50%);
+            display: flex;
+            justify-content: center;
+            pointer-events: none;
+        }
+        #stageWatermarkStars img { display: block; max-width: 480px; max-height: 110px; width: auto; height: auto; object-fit: contain; }
         #watermarkDropzone {
             padding: 16px; border: 2px dashed #475569; border-radius: 12px;
             cursor: pointer; text-align: center; transition: border-color .15s, background .15s;
@@ -713,11 +749,249 @@
                             </div>
                             <p class="text-[10px] text-slate-500">Size at 1080×1920. Long titles shrink automatically to fit.</p>
                             <p class="text-[10px] text-slate-500">Enter starts a new line. Colors also apply to automatically wrapped lines.</p>
-                            <p class="text-[10px] text-slate-500">Headlines use uppercase lettering for the reference layout.</p>
+                            <label class="flex items-center gap-2 text-xs text-slate-300">
+                                <input id="titleUppercase" type="checkbox" checked onchange="updateTitleStyle()" class="accent-emerald-400">
+                                Uppercase headline lettering (uncheck for mixed-case title)
+                            </label>
                             <label class="flex items-center gap-2 text-xs text-slate-300">
                                 <input id="visualEffects" type="checkbox" checked onchange="updateVisualEffects()" class="accent-emerald-400">
                                 Bold text outline, soft shadows &amp; background blur
                             </label>
+                            <label class="flex items-center gap-2 text-xs text-slate-300">
+                                <input id="introFadeToggle" type="checkbox" onchange="saveVideoSettings()" class="accent-emerald-400">
+                                Smooth intro fade-in from black (0.0s &rarr; 0.8s)
+                            </label>
+
+                            <!-- Shorts Auto-Montage Overlays (Top Stickers + Animated Subscribe Pill) -->
+                            <div class="mt-2 pt-3 border-t border-slate-800/80 flex flex-col gap-2.5">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <span class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-wand-magic-sparkles text-rose-400"></i>
+                                        <span>Shorts Auto-Montage Overlays</span>
+                                        <span class="px-1.5 py-0.5 rounded bg-slate-900 text-[10px] font-mono font-normal text-slate-400 border border-slate-800">Optional</span>
+                                    </span>
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        <button type="button" id="shortsPresetBtn" onclick="applyShortsViralPreset()"
+                                            class="px-2.5 py-1 rounded-lg bg-gradient-to-r from-rose-500/20 to-amber-500/20 hover:from-rose-500/30 hover:to-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-semibold transition flex items-center gap-1">
+                                            <i class="fa-solid fa-bolt text-amber-400"></i>
+                                            <span>Apply Reference Video Preset</span>
+                                        </button>
+                                        <button type="button" id="clearOverlaysBtn" onclick="clearAutoMontageOverlays()"
+                                            class="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 text-[10px] font-mono font-semibold transition flex items-center gap-1">
+                                            <i class="fa-solid fa-rotate-left text-rose-400"></i>
+                                            <span>Clear Overlays</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p class="text-[10px] text-slate-400">Optional overlays — leave as None / unchecked to render a standard map video without extra badges.</p>
+
+                                <div class="flex items-center justify-between gap-2 pt-0.5">
+                                    <span class="text-[11px] font-medium text-slate-300">Top corner stickers</span>
+                                    <button type="button" id="autoPickStickersBtn" onclick="setAutoStickers()"
+                                        class="px-2.5 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 text-[10px] font-mono font-semibold transition flex items-center gap-1">
+                                        <span>✨ Auto-Pick Stickers by Title</span>
+                                    </button>
+                                </div>
+
+                                <!-- Interactive Left & Right Variant Picker for Auto-Pick Stickers by Title -->
+                                <div id="autoStickerVariantsBox" class="hidden p-2.5 rounded-xl bg-slate-950/90 border border-indigo-500/30 flex flex-col gap-2">
+                                    <div class="flex items-center justify-between gap-2 text-[10px]">
+                                        <span id="autoStickerThemeLabel" class="font-mono text-indigo-300">Suggested variants for title</span>
+                                        <button type="button" onclick="document.getElementById('autoStickerVariantsBox').classList.add('hidden')" class="text-slate-500 hover:text-slate-300">Hide</button>
+                                    </div>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <div>
+                                            <div class="text-[10px] text-slate-400 mb-1">Left sticker options:</div>
+                                            <div id="autoLeftVariantsList" class="flex flex-wrap gap-1"></div>
+                                        </div>
+                                        <div>
+                                            <div class="text-[10px] text-slate-400 mb-1">Right sticker options:</div>
+                                            <div id="autoRightVariantsList" class="flex flex-wrap gap-1"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label for="topLeftStickerSelect" class="text-xs text-slate-300">Top-left sticker
+                                            <select id="topLeftStickerSelect" onchange="updateAutoMontagePreview()" class="mt-1 w-full px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white">
+                                                <option value="none" selected>None (No sticker)</option>
+                                                <option value="auto">✨ Auto-match (Library)</option>
+                                                <optgroup label="Generated Styles (Auto Theme)">
+                                                    <option value="gen_diecut:auto">✨ Generated Die-Cut Sticker</option>
+                                                    <option value="gen_neon:auto">💫 Generated Neon Badge</option>
+                                                    <option value="gen_stamp:auto">🏷️ Generated Editorial Stamp</option>
+                                                </optgroup>
+                                                <optgroup label="Holiday &amp; Seasonal">
+                                                    <option value="santa">🎅 Santa Claus</option>
+                                                    <option value="gift">🎁 Festive Gift</option>
+                                                    <option value="snowflake">❄️ Winter Snowflake</option>
+                                                    <option value="pumpkin">🎃 Halloween Pumpkin</option>
+                                                </optgroup>
+                                                <optgroup label="Geography &amp; Travel">
+                                                    <option value="globe">🌍 Earth Globe</option>
+                                                    <option value="compass">🧭 Explorer Compass</option>
+                                                    <option value="pin">📍 Map Location Pin</option>
+                                                    <option value="plane">✈️ Travel Airplane</option>
+                                                </optgroup>
+                                                <optgroup label="Economy &amp; Wealth">
+                                                    <option value="money">💰 Money Bag</option>
+                                                    <option value="chart">📈 Growth Chart</option>
+                                                    <option value="diamond">💎 Luxury Diamond</option>
+                                                </optgroup>
+                                                <optgroup label="History, Power &amp; Military">
+                                                    <option value="crown">👑 Royal Crown</option>
+                                                    <option value="shield">🛡️ Defense Shield</option>
+                                                    <option value="swords">⚔️ Crossed Swords</option>
+                                                </optgroup>
+                                                <optgroup label="Science &amp; Tech">
+                                                    <option value="rocket">🚀 Space Rocket</option>
+                                                    <option value="bolt">⚡ High Voltage / Energy</option>
+                                                </optgroup>
+                                                <optgroup label="Viral &amp; Ranking">
+                                                    <option value="trophy">🏆 Champion Trophy</option>
+                                                    <option value="fire">🔥 Viral Fire</option>
+                                                    <option value="star">⭐ Gold Star</option>
+                                                    <option value="heart">❤️ Red Heart</option>
+                                                    <option value="skull">💀 Danger Skull</option>
+                                                </optgroup>
+                                                <optgroup label="Wildlife, Nature &amp; Weather">
+                                                    <option value="bear">🐻 Bear</option>
+                                                    <option value="paw">🐾 Animal Paw</option>
+                                                    <option value="tree">🌲 Forest Tree</option>
+                                                    <option value="wolf">🐺 Wolf</option>
+                                                    <option value="sun">☀️ Sun / Climate</option>
+                                                </optgroup>
+                                                <optgroup label="Food, Drinks &amp; Lifestyle">
+                                                    <option value="beer">🍺 Beer Mug</option>
+                                                    <option value="coffee">☕ Coffee / Tea</option>
+                                                    <option value="wine">🍷 Wine Glass</option>
+                                                    <option value="pizza">🍕 Pizza / Food</option>
+                                                </optgroup>
+                                                <optgroup label="People, Sports &amp; Transport">
+                                                    <option value="brain">🧠 Brain / IQ</option>
+                                                    <option value="book">📚 Books / Language</option>
+                                                    <option value="soccer">⚽ Football / Sports</option>
+                                                    <option value="car">🚗 Car / Transport</option>
+                                                </optgroup>
+                                            </select>
+                                        </label>
+                                        <input id="leftStickerImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="selectLeftStickerImage(this.files[0])" class="hidden">
+                                        <div class="mt-1.5 flex items-center justify-between gap-1.5 text-[10px]">
+                                            <span id="leftStickerFileName" class="text-slate-500 truncate">Preset or custom file</span>
+                                            <div class="flex items-center gap-1 shrink-0">
+                                                <button type="button" onclick="document.getElementById('leftStickerImageInput').click()" class="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-indigo-300 border border-slate-700 transition">Upload file</button>
+                                                <button type="button" onclick="clearLeftStickerImage()" class="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-800 transition">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label for="topRightStickerSelect" class="text-xs text-slate-300">Top-right sticker
+                                            <select id="topRightStickerSelect" onchange="updateAutoMontagePreview()" class="mt-1 w-full px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white">
+                                                <option value="none" selected>None (No sticker)</option>
+                                                <option value="auto">✨ Auto-match (Library)</option>
+                                                <optgroup label="Generated Styles (Auto Theme)">
+                                                    <option value="gen_diecut:auto">✨ Generated Die-Cut Sticker</option>
+                                                    <option value="gen_neon:auto">💫 Generated Neon Badge</option>
+                                                    <option value="gen_stamp:auto">🏷️ Generated Editorial Stamp</option>
+                                                </optgroup>
+                                                <optgroup label="Holiday &amp; Seasonal">
+                                                    <option value="gift">🎁 Festive Gift</option>
+                                                    <option value="santa">🎅 Santa Claus</option>
+                                                    <option value="snowflake">❄️ Winter Snowflake</option>
+                                                    <option value="pumpkin">🎃 Halloween Pumpkin</option>
+                                                </optgroup>
+                                                <optgroup label="Geography &amp; Travel">
+                                                    <option value="globe">🌍 Earth Globe</option>
+                                                    <option value="compass">🧭 Explorer Compass</option>
+                                                    <option value="pin">📍 Map Location Pin</option>
+                                                    <option value="plane">✈️ Travel Airplane</option>
+                                                </optgroup>
+                                                <optgroup label="Economy &amp; Wealth">
+                                                    <option value="money">💰 Money Bag</option>
+                                                    <option value="chart">📈 Growth Chart</option>
+                                                    <option value="diamond">💎 Luxury Diamond</option>
+                                                </optgroup>
+                                                <optgroup label="History, Power &amp; Military">
+                                                    <option value="crown">👑 Royal Crown</option>
+                                                    <option value="shield">🛡️ Defense Shield</option>
+                                                    <option value="swords">⚔️ Crossed Swords</option>
+                                                </optgroup>
+                                                <optgroup label="Science &amp; Tech">
+                                                    <option value="rocket">🚀 Space Rocket</option>
+                                                    <option value="bolt">⚡ High Voltage / Energy</option>
+                                                </optgroup>
+                                                <optgroup label="Viral &amp; Ranking">
+                                                    <option value="trophy">🏆 Champion Trophy</option>
+                                                    <option value="fire">🔥 Viral Fire</option>
+                                                    <option value="star">⭐ Gold Star</option>
+                                                    <option value="heart">❤️ Red Heart</option>
+                                                    <option value="skull">💀 Danger Skull</option>
+                                                </optgroup>
+                                                <optgroup label="Wildlife, Nature &amp; Weather">
+                                                    <option value="bear">🐻 Bear</option>
+                                                    <option value="paw">🐾 Animal Paw</option>
+                                                    <option value="tree">🌲 Forest Tree</option>
+                                                    <option value="wolf">🐺 Wolf</option>
+                                                    <option value="sun">☀️ Sun / Climate</option>
+                                                </optgroup>
+                                                <optgroup label="Food, Drinks &amp; Lifestyle">
+                                                    <option value="beer">🍺 Beer Mug</option>
+                                                    <option value="coffee">☕ Coffee / Tea</option>
+                                                    <option value="wine">🍷 Wine Glass</option>
+                                                    <option value="pizza">🍕 Pizza / Food</option>
+                                                </optgroup>
+                                                <optgroup label="People, Sports &amp; Transport">
+                                                    <option value="brain">🧠 Brain / IQ</option>
+                                                    <option value="book">📚 Books / Language</option>
+                                                    <option value="soccer">⚽ Football / Sports</option>
+                                                    <option value="car">🚗 Car / Transport</option>
+                                                </optgroup>
+                                            </select>
+                                        </label>
+                                        <input id="rightStickerImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="selectRightStickerImage(this.files[0])" class="hidden">
+                                        <div class="mt-1.5 flex items-center justify-between gap-1.5 text-[10px]">
+                                            <span id="rightStickerFileName" class="text-slate-500 truncate">Preset or custom file</span>
+                                            <div class="flex items-center gap-1 shrink-0">
+                                                <button type="button" onclick="document.getElementById('rightStickerImageInput').click()" class="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-indigo-300 border border-slate-700 transition">Upload file</button>
+                                                <button type="button" onclick="clearRightStickerImage()" class="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-800 transition">Clear</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <label class="flex items-center gap-2 text-xs text-slate-300 pt-0.5">
+                                    <input id="subscribeBadgeToggle" type="checkbox" onchange="updateAutoMontagePreview()" class="accent-rose-500">
+                                    <span>Animated <strong class="text-white">[ ❤️ Subscribe! ▶️ ]</strong> pill below title</span>
+                                </label>
+
+                                <input id="subscribeImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="selectSubscribeImage(this.files[0])" class="hidden">
+                                <div class="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800/90 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                                    <span id="subscribeFileName" class="text-slate-400 truncate">Built-in [ ❤️ Subscribe! ▶️ ] or upload file</span>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        <button type="button" onclick="document.getElementById('subscribeImageInput').click()" class="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-[10px] font-semibold transition">
+                                            Upload custom badge image (PNG/WebP)
+                                        </button>
+                                        <button type="button" onclick="clearSubscribeImage()" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-800 text-[10px] transition">
+                                            Remove file
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-3 gap-2">
+                                    <label for="subscribeTextInput" class="col-span-2 text-[11px] text-slate-400">Badge text
+                                        <input id="subscribeTextInput" type="text" maxlength="40" value="Subscribe!" placeholder="Subscribe!"
+                                            oninput="updateAutoMontagePreview()"
+                                            class="mt-1 w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white">
+                                    </label>
+                                    <label for="subscribeDelayInput" class="text-[11px] text-slate-400">Fade-in (s)
+                                        <input id="subscribeDelayInput" type="number" min="0" max="25" step="0.5" value="2.5"
+                                            oninput="saveVideoSettings()"
+                                            class="mt-1 w-full px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-amber-300">
+                                    </label>
+                                </div>
+                            </div>
+
                             <p id="titlePreviewStatus" role="status" aria-live="polite" class="text-[11px] text-slate-400"></p>
                         </div>
 
@@ -750,6 +1024,22 @@
                                 <label class="block text-xs text-slate-300" for="watermarkColor">Text color
                                     <input id="watermarkColor" type="color" value="#a4e9ee" oninput="updateWatermarkPreview()" class="mt-1 block w-full h-9 p-1 bg-slate-950 border border-slate-700 rounded-lg">
                                 </label>
+                                <label class="flex items-center gap-2 text-xs text-slate-300 pt-1">
+                                    <input id="watermarkStarsToggle" type="checkbox" onchange="updateWatermarkPreview()" class="accent-emerald-400">
+                                    <span>Show 3 stars / footer badge (<strong class="text-amber-300">★ ★ ★</strong>) beneath watermark</span>
+                                </label>
+                                <input id="watermarkStarsImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="selectWatermarkStarsImage(this.files[0])" class="hidden">
+                                <div class="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800/90 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                                    <span id="watermarkStarsFileName" class="text-slate-400 truncate">Built-in ★ ★ ★ or upload file</span>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        <button type="button" onclick="document.getElementById('watermarkStarsImageInput').click()" class="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[10px] font-semibold transition">
+                                            Upload custom stars / footer image
+                                        </button>
+                                        <button type="button" onclick="clearWatermarkStarsImage()" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-800 text-[10px] transition">
+                                            Remove file
+                                        </button>
+                                    </div>
+                                </div>
                                 <p class="text-[10px] text-slate-500">Your logo is center-cropped to a circle below the map. Watermark text uses its own font near the bottom.</p>
                                 <p id="watermarkPreviewStatus" role="status" aria-live="polite" class="text-[11px] text-slate-400"></p>
                         </div>
@@ -829,7 +1119,10 @@
 
                             <!-- Composite Foreground (Title + Map preview before final render) -->
                             <div id="stageCompositeBox" class="relative z-10 flex flex-col items-center justify-center text-center w-full h-full">
+                                <div id="stageTopLeftSticker" class="hidden"></div>
+                                <div id="stageTopRightSticker" class="hidden"></div>
                                 <div id="stageTitleBanner" class="text-white hidden"></div>
+                                <div id="stageSubscribeBanner" class="hidden"></div>
                                 <div id="stageMapArea">
                                     <img id="stageMapPreview" alt="Map frame preview" class="hidden object-contain">
                                     <div id="stageEmptyPlaceholder" class="flex flex-col items-center gap-2 text-slate-500">
@@ -842,6 +1135,7 @@
                                 </div>
                                 <img id="stageWatermarkImage" alt="Watermark logo preview" class="hidden">
                                 <div id="stageWatermarkText" class="hidden"></div>
+                                <div id="stageWatermarkStars" class="hidden"></div>
                             </div>
 
                             <!-- Watermarks share the same 1080×1920 coordinate space as the map. -->
@@ -921,8 +1215,10 @@
         const VIDEO_SETTINGS_KEY = 'automap_video_settings_v1';
         const VIDEO_SETTING_IDS = ['musicUrlInput', 'cutStartInput', 'cutDurationInput',
             'videoTitleInput', 'titleFontSelect', 'titleFontSize', 'titleFirstLineColor',
-            'titleOtherLinesColor', 'visualEffects', 'watermarkTextInput',
-            'watermarkFontSelect', 'watermarkColor', 'codecSelect'];
+            'titleOtherLinesColor', 'titleUppercase', 'visualEffects', 'introFadeToggle',
+            'topLeftStickerSelect', 'topRightStickerSelect', 'subscribeBadgeToggle',
+            'subscribeTextInput', 'subscribeDelayInput', 'watermarkTextInput',
+            'watermarkFontSelect', 'watermarkColor', 'watermarkStarsToggle', 'codecSelect'];
         let videoSettingsReady = false;
         const materialVersions = {mapFileInput: 0, bgFileInput: 0};
         let pendingAssetSaves = Promise.resolve();
@@ -958,8 +1254,12 @@
                         if (input.type === 'checkbox') {
                             if (typeof value === 'boolean') input.checked = value;
                         } else if (typeof value === 'string') {
-                            if (input.tagName === 'SELECT' && ![...input.options].some(option => option.value === value)) return;
-                            input.value = input.maxLength > 0 ? value.slice(0, input.maxLength) : value;
+                            let normalized = value;
+                            if ((id === 'topLeftStickerSelect' || id === 'topRightStickerSelect') && value.startsWith('gen_')) {
+                                normalized = normalizeDynamicStickerValue(value);
+                            }
+                            if (input.tagName === 'SELECT' && ![...input.options].some(option => option.value === normalized)) return;
+                            input.value = input.maxLength > 0 ? normalized.slice(0, input.maxLength) : normalized;
                         }
                     });
                 }
@@ -967,13 +1267,26 @@
                 // Invalid or unavailable saved settings should not prevent opening the studio.
             }
             videoSettingsReady = true;
+            if (isDynamicStickerValue(document.getElementById('topLeftStickerSelect').value) ||
+                isDynamicStickerValue(document.getElementById('topRightStickerSelect').value)) {
+                document.getElementById('autoStickerVariantsBox').classList.remove('hidden');
+            }
             setCutDuration(document.getElementById('cutDurationInput').value);
             updateVisualEffects();
             try {
-                const [latest, selected, background, logo, cutAudio] = await Promise.all([
-                    StudioStorage.getAsset('latest-map'), StudioStorage.getAsset('video-map'),
-                    StudioStorage.getAsset('video-background'), StudioStorage.getAsset('video-watermark'),
+                const [
+                    latest, selected, background, logo, cutAudio,
+                    savedSubImg, savedStarsImg, savedLeftStickerImg, savedRightStickerImg,
+                ] = await Promise.all([
+                    StudioStorage.getAsset('latest-map'),
+                    StudioStorage.getAsset('video-map'),
+                    StudioStorage.getAsset('video-background'),
+                    StudioStorage.getAsset('video-watermark'),
                     StudioStorage.getAsset('video-cut-audio'),
+                    StudioStorage.getAsset('video-subscribe-image'),
+                    StudioStorage.getAsset('video-stars-image'),
+                    StudioStorage.getAsset('video-left-sticker-image'),
+                    StudioStorage.getAsset('video-right-sticker-image'),
                 ]);
                 // A newer generated map wins. A manually selected or removed map
                 // remains the user's choice until another map is generated.
@@ -988,6 +1301,10 @@
                     acceptFile('bgFileInput', background.file, false);
                 }
                 if (logo?.file && watermarkUploadVersion === 0) await selectWatermark(logo.file, false);
+                if (savedSubImg?.file && subscribeUploadVersion === 0) await selectSubscribeImage(savedSubImg.file, false);
+                if (savedStarsImg?.file && watermarkStarsUploadVersion === 0) await selectWatermarkStarsImage(savedStarsImg.file, false);
+                if (savedLeftStickerImg?.file && leftStickerUploadVersion === 0) await selectLeftStickerImage(savedLeftStickerImg.file, false);
+                if (savedRightStickerImg?.file && rightStickerUploadVersion === 0) await selectRightStickerImage(savedRightStickerImg.file, false);
                 if (cutAudio?.file && audioSelectionVersion === 0) {
                     const restoredAudio = await fileToDataUrl(cutAudio.file);
                     if (audioSelectionVersion !== 0) return;
@@ -1560,7 +1877,14 @@
                 title_font_size: Number(document.getElementById('titleFontSize').value),
                 title_first_line_color: document.getElementById('titleFirstLineColor').value,
                 title_other_lines_color: document.getElementById('titleOtherLinesColor').value,
+                title_uppercase: document.getElementById('titleUppercase').checked,
                 visual_effects: document.getElementById('visualEffects').checked,
+                intro_fade: document.getElementById('introFadeToggle').checked,
+                top_left_sticker: document.getElementById('topLeftStickerSelect').value,
+                top_right_sticker: document.getElementById('topRightStickerSelect').value,
+                subscribe_badge: document.getElementById('subscribeBadgeToggle').checked,
+                subscribe_text: document.getElementById('subscribeTextInput').value.trim() || 'Subscribe!',
+                subscribe_delay: Number(document.getElementById('subscribeDelayInput').value || 2.5),
             };
         }
 
@@ -1594,6 +1918,7 @@
         function updateTitleStyle() {
             document.getElementById('titleFontSizeValue').textContent = `${titleSettings().title_font_size} px`;
             updateStageTitlePreview(document.getElementById('videoTitleInput').value);
+            updateAutoMontagePreview();
             updateWatermarkPreview();
             saveVideoSettings();
         }
@@ -1603,7 +1928,689 @@
             document.getElementById('titleFontSize').value = '100';
             document.getElementById('titleFirstLineColor').value = '#ffffff';
             document.getElementById('titleOtherLinesColor').value = '#ffe735';
+            document.getElementById('titleUppercase').checked = true;
+            document.getElementById('subscribeTextInput').value = 'Subscribe!';
+            document.getElementById('subscribeDelayInput').value = '2.5';
+            clearAutoMontageOverlays(false);
             updateTitleStyle();
+        }
+
+        function clearAutoMontageOverlays(notify = true) {
+            document.getElementById('topLeftStickerSelect').value = 'none';
+            document.getElementById('topRightStickerSelect').value = 'none';
+            document.getElementById('subscribeBadgeToggle').checked = false;
+            document.getElementById('watermarkStarsToggle').checked = false;
+            document.getElementById('introFadeToggle').checked = false;
+            document.getElementById('autoStickerVariantsBox').classList.add('hidden');
+            clearLeftStickerImage(true);
+            clearRightStickerImage(true);
+            clearSubscribeImage(true);
+            clearWatermarkStarsImage(true);
+            showLiveComposite();
+            updateAutoMontagePreview();
+            updateWatermarkPreview();
+            saveVideoSettings();
+            if (notify) {
+                showToast('Cleared optional auto-montage overlays.', 'info');
+            }
+        }
+
+        const STICKER_CATALOG = {
+            auto: '✨ Auto',
+            santa: '🎅 Santa',
+            gift: '🎁 Gift',
+            snowflake: '❄️ Snow',
+            pumpkin: '🎃 Pumpkin',
+            globe: '🌍 Globe',
+            compass: '🧭 Compass',
+            pin: '📍 Pin',
+            plane: '✈️ Plane',
+            money: '💰 Money',
+            chart: '📈 Chart',
+            diamond: '💎 Diamond',
+            crown: '👑 Crown',
+            shield: '🛡️ Shield',
+            swords: '⚔️ Swords',
+            rocket: '🚀 Rocket',
+            bolt: '⚡ Bolt',
+            trophy: '🏆 Trophy',
+            fire: '🔥 Fire',
+            star: '⭐ Star',
+            heart: '❤️ Heart',
+            skull: '💀 Skull',
+            bear: '🐻 Bear',
+            paw: '🐾 Paw',
+            tree: '🌲 Tree',
+            wolf: '🐺 Wolf',
+            beer: '🍺 Beer',
+            coffee: '☕ Coffee',
+            wine: '🍷 Wine',
+            pizza: '🍕 Pizza',
+            soccer: '⚽ Football',
+            car: '🚗 Car',
+            brain: '🧠 Brain',
+            book: '📚 Book',
+            sun: '☀️ Sun',
+        };
+
+        const AUTO_STICKER_THEME_VARIANTS = [
+            {
+                name: 'Wildlife & Nature',
+                keywords: ['bear', 'bears', 'grizzly', 'panda', 'wolf', 'wolves', 'fox', 'deer', 'moose', 'boar', 'lion', 'tiger', 'dog', 'dogs', 'cat', 'cats', 'pet', 'pets', 'animal', 'animals', 'wildlife', 'wild', 'forest', 'tree', 'trees', 'woods', 'nature', 'park', 'hunt', 'bird', 'fish', 'shark', 'snake', 'horse', 'cow', 'ведмід', 'ведмед', 'вовк', 'тварин', 'ліс', 'природ', 'собак', 'кіт'],
+                left: ['auto', 'bear', 'paw', 'tree', 'wolf'],
+                right: ['auto', 'tree', 'paw', 'bear', 'wolf'],
+            },
+            {
+                name: 'Food, Drinks & Lifestyle',
+                keywords: ['beer', 'beers', 'wine', 'alcohol', 'vodka', 'whiskey', 'drink', 'drinks', 'pub', 'bar', 'coffee', 'tea', 'cafe', 'pizza', 'burger', 'food', 'cuisine', 'cheese', 'meat', 'bread', 'milk', 'water', 'пиво', 'вино', 'алкогол', 'кава', 'чай', 'їжа', 'страв'],
+                left: ['auto', 'beer', 'coffee', 'wine', 'pizza'],
+                right: ['auto', 'coffee', 'beer', 'pizza', 'wine'],
+            },
+            {
+                name: 'People, IQ & Education',
+                keywords: ['iq', 'smart', 'intelligent', 'brain', 'genius', 'education', 'school', 'university', 'student', 'literacy', 'book', 'books', 'read', 'language', 'languages', 'speak', 'word', 'words', 'alphabet', 'name', 'names', 'population', 'people', 'human', 'мова', 'освіта', 'розум', 'книг', 'населення', 'люд', 'імен'],
+                left: ['auto', 'brain', 'book', 'crown', 'star'],
+                right: ['auto', 'book', 'brain', 'trophy', 'globe'],
+            },
+            {
+                name: 'Cars, Transport & Energy',
+                keywords: ['car', 'cars', 'auto', 'vehicle', 'drive', 'driving', 'highway', 'road', 'roads', 'train', 'rail', 'railway', 'metro', 'bus', 'traffic', 'fuel', 'gas', 'petrol', 'oil', 'tesla', 'bmw', 'авто', 'машин', 'дорог', 'поїзд', 'транспорт', 'бензин', 'нафт'],
+                left: ['auto', 'car', 'bolt', 'compass', 'fire'],
+                right: ['auto', 'bolt', 'car', 'pin', 'globe'],
+            },
+            {
+                name: 'Sports, Football & Games',
+                keywords: ['sport', 'sports', 'football', 'soccer', 'fifa', 'uefa', 'world cup', 'basketball', 'hockey', 'tennis', 'olympic', 'olympics', 'medal', 'athlete', 'gym', 'game', 'games', 'chess', 'спорт', 'футбол', 'олімп', 'медал', 'гра', 'ігр'],
+                left: ['auto', 'soccer', 'trophy', 'fire', 'crown'],
+                right: ['auto', 'trophy', 'soccer', 'star', 'fire'],
+            },
+            {
+                name: 'Cold, Ice & Winter Weather',
+                keywords: ['cold', 'coldest', 'freeze', 'freezing', 'frost', 'ice', 'icy', 'snow', 'snowy', 'blizzard', 'minus', 'subzero', 'arctic', 'glacier', 'chill', 'холод', 'найхолод', 'мороз', 'сніг', 'лід', 'арктик'],
+                left: ['auto', 'snowflake', 'compass', 'globe', 'star'],
+                right: ['auto', 'globe', 'snowflake', 'pin', 'compass'],
+            },
+            {
+                name: 'Weather, Climate & Heat',
+                keywords: ['weather', 'temperature', 'climate', 'sun', 'sunny', 'hot', 'hottest', 'heat', 'warm', 'warmest', 'summer', 'rain', 'wind', 'celsius', 'desert', 'погод', 'клімат', 'температур', 'сонц', 'спека', 'літо', 'тепл'],
+                left: ['auto', 'sun', 'compass', 'fire', 'globe'],
+                right: ['auto', 'compass', 'sun', 'pin', 'fire'],
+            },
+            {
+                name: 'Oceans, Rivers & Geography',
+                keywords: ['sea', 'ocean', 'river', 'lake', 'coast', 'island', 'water', 'mountain', 'mountains', 'море', 'океан', 'річк', 'озеро', 'острів', 'вода', 'гор'],
+                left: ['auto', 'compass', 'globe', 'pin', 'sun'],
+                right: ['auto', 'globe', 'pin', 'compass', 'star'],
+            },
+            {
+                name: 'Religion & Culture',
+                keywords: ['religion', 'christian', 'catholic', 'orthodox', 'islam', 'muslim', 'church', 'mosque', 'god', 'faith', 'реліг', 'християн', 'церкв', 'іслам'],
+                left: ['auto', 'star', 'globe', 'crown', 'book'],
+                right: ['auto', 'globe', 'star', 'pin', 'book'],
+            },
+            {
+                name: 'Holiday & Winter',
+                keywords: ['nicholas', 'santa', 'christmas', 'xmas', 'winter', 'holiday', 'new year', 'snow', 'миколая', 'різдв', 'санта', 'зима', 'свято', 'новий рік'],
+                left: ['auto', 'santa', 'snowflake', 'gift', 'star'],
+                right: ['auto', 'gift', 'snowflake', 'santa', 'crown'],
+            },
+            {
+                name: 'Halloween & Spooky',
+                keywords: ['halloween', 'spooky', 'horror', 'ghost', 'scary', 'геловін', 'страш'],
+                left: ['auto', 'pumpkin', 'skull', 'fire', 'star'],
+                right: ['auto', 'skull', 'pumpkin', 'fire', 'crown'],
+            },
+            {
+                name: 'Economy & Wealth',
+                keywords: ['gdp', 'rich', 'poor', 'money', 'salary', 'wage', 'economy', 'tax', 'price', 'cost', 'billion', 'wealth', 'ввп', 'багат', 'бідн', 'грош', 'зарплат', 'економік', 'цін', 'подат'],
+                left: ['auto', 'money', 'diamond', 'chart', 'crown'],
+                right: ['auto', 'chart', 'money', 'diamond', 'trophy'],
+            },
+            {
+                name: 'History, Military & Empires',
+                keywords: ['war', 'army', 'military', 'empire', 'history', 'battle', 'nato', 'soldier', 'війн', 'армі', 'імпері', 'історі', 'битв'],
+                left: ['auto', 'shield', 'swords', 'crown', 'skull'],
+                right: ['auto', 'swords', 'shield', 'fire', 'trophy'],
+            },
+            {
+                name: 'Royalty & Power',
+                keywords: ['queen', 'monarch', 'royal', 'king', 'president', 'power', 'ruler', 'монарх', 'корол', 'президент', 'влад'],
+                left: ['auto', 'crown', 'diamond', 'shield', 'star'],
+                right: ['auto', 'star', 'crown', 'trophy', 'globe'],
+            },
+            {
+                name: 'Science, Space & Energy',
+                keywords: ['space', 'nasa', 'tech', 'ai', 'internet', 'speed', 'energy', 'nuclear', 'science', 'космос', 'технолог', 'інтернет', 'швидк', 'енерг', 'наук'],
+                left: ['auto', 'rocket', 'bolt', 'globe', 'star'],
+                right: ['auto', 'bolt', 'rocket', 'chart', 'fire'],
+            },
+            {
+                name: 'Travel & Geography',
+                keywords: ['travel', 'tourist', 'visa', 'passport', 'flight', 'airport', 'visit', 'подорож', 'туризм', 'віза', 'паспорт', 'літак'],
+                left: ['auto', 'plane', 'globe', 'compass', 'pin'],
+                right: ['auto', 'compass', 'pin', 'plane', 'star'],
+            },
+            {
+                name: 'Rankings & Top Charts',
+                keywords: ['top', 'best', 'most', 'highest', 'winner', 'champion', 'rank', 'топ', 'найкращ', 'найбільш', 'рейтинг', 'чемпіон'],
+                left: ['auto', 'trophy', 'crown', 'star', 'fire'],
+                right: ['auto', 'fire', 'trophy', 'chart', 'diamond'],
+            },
+            {
+                name: 'Love, Health & Happiness',
+                keywords: ['happy', 'happiness', 'love', 'health', 'life', 'safe', 'щаст', 'любов', 'здоров', 'житт', 'безпек'],
+                left: ['auto', 'heart', 'star', 'globe', 'trophy'],
+                right: ['auto', 'star', 'heart', 'crown', 'globe'],
+            },
+            {
+                name: 'Danger & Risk',
+                keywords: ['danger', 'crime', 'dead', 'worst', 'risk', 'небезпек', 'злочин', 'смерт', 'ризик'],
+                left: ['auto', 'skull', 'fire', 'shield', 'bolt'],
+                right: ['auto', 'fire', 'skull', 'chart', 'pin'],
+            },
+        ];
+
+        const EXACT_STICKER_WORDS = new Set([
+            'ai', 'gdp', 'nato', 'top', 'iq', 'car', 'sun', 'pet', 'dog', 'cat',
+            'bar', 'pub', 'tea', 'oil', 'gas', 'bus', 'gym', 'ice', 'hot', 'god',
+            'sea', 'топ', 'ввп',
+        ]);
+
+        function detectTitleStickerVariants(title) {
+            const lower = (title || '').toLowerCase();
+            let best = null;
+            let bestScore = 0;
+            for (const theme of AUTO_STICKER_THEME_VARIANTS) {
+                let score = 0;
+                for (const kw of theme.keywords) {
+                    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const pattern = EXACT_STICKER_WORDS.has(kw)
+                        ? new RegExp(`(^|[^a-zа-яіїєґ0-9_])${escaped}($|[^a-zа-яіїєґ0-9_])`, 'i')
+                        : new RegExp(`(^|[^a-zа-яіїєґ0-9_])${escaped}`, 'i');
+                    if (pattern.test(lower)) score += 1;
+                }
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = theme;
+                }
+            }
+            return best || {
+                name: 'World & Maps',
+                left: ['auto', 'globe', 'compass', 'trophy', 'fire'],
+                right: ['auto', 'pin', 'star', 'chart', 'crown'],
+            };
+        }
+
+        function normalizeDynamicStickerValue(val) {
+            if (!val) return 'none';
+            if (val.startsWith('gen_diecut:')) return 'gen_diecut:auto';
+            if (val.startsWith('gen_neon:')) return 'gen_neon:auto';
+            if (val.startsWith('gen_stamp:')) return 'gen_stamp:auto';
+            return val;
+        }
+
+        function isDynamicStickerValue(val) {
+            return val === 'auto' || (typeof val === 'string' && val.startsWith('gen_'));
+        }
+
+        function pickStickerVariant(side, value) {
+            const selectId = side === 'left' ? 'topLeftStickerSelect' : 'topRightStickerSelect';
+            const select = document.getElementById(selectId);
+            if (side === 'left' && leftStickerFile) clearLeftStickerImage(true);
+            if (side === 'right' && rightStickerFile) clearRightStickerImage(true);
+            if (![...select.options].some(opt => opt.value === value)) {
+                const opt = document.createElement('option');
+                opt.value = value;
+                const [prefix, base] = value.split(':');
+                const styleLabel = prefix === 'gen_diecut' ? 'Die-Cut' : prefix === 'gen_neon' ? 'Neon' : 'Stamp';
+                opt.textContent = `✨ Generated ${styleLabel} (${base})`;
+                select.appendChild(opt);
+            }
+            select.value = value;
+            showLiveComposite();
+            updateAutoMontagePreview();
+        }
+
+        let lastAutoStickerTheme = null;
+
+        function renderAutoStickerVariants() {
+            const box = document.getElementById('autoStickerVariantsBox');
+            if (!box || box.classList.contains('hidden')) return;
+            const title = document.getElementById('videoTitleInput').value.trim();
+            const theme = detectTitleStickerVariants(title);
+            document.getElementById('autoStickerThemeLabel').textContent = `Theme: ${theme.name} — library & generated variants`;
+
+            const leftSelect = document.getElementById('topLeftStickerSelect');
+            const rightSelect = document.getElementById('topRightStickerSelect');
+            if (lastAutoStickerTheme && lastAutoStickerTheme.name !== theme.name) {
+                if (lastAutoStickerTheme.left.includes(leftSelect.value) && leftSelect.value !== 'auto') {
+                    leftSelect.value = 'auto';
+                }
+                if (lastAutoStickerTheme.right.includes(rightSelect.value) && rightSelect.value !== 'auto') {
+                    rightSelect.value = 'auto';
+                }
+            }
+            lastAutoStickerTheme = theme;
+            if (leftSelect.value.startsWith('gen_') && !leftSelect.value.endsWith(':auto')) {
+                leftSelect.value = normalizeDynamicStickerValue(leftSelect.value);
+            }
+            if (rightSelect.value.startsWith('gen_') && !rightSelect.value.endsWith(':auto')) {
+                rightSelect.value = normalizeDynamicStickerValue(rightSelect.value);
+            }
+            const currentLeft = leftSelect.value;
+            const currentRight = rightSelect.value;
+            const bestLeftBase = theme.left[1] || 'globe';
+            const bestRightBase = theme.right[1] || 'pin';
+
+            const buildChips = (containerId, side, libraryItems, baseKind, currentValue) => {
+                const container = document.getElementById(containerId);
+                container.replaceChildren();
+
+                const addGroup = (heading, entries) => {
+                    const label = document.createElement('div');
+                    label.className = 'w-full text-[9px] font-mono uppercase tracking-wider text-slate-500 mt-0.5';
+                    label.textContent = heading;
+                    container.appendChild(label);
+
+                    entries.forEach(({ val, text, prefixMatch }) => {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        const active = currentValue === val || (prefixMatch && currentValue.startsWith(prefixMatch));
+                        btn.className = active
+                            ? 'px-2 py-0.5 rounded-md bg-indigo-500/30 text-white border border-indigo-400 text-[10px] font-medium transition'
+                            : 'px-2 py-0.5 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-[10px] transition';
+                        btn.textContent = text;
+                        btn.onclick = () => pickStickerVariant(side, val);
+                        container.appendChild(btn);
+                    });
+                };
+
+                addGroup('Library (Twemoji)', libraryItems.map(val => ({
+                    val,
+                    text: STICKER_CATALOG[val] || val,
+                })));
+
+                const baseLabel = STICKER_CATALOG[baseKind] || baseKind;
+                addGroup('Generated (Custom Art)', [
+                    { val: 'gen_diecut:auto', prefixMatch: 'gen_diecut:', text: `✨ Die-Cut (${baseLabel})` },
+                    { val: 'gen_neon:auto', prefixMatch: 'gen_neon:', text: `💫 Neon Badge (${baseLabel})` },
+                    { val: 'gen_stamp:auto', prefixMatch: 'gen_stamp:', text: `🏷️ Stamp (${baseLabel})` },
+                ]);
+            };
+
+            buildChips('autoLeftVariantsList', 'left', theme.left, bestLeftBase, currentLeft);
+            buildChips('autoRightVariantsList', 'right', theme.right, bestRightBase, currentRight);
+        }
+
+        function setAutoStickers() {
+            const leftSelect = document.getElementById('topLeftStickerSelect');
+            const rightSelect = document.getElementById('topRightStickerSelect');
+            leftSelect.value = leftSelect.value.startsWith('gen_')
+                ? normalizeDynamicStickerValue(leftSelect.value)
+                : 'auto';
+            rightSelect.value = rightSelect.value.startsWith('gen_')
+                ? normalizeDynamicStickerValue(rightSelect.value)
+                : 'auto';
+            document.getElementById('autoStickerVariantsBox').classList.remove('hidden');
+            renderAutoStickerVariants();
+            showLiveComposite();
+            updateAutoMontagePreview();
+            showToast('Auto-matched stickers! Choose any left or right variant below.', 'info');
+        }
+
+        function applyShortsViralPreset() {
+            const titleEl = document.getElementById('videoTitleInput');
+            if (!titleEl.value.trim()) {
+                titleEl.value = 'When is Saint Nicholas\nDay in your country?';
+            }
+            const wmEl = document.getElementById('watermarkTextInput');
+            if (!wmEl.value.trim()) {
+                wmEl.value = 'TERRAMAPPER';
+            }
+            document.getElementById('titleUppercase').checked = false;
+            document.getElementById('titleFirstLineColor').value = '#ffffff';
+            document.getElementById('titleOtherLinesColor').value = '#ffffff';
+            document.getElementById('topLeftStickerSelect').value = 'santa';
+            document.getElementById('topRightStickerSelect').value = 'gift';
+            document.getElementById('subscribeBadgeToggle').checked = true;
+            document.getElementById('subscribeTextInput').value = 'Subscribe!';
+            document.getElementById('subscribeDelayInput').value = '2.5';
+            document.getElementById('watermarkColor').value = '#ffffff';
+            document.getElementById('watermarkStarsToggle').checked = true;
+            document.getElementById('introFadeToggle').checked = true;
+            document.getElementById('visualEffects').checked = true;
+            updateVisualEffects();
+            showToast('Applied Reference Video Auto-Montage Preset!', 'success');
+        }
+
+        let subscribePreviewUrl;
+        let leftStickerPreviewUrl;
+        let rightStickerPreviewUrl;
+        let starsPreviewUrl;
+        let autoMontageVersion = 0;
+
+        let subscribeImageFile = null;
+        let subscribeCustomUrl = null;
+        let subscribeUploadVersion = 0;
+
+        let watermarkStarsFile = null;
+        let watermarkStarsCustomUrl = null;
+        let watermarkStarsUploadVersion = 0;
+
+        let leftStickerFile = null;
+        let leftStickerCustomUrl = null;
+        let leftStickerUploadVersion = 0;
+
+        let rightStickerFile = null;
+        let rightStickerCustomUrl = null;
+        let rightStickerUploadVersion = 0;
+
+        const OVERLAY_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+        async function validateOverlayImageFile(file, inputEl, label) {
+            if (!file) return null;
+            if (!OVERLAY_IMAGE_TYPES.includes(file.type) || file.size > MAX_MATERIAL_BYTES) {
+                showToast(`Choose a PNG, JPEG, WebP or GIF ${label} up to 10 MB.`, 'error');
+                if (inputEl) inputEl.value = '';
+                return null;
+            }
+            const url = URL.createObjectURL(file);
+            const probe = new Image();
+            probe.src = url;
+            try {
+                await probe.decode();
+                if (probe.naturalWidth * probe.naturalHeight > 20000000) {
+                    throw new Error('Image is too large.');
+                }
+                return url;
+            } catch {
+                URL.revokeObjectURL(url);
+                if (inputEl) inputEl.value = '';
+                showToast(`Choose a valid ${label} image up to 20 megapixels.`, 'error');
+                return null;
+            }
+        }
+
+        function clearSubscribeImage(persist = true) {
+            subscribeUploadVersion++;
+            subscribeImageFile = null;
+            const input = document.getElementById('subscribeImageInput');
+            if (input) input.value = '';
+            const nameEl = document.getElementById('subscribeFileName');
+            if (nameEl) nameEl.textContent = 'Built-in [ ❤️ Subscribe! ▶️ ] or upload file';
+            if (subscribeCustomUrl) {
+                URL.revokeObjectURL(subscribeCustomUrl);
+                subscribeCustomUrl = null;
+            }
+            showLiveComposite();
+            updateAutoMontagePreview();
+            if (persist) rememberVideoAsset('video-subscribe-image', null);
+        }
+
+        async function selectSubscribeImage(file, persist = true) {
+            const input = document.getElementById('subscribeImageInput');
+            const version = ++subscribeUploadVersion;
+            if (!file) return;
+            const url = await validateOverlayImageFile(file, input, 'subscribe badge');
+            if (!url) return;
+            if (version !== subscribeUploadVersion) {
+                URL.revokeObjectURL(url);
+                return;
+            }
+            if (subscribeCustomUrl) URL.revokeObjectURL(subscribeCustomUrl);
+            subscribeImageFile = file;
+            subscribeCustomUrl = url;
+            document.getElementById('subscribeFileName').textContent = file.name;
+            if (persist) {
+                document.getElementById('subscribeBadgeToggle').checked = true;
+            }
+            showLiveComposite();
+            updateAutoMontagePreview();
+            if (persist) rememberVideoAsset('video-subscribe-image', file);
+        }
+
+        function clearWatermarkStarsImage(persist = true) {
+            watermarkStarsUploadVersion++;
+            watermarkStarsFile = null;
+            const input = document.getElementById('watermarkStarsImageInput');
+            if (input) input.value = '';
+            const nameEl = document.getElementById('watermarkStarsFileName');
+            if (nameEl) nameEl.textContent = 'Built-in ★ ★ ★ or upload file';
+            if (watermarkStarsCustomUrl) {
+                URL.revokeObjectURL(watermarkStarsCustomUrl);
+                watermarkStarsCustomUrl = null;
+            }
+            showLiveComposite();
+            updateWatermarkPreview();
+            if (persist) rememberVideoAsset('video-stars-image', null);
+        }
+
+        async function selectWatermarkStarsImage(file, persist = true) {
+            const input = document.getElementById('watermarkStarsImageInput');
+            const version = ++watermarkStarsUploadVersion;
+            if (!file) return;
+            const url = await validateOverlayImageFile(file, input, 'stars / footer badge');
+            if (!url) return;
+            if (version !== watermarkStarsUploadVersion) {
+                URL.revokeObjectURL(url);
+                return;
+            }
+            if (watermarkStarsCustomUrl) URL.revokeObjectURL(watermarkStarsCustomUrl);
+            watermarkStarsFile = file;
+            watermarkStarsCustomUrl = url;
+            document.getElementById('watermarkStarsFileName').textContent = file.name;
+            if (persist) {
+                document.getElementById('watermarkStarsToggle').checked = true;
+            }
+            showLiveComposite();
+            updateWatermarkPreview();
+            if (persist) rememberVideoAsset('video-stars-image', file);
+        }
+
+        function clearLeftStickerImage(persist = true) {
+            leftStickerUploadVersion++;
+            leftStickerFile = null;
+            const input = document.getElementById('leftStickerImageInput');
+            if (input) input.value = '';
+            const nameEl = document.getElementById('leftStickerFileName');
+            if (nameEl) nameEl.textContent = 'Preset or custom file';
+            if (leftStickerCustomUrl) {
+                URL.revokeObjectURL(leftStickerCustomUrl);
+                leftStickerCustomUrl = null;
+            }
+            showLiveComposite();
+            updateAutoMontagePreview();
+            if (persist) rememberVideoAsset('video-left-sticker-image', null);
+        }
+
+        async function selectLeftStickerImage(file, persist = true) {
+            const input = document.getElementById('leftStickerImageInput');
+            const version = ++leftStickerUploadVersion;
+            if (!file) return;
+            const url = await validateOverlayImageFile(file, input, 'top-left sticker');
+            if (!url) return;
+            if (version !== leftStickerUploadVersion) {
+                URL.revokeObjectURL(url);
+                return;
+            }
+            if (leftStickerCustomUrl) URL.revokeObjectURL(leftStickerCustomUrl);
+            leftStickerFile = file;
+            leftStickerCustomUrl = url;
+            document.getElementById('leftStickerFileName').textContent = file.name;
+            showLiveComposite();
+            updateAutoMontagePreview();
+            if (persist) rememberVideoAsset('video-left-sticker-image', file);
+        }
+
+        function clearRightStickerImage(persist = true) {
+            rightStickerUploadVersion++;
+            rightStickerFile = null;
+            const input = document.getElementById('rightStickerImageInput');
+            if (input) input.value = '';
+            const nameEl = document.getElementById('rightStickerFileName');
+            if (nameEl) nameEl.textContent = 'Preset or custom file';
+            if (rightStickerCustomUrl) {
+                URL.revokeObjectURL(rightStickerCustomUrl);
+                rightStickerCustomUrl = null;
+            }
+            showLiveComposite();
+            updateAutoMontagePreview();
+            if (persist) rememberVideoAsset('video-right-sticker-image', null);
+        }
+
+        async function selectRightStickerImage(file, persist = true) {
+            const input = document.getElementById('rightStickerImageInput');
+            const version = ++rightStickerUploadVersion;
+            if (!file) return;
+            const url = await validateOverlayImageFile(file, input, 'top-right sticker');
+            if (!url) return;
+            if (version !== rightStickerUploadVersion) {
+                URL.revokeObjectURL(url);
+                return;
+            }
+            if (rightStickerCustomUrl) URL.revokeObjectURL(rightStickerCustomUrl);
+            rightStickerFile = file;
+            rightStickerCustomUrl = url;
+            document.getElementById('rightStickerFileName').textContent = file.name;
+            showLiveComposite();
+            updateAutoMontagePreview();
+            if (persist) rememberVideoAsset('video-right-sticker-image', file);
+        }
+
+        async function fetchPreviewBlobUrl(payload) {
+            const response = await fetch('/api/video_title_preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (!response.ok) return null;
+            return URL.createObjectURL(await response.blob());
+        }
+
+        async function updateAutoMontagePreview() {
+            const version = ++autoMontageVersion;
+            const settings = titleSettings();
+            const currentTitle = document.getElementById('videoTitleInput').value.trim();
+            const compositeBox = document.getElementById('stageCompositeBox');
+            const leftBox = document.getElementById('stageTopLeftSticker');
+            const rightBox = document.getElementById('stageTopRightSticker');
+            const subBox = document.getElementById('stageSubscribeBanner');
+
+            const hasLeftSticker = Boolean(leftStickerFile || (settings.top_left_sticker && settings.top_left_sticker !== 'none'));
+            const hasRightSticker = Boolean(rightStickerFile || (settings.top_right_sticker && settings.top_right_sticker !== 'none'));
+            const hasStickers = hasLeftSticker || hasRightSticker;
+            compositeBox.classList.toggle('has-top-stickers', hasStickers);
+            renderAutoStickerVariants();
+            saveVideoSettings();
+
+            // Left sticker preview (custom file takes precedence over built-in preset)
+            if (leftStickerFile && leftStickerCustomUrl) {
+                const img = new Image();
+                img.alt = leftStickerFile.name || 'Custom top-left sticker';
+                img.src = leftStickerCustomUrl;
+                leftBox.replaceChildren(img);
+                leftBox.classList.remove('hidden');
+            } else if (settings.top_left_sticker && settings.top_left_sticker !== 'none') {
+                try {
+                    const url = await fetchPreviewBlobUrl({
+                        preview_kind: 'sticker',
+                        sticker_kind: settings.top_left_sticker,
+                        sticker_side: 'left',
+                        video_title: currentTitle,
+                        ...settings,
+                    });
+                    if (version === autoMontageVersion && url) {
+                        const img = new Image();
+                        img.alt = settings.top_left_sticker;
+                        img.src = url;
+                        await img.decode();
+                        leftBox.replaceChildren(img);
+                        leftBox.classList.remove('hidden');
+                        if (leftStickerPreviewUrl) URL.revokeObjectURL(leftStickerPreviewUrl);
+                        leftStickerPreviewUrl = url;
+                    } else if (url) {
+                        URL.revokeObjectURL(url);
+                    }
+                } catch {
+                    leftBox.classList.add('hidden');
+                }
+            } else {
+                leftBox.replaceChildren();
+                leftBox.classList.add('hidden');
+            }
+
+            // Right sticker preview (custom file takes precedence over built-in preset)
+            if (rightStickerFile && rightStickerCustomUrl) {
+                const img = new Image();
+                img.alt = rightStickerFile.name || 'Custom top-right sticker';
+                img.src = rightStickerCustomUrl;
+                rightBox.replaceChildren(img);
+                rightBox.classList.remove('hidden');
+            } else if (settings.top_right_sticker && settings.top_right_sticker !== 'none') {
+                try {
+                    const url = await fetchPreviewBlobUrl({
+                        preview_kind: 'sticker',
+                        sticker_kind: settings.top_right_sticker,
+                        sticker_side: 'right',
+                        video_title: currentTitle,
+                        ...settings,
+                    });
+                    if (version === autoMontageVersion && url) {
+                        const img = new Image();
+                        img.alt = settings.top_right_sticker;
+                        img.src = url;
+                        await img.decode();
+                        rightBox.replaceChildren(img);
+                        rightBox.classList.remove('hidden');
+                        if (rightStickerPreviewUrl) URL.revokeObjectURL(rightStickerPreviewUrl);
+                        rightStickerPreviewUrl = url;
+                    } else if (url) {
+                        URL.revokeObjectURL(url);
+                    }
+                } catch {
+                    rightBox.classList.add('hidden');
+                }
+            } else {
+                rightBox.replaceChildren();
+                rightBox.classList.add('hidden');
+            }
+
+            // Subscribe pill preview (custom uploaded badge image or built-in pill)
+            if (settings.subscribe_badge) {
+                if (subscribeImageFile && subscribeCustomUrl) {
+                    const img = new Image();
+                    img.alt = subscribeImageFile.name || 'Custom subscribe badge';
+                    img.src = subscribeCustomUrl;
+                    subBox.replaceChildren(img);
+                    subBox.classList.remove('hidden');
+                } else {
+                    try {
+                        const url = await fetchPreviewBlobUrl({
+                            preview_kind: 'subscribe',
+                            subscribe_text: settings.subscribe_text,
+                            ...settings,
+                        });
+                        if (version === autoMontageVersion && url) {
+                            const img = new Image();
+                            img.alt = settings.subscribe_text;
+                            img.src = url;
+                            await img.decode();
+                            subBox.replaceChildren(img);
+                            subBox.classList.remove('hidden');
+                            if (subscribePreviewUrl) URL.revokeObjectURL(subscribePreviewUrl);
+                            subscribePreviewUrl = url;
+                        } else if (url) {
+                            URL.revokeObjectURL(url);
+                        }
+                    } catch {
+                        subBox.classList.add('hidden');
+                    }
+                }
+            } else {
+                subBox.replaceChildren();
+                subBox.classList.add('hidden');
+            }
+            fitStageMap();
         }
 
         let watermarkFile = null;
@@ -1619,12 +2626,16 @@
                 watermark_text: document.getElementById('watermarkTextInput').value.trim(),
                 watermark_color: document.getElementById('watermarkColor').value,
                 watermark_font: document.getElementById('watermarkFontSelect').value,
+                watermark_stars: document.getElementById('watermarkStarsToggle').checked,
             };
         }
 
         function syncBrandingLayout() {
-            document.getElementById('stageCompositeBox').classList.toggle('has-branding',
-                Boolean(watermarkFile || watermarkSettings().watermark_text));
+            const wm = watermarkSettings();
+            const box = document.getElementById('stageCompositeBox');
+            box.classList.toggle('has-branding',
+                Boolean(watermarkFile || wm.watermark_text || wm.watermark_stars));
+            box.classList.toggle('has-stars', Boolean(wm.watermark_stars));
             fitStageMap();
         }
 
@@ -1696,12 +2707,49 @@
         function updateWatermarkPreview() {
             const settings = watermarkSettings();
             const banner = document.getElementById('stageWatermarkText');
+            const starsBox = document.getElementById('stageWatermarkStars');
             const status = document.getElementById('watermarkPreviewStatus');
             clearTimeout(watermarkPreviewTimer);
             if (watermarkPreviewRequest) watermarkPreviewRequest.abort();
             const version = ++watermarkPreviewVersion;
             showLiveComposite();
             syncBrandingLayout();
+            saveVideoSettings();
+
+            if (!settings.watermark_stars) {
+                starsBox.replaceChildren();
+                starsBox.classList.add('hidden');
+                if (starsPreviewUrl) URL.revokeObjectURL(starsPreviewUrl);
+                starsPreviewUrl = null;
+            } else if (watermarkStarsFile && watermarkStarsCustomUrl) {
+                const img = new Image();
+                img.alt = watermarkStarsFile.name || 'Custom stars badge';
+                img.src = watermarkStarsCustomUrl;
+                starsBox.replaceChildren(img);
+                starsBox.classList.remove('hidden');
+            } else {
+                fetchPreviewBlobUrl({
+                    preview_kind: 'stars',
+                    ...titleSettings(),
+                    ...settings,
+                }).then(async (url) => {
+                    if (version !== watermarkPreviewVersion || !url) {
+                        if (url) URL.revokeObjectURL(url);
+                        return;
+                    }
+                    const img = new Image();
+                    img.alt = '★ ★ ★';
+                    img.src = url;
+                    await img.decode();
+                    starsBox.replaceChildren(img);
+                    starsBox.classList.remove('hidden');
+                    if (starsPreviewUrl) URL.revokeObjectURL(starsPreviewUrl);
+                    starsPreviewUrl = url;
+                }).catch(() => {
+                    starsBox.classList.add('hidden');
+                });
+            }
+
             if (!settings.watermark_text) {
                 banner.replaceChildren();
                 banner.classList.add('hidden');
@@ -1744,6 +2792,12 @@
             }, 180);
         }
 
+        function shouldSyncStickersOnTitleEdit(cur) {
+            const box = document.getElementById('autoStickerVariantsBox');
+            const boxOpen = box && !box.classList.contains('hidden');
+            return boxOpen || isDynamicStickerValue(cur.top_left_sticker) || isDynamicStickerValue(cur.top_right_sticker);
+        }
+
         function updateStageTitlePreview(val) {
             const title = (val || '').trim();
             const banner = document.getElementById('stageTitleBanner');
@@ -1759,12 +2813,20 @@
                 if (titlePreviewUrl) URL.revokeObjectURL(titlePreviewUrl);
                 titlePreviewUrl = null;
                 status.textContent = '';
+                const cur = titleSettings();
+                if (shouldSyncStickersOnTitleEdit(cur)) {
+                    updateAutoMontagePreview();
+                }
                 return;
             }
             status.textContent = 'Updating preview…';
             // Use the same title rasterizer as the final render, including wrapping,
             // font metrics, shadows and automatic fitting. Debounce quick edits.
             titlePreviewTimer = setTimeout(async () => {
+                const cur = titleSettings();
+                if (shouldSyncStickersOnTitleEdit(cur)) {
+                    updateAutoMontagePreview();
+                }
                 const controller = new AbortController();
                 titlePreviewRequest = controller;
                 let url;
@@ -2096,11 +3158,25 @@
             logToConsole(`[Render] POST /api/render_video title="${title}" codec=${codec} duration=${durationSecs}s map=${mapFile.name} bg=${bgFile.name}`, 'cmd');
 
             try {
-                // Encode both materials as base64 data URLs.
-                const [mapB64, bgB64, watermarkB64, audioB64] = await Promise.all([
-                    fileToDataUrl(mapFile), fileToDataUrl(bgFile),
+                // Encode materials and any custom overlay images as base64 data URLs.
+                const [
+                    mapB64,
+                    bgB64,
+                    watermarkB64,
+                    audioB64,
+                    subscribeImageB64,
+                    watermarkStarsImageB64,
+                    leftStickerImageB64,
+                    rightStickerImageB64,
+                ] = await Promise.all([
+                    fileToDataUrl(mapFile),
+                    fileToDataUrl(bgFile),
                     watermarkFile ? fileToDataUrl(watermarkFile) : '',
                     includeAudio && cutAudioFile ? fileToDataUrl(cutAudioFile) : '',
+                    subscribeImageFile ? fileToDataUrl(subscribeImageFile) : '',
+                    watermarkStarsFile ? fileToDataUrl(watermarkStarsFile) : '',
+                    leftStickerFile ? fileToDataUrl(leftStickerFile) : '',
+                    rightStickerFile ? fileToDataUrl(rightStickerFile) : '',
                 ]);
 
                 // Everything (files as base64 + user args + selected duration) goes in a single JSON body.
@@ -2116,6 +3192,10 @@
                     ...titleSettings(),
                     ...watermarkSettings(),
                     watermark_image: watermarkB64,
+                    subscribe_image: subscribeImageB64,
+                    watermark_stars_image: watermarkStarsImageB64,
+                    top_left_sticker_image: leftStickerImageB64,
+                    top_right_sticker_image: rightStickerImageB64,
                 };
 
                 const response = await fetch('/api/render_video', {
@@ -2227,6 +3307,14 @@
                 if (titlePreviewUrl) URL.revokeObjectURL(titlePreviewUrl);
                 if (watermarkImageUrl) URL.revokeObjectURL(watermarkImageUrl);
                 if (watermarkTextUrl) URL.revokeObjectURL(watermarkTextUrl);
+                if (subscribePreviewUrl) URL.revokeObjectURL(subscribePreviewUrl);
+                if (leftStickerPreviewUrl) URL.revokeObjectURL(leftStickerPreviewUrl);
+                if (rightStickerPreviewUrl) URL.revokeObjectURL(rightStickerPreviewUrl);
+                if (starsPreviewUrl) URL.revokeObjectURL(starsPreviewUrl);
+                if (subscribeCustomUrl) URL.revokeObjectURL(subscribeCustomUrl);
+                if (watermarkStarsCustomUrl) URL.revokeObjectURL(watermarkStarsCustomUrl);
+                if (leftStickerCustomUrl) URL.revokeObjectURL(leftStickerCustomUrl);
+                if (rightStickerCustomUrl) URL.revokeObjectURL(rightStickerCustomUrl);
             });
         });
 

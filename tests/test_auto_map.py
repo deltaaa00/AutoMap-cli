@@ -156,3 +156,33 @@ def test_font_objects_are_cached_within_render(scene, monkeypatch):
     monkeypatch.setattr(renderer.ImageFont, 'truetype', load_font)
     render()
     assert load_font.call_count == 1
+
+
+def test_auto_fill_from_ai_detects_numbers_and_words():
+    txt_rules, num_rules = renderer._auto_fill_from_ai(
+        {'ukraine': 38, 'poland': 37, 'germany': 84, 'estonia': 1},
+        mode='number',
+    )
+    assert not txt_rules
+    assert len(num_rules) >= 2
+
+    txt_rules_w, num_rules_w = renderer._auto_fill_from_ai(
+        {'ukraine': '6 Dec', 'russia': '19 Dec', 'netherlands': '5 Dec'},
+        mode='text',
+    )
+    assert not num_rules_w
+    assert '6 Dec' in txt_rules_w
+    assert '19 Dec' in txt_rules_w
+    assert txt_rules_w['6 Dec'] != txt_rules_w['19 Dec']
+
+    # Short-form numeric strings in text mode should be grouped into gradient buckets,
+    # not assigned a distinct color per unique string.
+    short_txt, _ = renderer._auto_fill_from_ai(
+        {f'r{i}': f'{i}k' for i in range(1, 21)},
+        mode='text',
+    )
+    assert len(set(short_txt.values())) <= 5
+    assert short_txt['1k'] == short_txt['2k']
+    assert short_txt['1k'] != short_txt['20k']
+
+

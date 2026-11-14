@@ -247,3 +247,163 @@ def test_round_logo_center_crop_and_transparency(worker):
     assert logo.shape == (230, 230, 4)
     assert logo[0, 0, 3] == 0 and logo[-1, -1, 3] == 0
     assert tuple(logo[115, 115]) == (0, 255, 0, 128)
+
+
+def test_mixed_case_title_and_auto_montage_previews(worker):
+    client = worker.app.test_client()
+    upper_img = worker._title_image('When is Saint Nicholas', 1040, uppercase=True)
+    mixed_img = worker._title_image('When is Saint Nicholas', 1040, uppercase=False)
+    assert not np.array_equal(upper_img, mixed_img)
+
+    for payload in [
+        {'preview_kind': 'subscribe', 'subscribe_text': 'Subscribe!'},
+        {'preview_kind': 'stars', 'watermark_color': '#ffffff'},
+        {'preview_kind': 'sticker', 'sticker_kind': 'santa'},
+        {'preview_kind': 'sticker', 'sticker_kind': 'gift'},
+    ]:
+        res = client.post('/api/video_title_preview', json=payload)
+        assert res.status_code == 200
+        assert res.mimetype == 'image/png'
+        arr = np.array(Image.open(io.BytesIO(res.data)))
+        assert arr.ndim == 3 and arr.shape[2] == 4
+        assert np.any(arr[:, :, 3] > 200)
+
+
+def test_shorts_auto_montage_render_with_stickers_subscribe_and_stars(worker, tmp_path):
+    background = tmp_path / 'background.mp4'
+    with ColorClip((180, 320), color=(40, 80, 120), duration=1.0) as clip:
+        clip.write_videofile(str(background), fps=30, codec='libx264', logger=None)
+    map_buffer = io.BytesIO()
+    Image.new('RGBA', (500, 500), (0, 255, 0, 255)).save(map_buffer, format='PNG')
+    response = worker.app.test_client().post('/api/render_video', json={
+        'map_file': base64.b64encode(map_buffer.getvalue()).decode(),
+        'background_video': base64.b64encode(background.read_bytes()).decode(),
+        'video_title': 'When is Saint Nicholas\nDay in your country?',
+        'title_uppercase': False,
+        'top_left_sticker': 'santa',
+        'top_right_sticker': 'gift',
+        'subscribe_badge': True,
+        'subscribe_text': 'Subscribe!',
+        'subscribe_delay': 0.1,
+        'watermark_text': 'TERRAMAPPER',
+        'watermark_color': '#ffffff',
+        'watermark_stars': True,
+        'intro_fade': True,
+        'duration': 1,
+    })
+    assert response.status_code == 200, response.json
+    with VideoFileClip(response.json['file_path']) as result:
+        assert result.size == [1080, 1920]
+        frame_start = result.get_frame(0.0)
+        frame_mid = result.get_frame(0.8)
+    # Intro fade-in starts darker at t=0.0 than at t=0.8
+    assert frame_start.mean() < frame_mid.mean()
+    # Map green pixels are positioned below the title + subscribe pill and above the footer
+    green_y, _ = np.where((frame_mid[:, :, 1] > 210) & (frame_mid[:, :, 0] < 40))
+    assert len(green_y) > 100
+    assert green_y.min() > 380
+    assert green_y.max() < 1460
+    # Footer has both watermark text and the 3 stars row below y=1690
+    footer_bright = np.all(frame_mid[1690:1900, :, :] > 200, axis=2)
+    assert np.count_nonzero(footer_bright) > 100
+
+
+@pytest.mark.parametrize('title,expected', [
+    ('When is Saint Nicholas Day in your country?', ('santa', 'gift')),
+    ('Святкування Різдва та Святого Миколая', ('santa', 'gift')),
+    ('Spooky Halloween traditions across Europe', ('pumpkin', 'skull')),
+    ('GDP per capita and average salary in Europe', ('money', 'chart')),
+    ('ВВП та середня зарплата в країнах ЄС', ('money', 'chart')),
+    ('Roman Empire and ancient military history', ('shield', 'swords')),
+    ('Історія війн та найбільші битви', ('shield', 'swords')),
+    ('European Monarchs and Royal Families', ('crown', 'star')),
+    ('Fastest internet speed and AI technology', ('rocket', 'bolt')),
+    ('Visa-free travel and strongest passports', ('plane', 'compass')),
+    ('Top 10 best countries to visit', ('trophy', 'fire')),
+    ('Happiest countries and life expectancy', ('heart', 'star')),
+    ('Most dangerous crime rate in Europe', ('skull', 'fire')),
+    ('how many bears in your country?', ('bear', 'tree')),
+    ('What was the coldest temperature ever recorded in your country?', ('snowflake', 'globe')),
+    ('Hottest temperature and climate in Europe', ('sun', 'compass')),
+    ('Average beer and coffee consumption', ('beer', 'coffee')),
+    ('Average IQ and education in Europe', ('brain', 'book')),
+    ('Найкрасивіші країни Європи', ('globe', 'pin')),
+])
+def test_resolve_auto_stickers_thematic_matching(worker, title, expected):
+    assert worker._resolve_auto_stickers(title) == expected
+
+
+def test_all_sticker_kinds_and_auto_preview(worker):
+    client = worker.app.test_client()
+    for kind in worker.ALLOWED_STICKERS:
+        if kind == 'none':
+            assert worker._sticker_image(kind) is None
+            continue
+        arr = worker._sticker_image(kind)
+        assert arr is not None and arr.ndim == 3 and arr.shape[2] == 4
+        assert np.any(arr[:, :, 3] > 200)
+
+    res_left = client.post('/api/video_title_preview', json={
+        'preview_kind': 'sticker',
+        'sticker_kind': 'auto',
+        'sticker_side': 'left',
+        'video_title': 'GDP per capita in Europe',
+    })
+    res_right = client.post('/api/video_title_preview', json={
+        'preview_kind': 'sticker',
+        'sticker_kind': 'auto',
+        'sticker_side': 'right',
+        'video_title': 'GDP per capita in Europe',
+    })
+    assert res_left.status_code == 200 and res_right.status_code == 200
+    left_arr = np.array(Image.open(io.BytesIO(res_left.data)))
+    right_arr = np.array(Image.open(io.BytesIO(res_right.data)))
+    np.testing.assert_array_equal(left_arr, worker._sticker_image('money'))
+    np.testing.assert_array_equal(right_arr, worker._sticker_image('chart'))
+
+
+def test_custom_subscribe_stars_and_top_sticker_images_render(worker, tmp_path):
+    background = tmp_path / 'background.mp4'
+    with ColorClip((180, 320), color=(30, 50, 70), duration=1.0) as clip:
+        clip.write_videofile(str(background), fps=30, codec='libx264', logger=None)
+
+    map_buf, sub_buf, stars_buf, sticker_buf = io.BytesIO(), io.BytesIO(), io.BytesIO(), io.BytesIO()
+    Image.new('RGBA', (500, 500), (0, 255, 0, 255)).save(map_buf, format='PNG')
+    # Custom magenta subscribe badge
+    Image.new('RGBA', (400, 90), (255, 0, 255, 255)).save(sub_buf, format='PNG')
+    # Custom yellow footer stars/badge image
+    Image.new('RGBA', (320, 70), (255, 255, 0, 255)).save(stars_buf, format='PNG')
+    # Custom cyan top-left sticker image
+    Image.new('RGBA', (140, 140), (0, 255, 255, 255)).save(sticker_buf, format='PNG')
+
+    response = worker.app.test_client().post('/api/render_video', json={
+        'map_file': base64.b64encode(map_buf.getvalue()).decode(),
+        'background_video': base64.b64encode(background.read_bytes()).decode(),
+        'video_title': 'Custom Overlays Test',
+        'top_left_sticker_image': base64.b64encode(sticker_buf.getvalue()).decode(),
+        'top_right_sticker': 'auto',
+        'subscribe_image': base64.b64encode(sub_buf.getvalue()).decode(),
+        'subscribe_delay': 0.0,
+        'watermark_text': 'TERRAMAPPER',
+        'watermark_stars_image': base64.b64encode(stars_buf.getvalue()).decode(),
+        'duration': 1,
+    })
+    assert response.status_code == 200, response.json
+    with VideoFileClip(response.json['file_path']) as result:
+        frame = result.get_frame(0.5)
+
+    # Top-left custom cyan sticker is rendered near the top-left slot
+    cyan_top = (frame[:200, :350, 1] > 210) & (frame[:200, :350, 2] > 210) & (frame[:200, :350, 0] < 50)
+    assert np.count_nonzero(cyan_top) > 200
+
+    # Custom magenta subscribe badge is rendered below the title and shifts map down
+    magenta = (frame[:, :, 0] > 210) & (frame[:, :, 2] > 210) & (frame[:, :, 1] < 50)
+    mag_y, _ = np.where(magenta)
+    assert len(mag_y) > 200
+    green_y, _ = np.where((frame[:, :, 1] > 210) & (frame[:, :, 0] < 40) & (frame[:, :, 2] < 40))
+    assert green_y.min() > mag_y.max()
+
+    # Custom yellow stars/footer badge is rendered at the bottom footer
+    yellow_footer = (frame[1760:1915, :, 0] > 210) & (frame[1760:1915, :, 1] > 210) & (frame[1760:1915, :, 2] < 60)
+    assert np.count_nonzero(yellow_footer) > 200
+
