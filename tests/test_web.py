@@ -220,3 +220,92 @@ def test_analyze_map_endpoint_returns_rules_and_style(web):
     assert len(data['analysis']['ui_txt_rules']) == 3
     assert 'recommended_font' in data['analysis']['label_style']
 
+
+def test_restyle_map_repaints_without_ai_request(web, monkeypatch):
+    client = web.app.test_client()
+    fake_buf = io.BytesIO(b'repainted-png')
+    fake_buf.map_meta = {
+        'ai_answer': {'ukraine': 'Yes', 'poland': 'No'},
+        'resolved_theme': 'emerald',
+        'used_txt': {'Yes': [16, 185, 129, 255], 'No': [239, 68, 68, 255]},
+        'label_style': {
+            'text_color': '#ffeeaa',
+            'stroke_color': '#112233',
+            'stroke_width': 11,
+            'auto_fit': True,
+            'recommended_font': 'Bips.ttf',
+            'recommended_gsm': 15,
+        },
+    }
+    mock_auto_map = Mock(return_value=fake_buf)
+    monkeypatch.setattr(web, 'auto_map', mock_auto_map)
+
+    res = client.post('/api/restyle_map', json={
+        'topic': 'Test',
+        'mode': 'text',
+        'map_type': 'default',
+        'gsm': 15,
+        'font': 'Bips.ttf',
+        'auto_style': False,
+        'palette_theme': 'emerald',
+        'filling_txt': {'Yes': [16, 185, 129, 255], 'No': [239, 68, 68, 255]},
+        'label_style': {'text_color': '#ffeeaa', 'stroke_color': '#112233', 'stroke_width': 11, 'auto_fit': True},
+        'map_values': {'ukraine': 'Yes', 'poland': 'No'},
+    })
+    assert res.status_code == 200
+    assert res.json['status'] == 'success'
+    assert base64.b64decode(res.json['image_url'].split(',')[1]) == b'repainted-png'
+    assert mock_auto_map.call_args.kwargs['ai_answer_override'] == {'ukraine': 'Yes', 'poland': 'No'}
+    assert mock_auto_map.call_args.kwargs['auto_style'] is False
+    assert res.json['analysis']['label_style']['text_color'] == '#ffeeaa'
+    assert res.json['analysis']['filling_txt']['Yes'] == [16, 185, 129, 255]
+
+
+def test_restyle_map_requires_map_values(web):
+    client = web.app.test_client()
+    res = client.post('/api/restyle_map', json={'topic': 'Test', 'mode': 'text'})
+    assert res.status_code == 400
+    assert res.json['status'] == 'error'
+
+
+def test_analyze_map_validates_and_inspects_uploaded_image(web):
+    from PIL import Image
+    client = web.app.test_client()
+
+    # Invalid base64/image must return 400 error instead of sample data
+    bad_res = client.post('/api/analyze_map', json={
+        'image_data': 'data:image/png;base64,invalid',
+        'topic': 'Any',
+        'prefer_cached': False,
+    })
+    assert bad_res.status_code == 400
+    assert bad_res.json['status'] == 'error'
+
+    # Valid PNG image is inspected for its actual pixel colors
+    img = Image.new('RGBA', (220, 180), (20, 180, 90, 255))
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    b64 = base64.b64encode(buf.getvalue()).decode('ascii')
+
+    ok_res = client.post('/api/analyze_map', json={
+        'image_data': f'data:image/png;base64,{b64}',
+        'map_type': 'default',
+        'prefer_cached': False,
+    })
+    assert ok_res.status_code == 200
+    assert ok_res.json['source'] == 'image_inspection'
+    assert '#14b45a' in ok_res.json['analysis']['filling_txt']
+
+
+def test_analyze_map_prefer_cached_false_does_not_leak_previous_state(web):
+    client = web.app.test_client()
+    res = client.post('/api/analyze_map', json={
+        'topic': 'When is Saint Nicholas Day',
+        'mode': 'text',
+        'prefer_cached': False,
+    })
+    assert res.status_code == 200
+    assert res.json['source'] == 'topic_preview'
+    assert res.json['map_values']['ukraine'] == '6 Dec'
+
+

@@ -31,6 +31,10 @@ MAX_MATERIAL_BYTES = 10 * 1024 * 1024
 #   h264_nvenc         - NVIDIA GPUs
 #   h264_videotoolbox  - Apple Silicon chips
 ALLOWED_CODECS = ("libx264", "h264_nvenc", "h264_videotoolbox")
+_OG_TITLE_RE = re.compile(r'<meta\s+property="og:title"\s+content="([^"]+)"')
+_HTML_TITLE_RE = re.compile(r'<title>(.*?)</title>')
+_SAFE_TITLE_RE = re.compile(r'[^\w\-]')
+_AUDIO_TITLE_RE = re.compile(r'[\w\-]+')
 
 
 @lru_cache(maxsize=1)
@@ -79,12 +83,12 @@ def _get_song_title(url: str) -> str | None:
         response = requests.get(url, timeout=10)
         response.raise_for_status()
 
-        match = re.search(r'<meta\s+property="og:title"\s+content="([^"]+)"', response.text)
+        match = _OG_TITLE_RE.search(response.text)
         if match:
             return match.group(1)
 
         # Fall back to the page title when Open Graph metadata is unavailable.
-        match_title = re.search(r'<title>(.*?)</title>', response.text)
+        match_title = _HTML_TITLE_RE.search(response.text)
         if match_title:
             return match_title.group(1)
 
@@ -1342,10 +1346,10 @@ def make_video() -> tuple[object, int]:
     except ValueError as ve:
         return jsonify({"status": "error", "error": str(ve)}), 400
 
-    safe_title = re.sub(r'[^\w\-]', '_', title)
+    safe_title = _SAFE_TITLE_RE.sub('_', title)
     # The video headline and the selected song are independent identifiers.
     audio_title = data.get('audio_title', '')
-    if not isinstance(audio_title, str) or (audio_title and not re.fullmatch(r'[\w\-]+', audio_title)):
+    if not isinstance(audio_title, str) or (audio_title and not _AUDIO_TITLE_RE.fullmatch(audio_title)):
         return jsonify(status='error', error='Invalid audio track title.'), 400
     try:
         audio_bytes = _decode_material(str(data['audio_file']), 'audio_file') if data.get('audio_file') else None

@@ -186,3 +186,39 @@ def test_auto_fill_from_ai_detects_numbers_and_words():
     assert short_txt['1k'] != short_txt['20k']
 
 
+def test_auto_map_applies_request_color_and_label_overrides(scene, monkeypatch):
+    answer, _, real_open = scene
+    answer.return_value = {'one': 'CustomLabel', 'two': 'OtherLabel', 'three': ''}
+    draw_text = Mock(wraps=ImageDraw.ImageDraw.text)
+    monkeypatch.setattr(ImageDraw.ImageDraw, 'text', draw_text)
+
+    buf = render(
+        filling_txt_override={'CustomLabel': [12, 34, 56, 255], 'OtherLabel': [65, 43, 21, 255]},
+        label_style={'text_color': '#ff1122', 'stroke_color': '#010203', 'stroke_width': 9, 'auto_fit': True},
+        auto_style=False,
+        palette_theme='emerald',
+    )
+    image = real_open(buf)
+    assert image.getpixel((80, 600)) == (12, 34, 56, 255)
+    assert image.getpixel((290, 600)) == (65, 43, 21, 255)
+    assert draw_text.call_args.kwargs['fill'] == (255, 17, 34, 255)
+    assert draw_text.call_args.kwargs['stroke_fill'] == (1, 2, 3, 255)
+    assert draw_text.call_args.kwargs['stroke_width'] == 9
+    assert buf.map_meta['label_style']['text_color'] == '#ff1122'
+    assert buf.map_meta['used_txt']['CustomLabel'] == [12, 34, 56, 255]
+
+
+def test_auto_map_restyle_override_skips_ai_request(scene):
+    answer, _, real_open = scene
+    buf = render(
+        ai_answer_override={'one': 'Alpha', 'two': 'Beta', 'three': 'Alpha'},
+        filling_txt_override={'Alpha': [10, 200, 100, 255], 'Beta': [200, 10, 100, 255]},
+        auto_style=False,
+    )
+    answer.assert_not_called()
+    image = real_open(buf)
+    assert image.getpixel((80, 600)) == (10, 200, 100, 255)
+    assert image.getpixel((290, 600)) == (200, 10, 100, 255)
+
+
+

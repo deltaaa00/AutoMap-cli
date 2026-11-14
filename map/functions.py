@@ -72,18 +72,19 @@ def ai_request(prompt: str, mode: str, ai_model: str, api_key: str | None = None
 
     try:
         # Models may wrap otherwise valid JSON in a Markdown code fence.
-        json_style = request.strip().replace("```json", "").replace("```", "").strip()
+        json_style = (
+            request.strip()
+            .removeprefix("```json")
+            .removeprefix("```python")
+            .removeprefix("```")
+            .removesuffix("```")
+            .strip()
+        )
         country_dict = json.loads(json_style)
-
     except json.JSONDecodeError:
-        try:
-            json_style = request.strip().replace("```python", "").replace("```", "").strip()
-            country_dict = json.loads(json_style)
-
-        except json.JSONDecodeError:
-            _error(f"Failed to convert into dictionary. Result {json_style}")
-            print("Result:", json_style)
-            return None
+        _error(f"Failed to convert into dictionary. Result {json_style}")
+        print("Result:", json_style)
+        return None
     except (AttributeError, TypeError) as e:
         _error("AI response parsing error", str(e))
         return None
