@@ -126,13 +126,26 @@ def test_render_validation(worker, changes):
     assert response.status_code == 400 and response.json['status'] == 'error'
 
 
-@pytest.mark.parametrize('field', ['map_file', 'background_video'])
+@pytest.mark.parametrize('field', ['map_file', 'background_video', 'watermark_image'])
 def test_render_material_limit(worker, monkeypatch, field):
     monkeypatch.setattr(worker, 'MAX_MATERIAL_BYTES', 3)
     data = dict(map_file='eA==', background_video='eA==', video_title='test')
     data[field] = base64.b64encode(b'1234').decode()
     response = worker.app.test_client().post('/api/render_video', json=data)
     assert response.status_code == 400 and '10 MB' in response.json['error']
+
+
+@pytest.mark.parametrize('settings', [
+    {'watermark_text': 'x' * 81}, {'watermark_text': 123},
+    {'watermark_color': '#xyzxyz'}, {'watermark_color': None},
+    {'watermark_font': '../../etc/passwd'}, {'watermark_font': 'missing.ttf'},
+    {'watermark_image': 'not-an-image'},
+    {'watermark_image': base64.b64encode(b'not an image').decode()},
+])
+def test_invalid_watermark_rejected_before_render(worker, settings):
+    data = dict(map_file='eA==', background_video='eA==', video_title='test', **settings)
+    response = worker.app.test_client().post('/api/render_video', json=data)
+    assert response.status_code == 400, response.json
 
 
 def test_failed_render_cleans_material_files(worker, monkeypatch, tmp_path):
@@ -185,3 +198,21 @@ def test_preview_rejects_unfittable_multiline_title(worker):
     })
     assert response.status_code == 400
     assert 'too long' in response.json['error']
+def test_codec_probe_checks_actual_encoder_and_caches_result(worker, monkeypatch):
+    run = Mock(side_effect=[Mock(returncode=0), Mock(returncode=1),
+                            subprocess.TimeoutExpired('ffmpeg', 5)])
+    monkeypatch.setattr(worker.subprocess, 'run', run)
+    assert worker._available_codecs() == ('libx264',)
+    assert worker._available_codecs() == ('libx264',)
+    assert run.call_count == 3
+    assert all('-frames:v' in call.args[0] for call in run.call_args_list)
+    assert worker.app.test_client().get('/api/codecs').json == {'codecs': ['libx264']}
+
+
+def test_render_rejects_unavailable_hardware_codec(worker, monkeypatch):
+    monkeypatch.setattr(worker, '_available_codecs', lambda: ('libx264',))
+    response = worker.app.test_client().post('/api/render_video', json={
+        'map_file': 'eA==', 'background_video': 'eA==', 'video_title': 'Test', 'codec': 'h264_nvenc',
+    })
+    assert response.status_code == 400
+    assert 'unavailable' in response.json['error']

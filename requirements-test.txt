@@ -1,3 +1,6 @@
+# Install the application plus the tools needed to run its test suite.
 -r requirements.txt
+pytest>=9.0.0
 pytest-cov>=6.0
 playwright>=1.50
+packaging>=24.0

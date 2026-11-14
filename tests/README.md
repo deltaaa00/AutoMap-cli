@@ -2,6 +2,9 @@
 
 Use Python 3.12, matching CI. From the project root:
 
+`requirements.txt` contains runtime dependencies. `requirements-test.txt`
+includes that list plus pytest, coverage, Playwright, and dependency validation tools.
+
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
@@ -41,7 +44,9 @@ GitHub Actions runs the complete suite and uploads `coverage.xml`.
 - Worker: metadata/downloads, audio slices, expiry cleanup, validation, safe
   downloads, title fitting, real FFmpeg portrait rendering and audio attachment.
 - Browser: font/size/reset controls, exact title PNGs, debounce, responsive
-  preview scaling, map replacement/removal and blob URL cleanup.
+  preview scaling, map replacement/removal and blob URL cleanup; automatic map
+  transfer between studios, persistent settings and uploaded materials, large-map
+  preparation for video, and graceful handling of unavailable browser storage.
 - Image preparation tools: temporary input/output images only.
 
 Tests mock external AI, HTTP and yt-dlp downloads. An autouse fixture rejects

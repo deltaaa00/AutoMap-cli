@@ -61,6 +61,7 @@ def success(message: str) -> None:
 
 def warning(message: str) -> None:
     """Log a warning. Always shown."""
+    # Warnings remain visible even when routine progress output is disabled.
     console.print(f"[bold yellow]⚠[/] {message}")
 
 
@@ -99,6 +100,8 @@ def spinner(message: str = "Working..."):
     """
     with console.status(f"[bold cyan]{message}", spinner="dots") as status:
         try:
+            # Keep the status active for the caller's block; errors propagate
+            # after the status context has had a chance to stop the animation.
             yield status
         except Exception:
             raise

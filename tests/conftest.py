@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def isolate_external_services(monkeypatch):
     from map import functions, log
 
+    # Fail immediately if a test reaches a real network or AI client by accident.
     monkeypatch.setenv('GEMINI_API_KEY', 'test-key-never-send')
     monkeypatch.setattr(requests.sessions.Session, 'request', Mock(
         side_effect=AssertionError('Unexpected network request; mock the external service'),
@@ -28,9 +29,11 @@ def isolate_external_services(monkeypatch):
 
 @pytest.fixture
 def worker(tmp_path, monkeypatch):
+    # Load a fresh worker module because its filename cannot be imported normally.
     spec = importlib.util.spec_from_file_location('video_worker', ROOT / 'yt-dlp_serv.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    # Keep each test's media files separate from shared worker storage.
     for name in ('STORAGE_DIR', 'RENDER_DIR', 'DOWNLOADS', 'CUT_DIR'):
         folder = tmp_path / name
         folder.mkdir()

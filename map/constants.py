@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Europe countries coordinates
+# Pixel coordinates in the bundled map artwork, rather than geographic coordinates.
+# The first point anchors the label; additional points fill disconnected land areas.
 europe_coords = {
     "ukraine": [(3144, 2440), (3565, 2805)],
     "poland": [(2370, 2338)],
@@ -56,7 +57,7 @@ europe_coords = {
     "belgium": [(1491, 2539)],
     "usa": [(1398, 629)],
 }
-# Continents coordinates
+# These seeds use the world map's own pixel dimensions.
 world_coords = {
     "asia": [(2240,842), (2273,1370), (2250,1270), (2617,1230), (2459,311), (2412,272), (2396,214), (2795,491),
              (2776,434), (2814,429), (2854,446), (2806,944), (2801,983), (2803,1025), (2784,1036), (2773,1101),
@@ -72,7 +73,8 @@ world_coords = {
                       (922,238), (1237,386), (1128,597), (227,853), (273,836),(273,836),(203,864),(185,876),(302,788)]
 }
 
-# Europe countries dictionary
+# Prompt templates intentionally leave values blank for the AI to supply.
+# These strings are instructions, not JSON documents to parse directly.
 europe = """{
 
         "ukraine":,

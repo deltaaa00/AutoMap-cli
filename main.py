@@ -87,14 +87,18 @@ def video_title_preview():
 
     data = request.get_json(silent=True) or {}
     try:
+        # Preview and final rendering share the worker's title styling options.
         response = requests.post(
             'http://yt-dlp-worker:8080/api/video_title_preview',
             json={key: data[key] for key in ('video_title', 'title_font', 'title_font_size',
-                                            'title_first_line_color', 'title_other_lines_color') if key in data},
+                                            'title_first_line_color', 'title_other_lines_color',
+                                            'visual_effects', 'preview_kind', 'watermark_text',
+                                            'watermark_color', 'watermark_font') if key in data},
             timeout=15,
         )
     except requests.RequestException:
         return jsonify(error='Title preview is unavailable. Please try again.'), 502
+    # Preserve the worker's image content type for successful preview responses.
     return Response(response.content, status=response.status_code,
                     content_type=response.headers.get('Content-Type', 'application/json'))
 
@@ -108,6 +112,18 @@ def api_fonts():
     """
     fonts = _available_fonts()
     return jsonify({"fonts": fonts, "count": len(fonts)})
+
+
+@app.route('/api/codecs')
+def api_codecs():
+    """Ask the render worker which encoders its FFmpeg and hardware can use."""
+    import requests
+
+    try:
+        response = requests.get('http://yt-dlp-worker:8080/api/codecs', timeout=20)
+        return jsonify(response.json()), response.status_code
+    except (requests.RequestException, ValueError):
+        return jsonify(error='Could not check render worker codecs. Use libx264 (CPU).'), 502
 
 
 @app.route('/api/status')
@@ -155,7 +171,7 @@ def generate():
     except (TypeError, ValueError):
         gsm = 15
 
-    # Rebuild the equivalent CLI command so the UI can show / log it.
+    # Rebuild the equivalent CLI command for display only; it is never executed.
     command = (
         f"python cli.py make \"{data.get('topic', '')}\" "
         f"-m {data.get('mode', 'text')} -mp {data.get('map_type', 'default')} "
@@ -262,9 +278,10 @@ def cut_audio() -> tuple[object, int]:
         duration = int(raw_duration) if raw_duration is not None else 8
     except (TypeError, ValueError):
         duration = 8
+    # Keep audio cuts within the supported 1–30 second range before forwarding.
     duration = max(1, min(30, duration))
 
-    # Another service downloads music from YouTube and converts it to mp3.
+    # The worker owns the downloaded track and performs the cut in its storage.
     try:
         response = requests.post(
             "http://yt-dlp-worker:8080/api/music_cut/",
@@ -332,7 +349,12 @@ def make_video() -> tuple[object, int]:
                 "title_font": data.get('title_font', 'DIN Condensed.ttf'),
                 "title_font_size": data.get('title_font_size', 100),
                 "title_first_line_color": data.get('title_first_line_color', '#ffffff'),
-                "title_other_lines_color": data.get('title_other_lines_color', '#a7f3d0'),
+                "title_other_lines_color": data.get('title_other_lines_color', '#ffe735'),
+                "visual_effects": data.get('visual_effects', True),
+                "watermark_image": data.get('watermark_image', ''),
+                "watermark_text": data.get('watermark_text', ''),
+                "watermark_color": data.get('watermark_color', '#a4e9ee'),
+                "watermark_font": data.get('watermark_font', 'DIN Condensed.ttf'),
             },
             # Video rendering (moviepy/ffmpeg) can take a while - allow more time.
             timeout=300,

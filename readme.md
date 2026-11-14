@@ -74,6 +74,9 @@ To get started with **AutoMap**, follow these steps:
    pip install -r requirements.txt
    ```
 
+   For testing, install `requirements-test.txt` instead. It includes runtime
+   dependencies and test tools. See [tests/README.md](tests/README.md) for test commands.
+
 4. **Configure your API key:**
    AutoMap reads `GEMINI_API_KEY` from a `.env` file (see `example.env`).
    - Copy `example.env` to `.env`.

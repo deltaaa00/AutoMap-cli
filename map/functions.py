@@ -71,6 +71,7 @@ def ai_request(prompt: str, mode: str, ai_model: str, api_key: str | None = None
         return None
 
     try:
+        # Models may wrap otherwise valid JSON in a Markdown code fence.
         json_style = request.strip().replace("```json", "").replace("```", "").strip()
         country_dict = json.loads(json_style)
 
@@ -112,12 +113,15 @@ def load_filling():
 
 
         raw_txt = data.get("filling_txt", {})
+        # JSON stores colors as arrays; Pillow also accepts these tuple values.
         filling_txt = {k: tuple(v) for k, v in raw_txt.items()}
 
 
         raw_num = data.get("filling_num", {})
         for key_str, color_list in raw_num.items():
             try:
+                # JSON object keys are strings; recover the (low, high) range
+                # with literal_eval, which parses literals without executing code.
                 tuple_key = literal_eval(key_str)
                 filling_num[tuple_key] = tuple(color_list)
             except (ValueError, SyntaxError):

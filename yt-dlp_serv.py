@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import time
 import uuid
+from functools import lru_cache
 
 from flask import Flask, request, jsonify, send_file
 
@@ -31,8 +32,35 @@ MAX_MATERIAL_BYTES = 10 * 1024 * 1024
 #   h264_videotoolbox  - Apple Silicon chips
 ALLOWED_CODECS = ("libx264", "h264_nvenc", "h264_videotoolbox")
 
+
+@lru_cache(maxsize=1)
+def _available_codecs():
+    """Probe the encoder and device together, using the same FFmpeg as MoviePy."""
+    from moviepy.config import FFMPEG_BINARY
+
+    available = []
+    for codec in ALLOWED_CODECS:
+        try:
+            result = subprocess.run([
+                FFMPEG_BINARY, '-hide_banner', '-loglevel', 'error',
+                '-f', 'lavfi', '-i', 'color=size=64x64:rate=1',
+                '-frames:v', '1', '-pix_fmt', 'yuv420p', '-c:v', codec,
+                '-f', 'null', '-',
+            ], capture_output=True, timeout=5, check=False)
+            if result.returncode == 0:
+                available.append(codec)
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+    return tuple(available)
+
+
+@app.route('/api/codecs')
+def api_codecs():
+    return jsonify(codecs=list(_available_codecs()))
+
 def cleanup_old_files(max_age_seconds=1800):
     """Delete old files"""
+    # Use one cutoff reference for the entire scan of downloads, cuts, and renders.
     now = time.time()
     for root, _dirs, files in os.walk(STORAGE_DIR):
         for name in files:
@@ -55,6 +83,7 @@ def _get_song_title(url: str) -> str | None:
         if match:
             return match.group(1)
 
+        # Fall back to the page title when Open Graph metadata is unavailable.
         match_title = re.search(r'<title>(.*?)</title>', response.text)
         if match_title:
             return match_title.group(1)
@@ -226,10 +255,12 @@ TITLE_FONT_PATH = os.path.join(
 def _title_settings(data):
     font_name = str(data.get('title_font') or 'DIN Condensed.ttf')
     font_dir = os.path.dirname(TITLE_FONT_PATH)
+    # Accept bundled filenames only, rather than arbitrary client-supplied paths.
     fonts = {name for name in os.listdir(font_dir) if name.lower().endswith(('.ttf', '.otf'))}
     if font_name not in fonts:
         raise ValueError('Unknown title font.')
     raw_size = data.get('title_font_size', 100)
+    # Reject booleans explicitly because int(True) would otherwise succeed.
     if isinstance(raw_size, bool):
         raise ValueError('Title size must be a number between 48 and 144.')
     try:
@@ -243,19 +274,22 @@ def _title_settings(data):
 
 def _title_colors(data):
     colors = (data.get('title_first_line_color', '#ffffff'),
-              data.get('title_other_lines_color', '#a7f3d0'))
+              data.get('title_other_lines_color', '#ffe735'))
     if any(not isinstance(color, str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', color) for color in colors):
         raise ValueError('Title colors must use #RRGGBB format.')
     return colors
 
 
 def _title_image(title: str, max_width: int, font_path=TITLE_FONT_PATH, font_size=100,
-                 first_line_color='#ffffff', other_lines_color='#a7f3d0'):
-    """Lay out a centered, wrapped title with safe margins and a soft shadow."""
+                 first_line_color='#ffffff', other_lines_color='#ffe735',
+                 effects=True, max_height=360):
+    """Lay out a centered, wrapped title with safe margins and a layered shadow."""
     import numpy as np
     from PIL import Image, ImageColor, ImageDraw, ImageFilter, ImageFont
 
+    title = title.upper()
     padding = 24
+    outline = 6 if effects else 1
     text_width = max_width - padding * 2
     measure = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
     # Shrink long titles to keep the map visible. Character wrapping also handles
@@ -282,44 +316,90 @@ def _title_image(title: str, max_width: int, font_path=TITLE_FONT_PATH, font_siz
         text = "\n".join(lines)
         spacing = round(fitted_size * 0.22)
         bounds = measure.multiline_textbbox((0, 0), text, font=font,
-                                            spacing=spacing, align="center", stroke_width=1)
+                                            spacing=spacing, align="center", stroke_width=outline)
         height = bounds[3] - bounds[1]
-        if height <= 360:
+        if height <= max_height:
             break
-    if height > 360:
+    if height > max_height:
         raise ValueError("Video title is too long. Please shorten it.")
 
     size = (max_width, height + padding * 2)
     shadow = Image.new("RGBA", size)
+    # Account for the font's vertical bounding-box offset inside the padded image.
     xy = (max_width / 2, padding - bounds[1])
-    ImageDraw.Draw(shadow).multiline_text(
-        (xy[0], xy[1] + 5), text, font=font, anchor="ma", align="center",
-        spacing=spacing, fill=(0, 0, 0, 230), stroke_width=3,
-    )
-    image = shadow.filter(ImageFilter.GaussianBlur(8))
+    # Use one line advance for shadow and colored text. Different stroke widths
+    # in multiline_text would otherwise change the spacing and clip lower rows.
+    advance = measure.textbbox((0, 0), 'A', font=font, stroke_width=outline)[3] + outline + spacing
+    shadow_draw = ImageDraw.Draw(shadow)
+    for row, line in enumerate(lines):
+        shadow_draw.text((xy[0], xy[1] + row * advance + 5), line,
+                         font=font, anchor='ma', fill=(0, 0, 0, 255), stroke_width=outline)
+    # Combine a soft halo with a tighter drop shadow for contrast on bright footage.
+    # Preview and final video both use this image, so the shading stays consistent.
+    image = shadow.filter(ImageFilter.GaussianBlur(8)) if effects else Image.new('RGBA', size)
+    if effects:
+        image = Image.alpha_composite(image, shadow.filter(ImageFilter.GaussianBlur(2)))
     draw = ImageDraw.Draw(image)
     first_rgb = ImageColor.getrgb(first_line_color)
     other_rgb = ImageColor.getrgb(other_lines_color)
-    # Preserve the same baseline and line spacing as the shadow, including
-    # automatic wrapping. A blank first line reserves its place for the headline.
-    if len(lines) > 1:
-        draw.multiline_text(
-            xy, '\n' + '\n'.join(lines[1:]), font=font, anchor='ma',
-            align='center', spacing=spacing, fill=other_rgb + (255,),
-            stroke_width=1, stroke_fill=other_rgb + (220,),
-        )
-    draw.text(xy, lines[0], font=font, anchor='ma', fill=first_rgb + (255,),
-              stroke_width=1, stroke_fill=first_rgb + (220,))
+    for row, line in enumerate(lines):
+        color = first_rgb if row == 0 else other_rgb
+        draw.text((xy[0], xy[1] + row * advance), line, font=font, anchor='ma',
+                  fill=color + (255,), stroke_width=outline,
+                  stroke_fill=(0, 0, 0, 255) if effects else color + (220,))
     return np.array(image)
 
 
 def _build_title_clip(title: str, duration: float, max_width: int,
                       font_path=TITLE_FONT_PATH, font_size=100,
-                      first_line_color='#ffffff', other_lines_color='#a7f3d0'):
+                      first_line_color='#ffffff', other_lines_color='#ffe735', effects=True):
     from moviepy import ImageClip
 
     return ImageClip(_title_image(title, max_width, font_path, font_size,
-                                 first_line_color, other_lines_color)).with_duration(duration)
+                                 first_line_color, other_lines_color, effects)).with_duration(duration)
+
+
+def _watermark_settings(data):
+    text = data.get('watermark_text', '')
+    color = data.get('watermark_color', '#a4e9ee')
+    if not isinstance(text, str) or len(text) > 80:
+        raise ValueError('Watermark text must be at most 80 characters.')
+    if not isinstance(color, str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', color):
+        raise ValueError('Watermark color must use #RRGGBB format.')
+    return text.strip(), color
+
+
+def _watermark_font_path(data):
+    # Validate the watermark's own font against the bundled filenames.
+    return _title_settings({'title_font': data.get('watermark_font', 'DIN Condensed.ttf')})[0]
+
+
+def _round_watermark(image, diameter=230):
+    """Center-crop the logo to a circle while preserving existing transparency."""
+    from PIL import Image, ImageChops, ImageDraw, ImageOps
+
+    image = ImageOps.fit(image.convert('RGBA'), (diameter, diameter), method=Image.Resampling.LANCZOS)
+    # Draw the mask at higher resolution for a smooth circular edge.
+    mask = Image.new('L', (diameter * 4, diameter * 4))
+    ImageDraw.Draw(mask).ellipse((0, 0, mask.width - 1, mask.height - 1), fill=255)
+    mask = mask.resize(image.size, Image.Resampling.LANCZOS)
+    image.putalpha(ImageChops.multiply(image.getchannel('A'), mask))
+    return image
+
+
+def _with_shadow(image):
+    """Add a soft silhouette shadow while keeping transparent areas transparent."""
+    from PIL import Image, ImageFilter
+
+    image = image.convert('RGBA')
+    canvas = Image.new('RGBA', (image.width + 48, image.height + 48))
+    alpha = Image.new('L', canvas.size)
+    alpha.paste(image.getchannel('A'), (24, 32))
+    shadow = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
+    shadow.putalpha(alpha.filter(ImageFilter.GaussianBlur(10)).point(lambda p: round(p * .8)))
+    canvas = Image.alpha_composite(canvas, shadow)
+    canvas.alpha_composite(image, (24, 24))
+    return canvas
 
 
 @app.route('/api/video_title_preview', methods=['POST'])
@@ -333,7 +413,13 @@ def video_title_preview():
     try:
         font_path, font_size = _title_settings(data)
         first_color, other_color = _title_colors(data)
-        image = _title_image(title, 936, font_path, font_size, first_color, other_color)
+        effects = data.get('visual_effects', True) is not False
+        if data.get('preview_kind') == 'watermark':
+            text, color = _watermark_settings(data)
+            image = _title_image(text, 936, _watermark_font_path(data), 96,
+                                 color, color, effects, max_height=110)
+        else:
+            image = _title_image(title, 1040, font_path, font_size, first_color, other_color, effects)
     except ValueError as error:
         return jsonify(error=str(error)), 400
     output = io.BytesIO()
@@ -365,12 +451,16 @@ def make_video() -> tuple[object, int]:
     try:
         font_path, font_size = _title_settings(data)
         first_color, other_color = _title_colors(data)
+        watermark_text, watermark_color = _watermark_settings(data)
+        watermark_font_path = _watermark_font_path(data)
     except ValueError as error:
         return jsonify(status='error', error=str(error)), 400
     if codec not in ALLOWED_CODECS:
         return jsonify({"status": "error",
                         "error": f"Unsupported codec '{codec}'. "
                                  f"Allowed: {', '.join(ALLOWED_CODECS)}."}), 400
+    if codec != 'libx264' and codec not in _available_codecs():
+        return jsonify(status='error', error=f"Codec '{codec}' is unavailable on the render worker. Select libx264 (CPU)."), 400
 
     def _decode_material(value: str, label: str) -> bytes:
         """Strip an optional `data:...;base64,` prefix and decode to bytes."""
@@ -385,6 +475,7 @@ def make_video() -> tuple[object, int]:
             raise ValueError(f"{label} is not valid base64.")
         if not raw:
             raise ValueError(f"{label} is empty after decoding.")
+        # Apply the upload limit to decoded bytes, excluding base64 overhead.
         if len(raw) > MAX_MATERIAL_BYTES:
             raise ValueError(f"{label} exceeds the 10 MB limit ({len(raw) // (1024 * 1024)} MB).")
         return raw
@@ -392,11 +483,23 @@ def make_video() -> tuple[object, int]:
     try:
         map_bytes = _decode_material(map_b64, "map_file")
         bg_bytes = _decode_material(background_b64, "background_video")
+        watermark_bytes = _decode_material(str(data['watermark_image']), 'watermark_image') if data.get('watermark_image') else None
+        from PIL import Image, UnidentifiedImageError
+        watermark_image = None
+        if watermark_bytes:
+            try:
+                with Image.open(io.BytesIO(watermark_bytes)) as uploaded:
+                    if uploaded.width * uploaded.height > 20_000_000:
+                        raise ValueError('Watermark image must be at most 20 megapixels.')
+                    watermark_image = uploaded.convert('RGBA')
+            except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+                raise ValueError('Watermark must be a valid image.')
     except ValueError as ve:
         return jsonify({"status": "error", "error": str(ve)}), 400
 
     safe_title = re.sub(r'[^\w\-]', '_', title)
     cut_audio_path = os.path.join(CUT_DIR, f"{safe_title}_cut.mp3")
+    # Prefer an edited track; fall back to the full download if no cut exists.
     audio_path = (
         cut_audio_path
         if os.path.exists(cut_audio_path)
@@ -440,29 +543,58 @@ def make_video() -> tuple[object, int]:
             width=canvas_w, height=canvas_h,
         )
 
+        effects = data.get('visual_effects', True) is not False
+        if effects:
+            from PIL import ImageFilter
+            # Blur a smaller frame for a soft background without blurring the overlays.
+            def soften(frame):
+                small = Image.fromarray(frame).resize((270, 480))
+                return np.array(small.filter(ImageFilter.GaussianBlur(2)).resize((1080, 1920)))
+            import numpy as np
+            background_video = background_video.image_transform(soften)
+
         # Darken the edges and the area behind the title for readable white text.
         import numpy as np
         shade = np.zeros((canvas_h, canvas_w, 4), dtype=np.uint8)
         y = np.linspace(-1, 1, canvas_h)
-        shade[:, :, 3] = (70 + 95 * np.abs(y) ** 1.5).astype(np.uint8)[:, None]
+        shade[:, :, 3] = (25 + 65 * np.abs(y) ** 1.5).astype(np.uint8)[:, None]
         scrim = ImageClip(shade).with_duration(bg_duration)
 
         # Anchor the headline near the top and let the map fill the space below.
-        title_clip = _build_title_clip(title, bg_duration, canvas_w - 144, font_path,
-                                       font_size, first_color, other_color)
+        title_clip = _build_title_clip(title, bg_duration, 1040, font_path,
+                                       font_size, first_color, other_color, effects)
         map_clip = ImageClip(map_path).with_duration(bg_duration)
-        title_top, gap, bottom_margin = 120, 48, 160
+        title_top, gap = 70, 16
         map_top = title_top + title_clip.h + gap
-        map_area_height = canvas_h - map_top - bottom_margin
-        scale = min((canvas_w - 72) / map_clip.w, map_area_height / map_clip.h)
+        branded = bool(watermark_image is not None or watermark_text)
+        map_bottom = 1450 if branded else 1760
+        map_area_height = map_bottom - map_top
+        # Fit both dimensions so the whole map stays inside the space below the title.
+        scale = min(1040 / map_clip.w, map_area_height / map_clip.h)
         map_clip = map_clip.resized(scale)
+        if effects:
+            map_image = Image.open(map_path).convert('RGBA').resize((map_clip.w, map_clip.h))
+            map_clip = ImageClip(np.array(_with_shadow(map_image))).with_duration(bg_duration)
         title_clip = title_clip.with_position(("center", title_top))
-        map_clip = map_clip.with_position(("center", map_top))
+        map_clip = map_clip.with_position(("center", map_top - (24 if effects else 0)))
         clips = [background_video, scrim, map_clip, title_clip]
+        if watermark_image is not None:
+            watermark_image = _round_watermark(watermark_image)
+            logo_top = 1470
+            if effects:
+                watermark_image = _with_shadow(watermark_image)
+                logo_top -= 24
+            logo = ImageClip(np.array(watermark_image)).with_duration(bg_duration)
+            clips.append(logo.with_position(('center', logo_top)))
+        if watermark_text:
+            lettering = _title_image(watermark_text, 936, watermark_font_path, 96,
+                                    watermark_color, watermark_color, effects, max_height=110)
+            branding = ImageClip(lettering).with_duration(bg_duration)
+            clips.append(branding.with_position(('center', 1740)))
 
         final_clip = CompositeVideoClip(clips, size=(canvas_w, canvas_h))
 
-        # Attach audio if the cut mp3 exists; otherwise render silent video.
+        # Attach the selected cut or full track when available; otherwise render silently.
         if os.path.exists(audio_path):
             audio_clip = AudioFileClip(audio_path)
             audio_duration = min(bg_duration, audio_clip.duration or bg_duration)
@@ -513,6 +645,7 @@ def download_video():
         return jsonify({"status": "error", "error": "Missing 'path' query param."}), 400
 
     # Normalise and enforce that the file lives under RENDER_DIR.
+    # Resolve symlinks before checking containment in the render directory.
     candidate = os.path.realpath(raw_path)
     render_root = os.path.realpath(RENDER_DIR)
     if os.path.commonpath([candidate, render_root]) != render_root:

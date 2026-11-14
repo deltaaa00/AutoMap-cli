@@ -33,6 +33,7 @@ def _available_fonts():
     """Return the list of usable font files from resources/fonts."""
     if not FONTS_DIR.is_dir():
         return []
+    # Sort filenames so help output and font choices stay stable across systems.
     return sorted(p.name for p in FONTS_DIR.iterdir() if p.suffix.lower() in (".ttf", ".otf"))
 
 
@@ -112,6 +113,7 @@ def make(prompt, mode, map_type, size_mod, optional_feature, model, font_name, s
     if api_key:
         os.environ["GEMINI_API_KEY"] = api_key
 
+    # Click accepts mixed-case choices; the renderer compares lowercase names.
     out_path = auto_map(
         prompt=prompt,
         mode=mode.lower(),
@@ -124,6 +126,7 @@ def make(prompt, mode, map_type, size_mod, optional_feature, model, font_name, s
     )
 
     if out_path is None:
+        # Convert renderer failures into a nonzero exit status for shell scripts.
         raise click.ClickException("Map generation failed. See errors above.")
 
 

@@ -42,7 +42,7 @@ def test_preview_uses_render_title_layout(worker, font, size):
     assert response.mimetype == 'image/png'
     actual = np.array(Image.open(io.BytesIO(response.data)))
     font_path, font_size = worker._title_settings({'title_font': font, 'title_font_size': size})
-    expected = worker._title_image('Найкрасивіші країни Європи', 936, font_path, font_size)
+    expected = worker._title_image('Найкрасивіші країни Європи', 1040, font_path, font_size)
     np.testing.assert_array_equal(actual, expected)
 
 
@@ -63,7 +63,7 @@ def test_default_preview_matches_default_render_title(worker):
     response = worker.app.test_client().post('/api/video_title_preview', json={'video_title': 'Test'})
     assert response.status_code == 200
     np.testing.assert_array_equal(
-        np.array(Image.open(io.BytesIO(response.data))), worker._title_image('Test', 936),
+        np.array(Image.open(io.BytesIO(response.data))), worker._title_image('Test', 1040),
     )
 
 
@@ -98,13 +98,12 @@ def test_portrait_render_with_centered_title_and_map(worker, tmp_path, font, siz
         assert xs.max() - xs.min() >= 1000
     white = np.all(frame > 220, axis=2)
     title_y, title_x = np.where(white)
-    assert 120 <= title_y.min() < 200
-    mint = ((frame[:, :, 0] > 140) & (frame[:, :, 0] < 195)
-            & (frame[:, :, 1] > 215) & (frame[:, :, 2] > 175))
+    assert 70 <= title_y.min() < 150
+    mint = ((frame[:, :, 0] > 220) & (frame[:, :, 1] > 195) & (frame[:, :, 2] < 90))
     mint_y, _ = np.where(mint)
     assert len(mint_y) > 100
     assert mint_y.min() > title_y.max()
-    assert 40 < ys.min() - mint_y.max() < 100
+    assert 15 < ys.min() - mint_y.max() < 70
     assert abs((title_x.min() + title_x.max()) / 2 - 540) < 8
 
 
@@ -147,13 +146,15 @@ def test_line_colors_follow_displayed_rows(worker, first, other):
     assert len(first_y) > 100 and len(other_y) > 100
     assert first_y.max() < other_y.min()
     assert other_y.max() - other_y.min() > 100
+    assert first_y.min() >= 20
+    assert other_y.max() < image.shape[0] - 20
 
 
 def test_wrapped_lines_use_secondary_color(worker):
     image = worker._title_image('A long title about the most beautiful countries in Europe', 936)
     alpha = image[:, :, 3] > 240
     assert np.any(np.all(image[:, :, :3] == (255, 255, 255), axis=2) & alpha)
-    assert np.any(np.all(image[:, :, :3] == (167, 243, 208), axis=2) & alpha)
+    assert np.any(np.all(image[:, :, :3] == (255, 231, 53), axis=2) & alpha)
 
 
 @pytest.mark.parametrize('field', ['title_first_line_color', 'title_other_lines_color'])
@@ -172,10 +173,67 @@ def test_preview_and_clip_share_custom_colors(worker):
         'video_title': 'First\nSecond', **colors,
     })
     assert response.status_code == 200
-    expected = worker._title_image('First\nSecond', 936,
+    expected = worker._title_image('First\nSecond', 1040,
                                   first_line_color='#ff6600', other_lines_color='#3366ff')
     np.testing.assert_array_equal(np.array(Image.open(io.BytesIO(response.data))), expected)
-    clip = worker._build_title_clip('First\nSecond', 1, 936,
+    clip = worker._build_title_clip('First\nSecond', 1, 1040,
                                     first_line_color='#ff6600', other_lines_color='#3366ff')
     np.testing.assert_array_equal(clip.get_frame(0), expected[:, :, :3])
     clip.close()
+
+
+@pytest.mark.parametrize('effects', [True, False])
+@pytest.mark.parametrize('watermark_font', ['DIN Condensed.ttf', 'Bips.ttf'])
+def test_watermark_preview_uses_rendered_lettering(worker, effects, watermark_font):
+    response = worker.app.test_client().post('/api/video_title_preview', json={
+        'video_title': 'My channel', 'preview_kind': 'watermark',
+        'watermark_text': 'My channel', 'watermark_color': '#a4e9ee',
+        'visual_effects': effects,
+        'title_font': 'arialroundedmtbold.ttf', 'watermark_font': watermark_font,
+    })
+    assert response.status_code == 200
+    font_path = worker._watermark_font_path({'watermark_font': watermark_font})
+    expected = worker._title_image('My channel', 936, font_path=font_path, font_size=96,
+        first_line_color='#a4e9ee', other_lines_color='#a4e9ee', effects=effects, max_height=110)
+    np.testing.assert_array_equal(np.array(Image.open(io.BytesIO(response.data))), expected)
+
+
+def test_branded_render_reserves_footer_and_keeps_logo_transparency(worker, tmp_path):
+    background = tmp_path / 'background.mp4'
+    with ColorClip((180, 320), color=(50, 100, 150), duration=.3) as clip:
+        clip.write_videofile(str(background), fps=30, codec='libx264', logger=None)
+    map_buffer, logo_buffer = io.BytesIO(), io.BytesIO()
+    Image.new('RGBA', (400, 800), (0, 255, 0, 255)).save(map_buffer, format='PNG')
+    logo = Image.new('RGBA', (300, 200), (255, 0, 255, 255))
+    logo.save(logo_buffer, format='PNG')
+    response = worker.app.test_client().post('/api/render_video', json={
+        'map_file': base64.b64encode(map_buffer.getvalue()).decode(),
+        'background_video': base64.b64encode(background.read_bytes()).decode(),
+        'watermark_image': base64.b64encode(logo_buffer.getvalue()).decode(),
+        'video_title': 'Headline\nSecond line', 'watermark_text': 'My channel',
+        'watermark_font': 'Bips.ttf', 'duration': 1,
+    })
+    assert response.status_code == 200, response.json
+    with VideoFileClip(response.json['file_path']) as result:
+        frame = result.get_frame(.1)
+    green_y, _ = np.where((frame[:, :, 1] > 220) & (frame[:, :, 0] < 30))
+    logo_y, logo_x = np.where((frame[:, :, 0] > 220) & (frame[:, :, 2] > 220) & (frame[:, :, 1] < 50))
+    assert green_y.max() < 1451
+    assert 1470 <= logo_y.min() < logo_y.max() < 1701
+    assert abs((logo_x.min() + logo_x.max()) / 2 - 540) < 2
+    # Transparent corners show the background, not an opaque logo rectangle.
+    assert frame[1480, 435, 2] > frame[1480, 435, 0]
+    cyan = (frame[:, :, 0] > 130) & (frame[:, :, 1] > 200) & (frame[:, :, 2] > 200)
+    footer_y, _ = np.where(cyan & (np.indices(cyan.shape)[0] > 1740))
+    assert len(footer_y) > 100 and footer_y.max() < 1900
+
+
+def test_round_logo_center_crop_and_transparency(worker):
+    from PIL import ImageDraw
+
+    original = Image.new('RGBA', (400, 200), 'red')
+    ImageDraw.Draw(original).rectangle((100, 0, 299, 199), fill=(0, 255, 0, 128))
+    logo = np.array(worker._round_watermark(original))
+    assert logo.shape == (230, 230, 4)
+    assert logo[0, 0, 3] == 0 and logo[-1, -1, 3] == 0
+    assert tuple(logo[115, 115]) == (0, 255, 0, 128)

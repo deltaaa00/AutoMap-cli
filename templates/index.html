@@ -925,6 +925,7 @@
     </div>
 
     <!-- Application JavaScript -->
+    <script src="{{ url_for('static', filename='studio-storage.js') }}"></script>
     <script>
         // --- State ---
         let currentZoom = 1;
@@ -1368,7 +1369,13 @@
 
                     metaBadge.textContent = `Generated (${new Date().toLocaleTimeString()})`;
                     addToHistory(state, cmd);
-                    showToast("Map generated successfully!", "success");
+                    try {
+                        const blob = await (await fetch(result.image_url)).blob();
+                        await StudioStorage.setAsset('latest-map', new File([blob], 'generated-map.png', {type: 'image/png'}));
+                        showToast("Map generated! It is ready in Video Studio.", "success");
+                    } catch (error) {
+                        showToast("Map generated, but automatic transfer could not be saved. Download it to use in Video Studio.", "warn");
+                    }
                 } else {
                     // Backend errors use {status:'error', error:'...'}
                     throw new Error(result.error || result.stderr || 'Generation failed');

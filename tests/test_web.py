@@ -129,12 +129,19 @@ def test_render_forwards_title_style_and_legacy_title(web, monkeypatch):
     web.app.test_client().post('/api/render_video', json={
         'title': ' Legacy ', 'title_font': 'Bips.ttf', 'title_font_size': 72,
         'title_first_line_color': '#ff6600', 'title_other_lines_color': '#3366ff',
+        'watermark_image': 'base64-logo', 'watermark_text': 'Channel',
+        'watermark_color': '#a4e9ee', 'visual_effects': False,
+        'watermark_font': 'arialroundedmtbold.ttf',
     })
     assert post.call_args.kwargs['json']['video_title'] == 'Legacy'
     assert post.call_args.kwargs['json']['title_font'] == 'Bips.ttf'
     assert post.call_args.kwargs['json']['title_font_size'] == 72
     assert post.call_args.kwargs['json']['title_first_line_color'] == '#ff6600'
     assert post.call_args.kwargs['json']['title_other_lines_color'] == '#3366ff'
+    assert post.call_args.kwargs['json']['watermark_image'] == 'base64-logo'
+    assert post.call_args.kwargs['json']['watermark_text'] == 'Channel'
+    assert post.call_args.kwargs['json']['watermark_font'] == 'arialroundedmtbold.ttf'
+    assert post.call_args.kwargs['json']['visual_effects'] is False
 
 
 @pytest.mark.parametrize('status', [200, 400])
@@ -179,3 +186,15 @@ def test_video_download_errors(web, monkeypatch, kind):
     monkeypatch.setattr(requests, 'get', get)
     response = web.app.test_client().get('/api/download_video?path=clip.mp4')
     assert response.status_code == (502 if kind == 'network' else 404)
+def test_codec_proxy_returns_worker_capabilities(web, monkeypatch):
+    monkeypatch.setattr(requests, 'get', Mock(return_value=Mock(
+        status_code=200, json=lambda: {'codecs': ['libx264']})))
+    assert web.app.test_client().get('/api/codecs').json == {'codecs': ['libx264']}
+
+
+@pytest.mark.parametrize('failure', [requests.Timeout(), ValueError('bad JSON')])
+def test_codec_proxy_failure(web, monkeypatch, failure):
+    response = Mock()
+    response.json.side_effect = failure
+    monkeypatch.setattr(requests, 'get', Mock(return_value=response))
+    assert web.app.test_client().get('/api/codecs').status_code == 502

@@ -28,6 +28,7 @@ def _numeric_extrema(values):
     """Return region names for finite numeric extrema, or None if absent."""
     numeric = {}
     for name, value in values.items():
+        # bool converts to 0/1 in Python, but is not a numeric measurement here.
         if isinstance(value, bool):
             continue
         try:
@@ -58,7 +59,8 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
       api_key          -- optional Gemini API key (overrides env var for this run)
     """
 
-    _font_cache = {}  # Dictionary with fonts
+    # Reuse font objects across regions that share a label size.
+    _font_cache = {}
 
     def get_font(size):
         key = (font_name, size)
@@ -120,6 +122,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
     img = Image.open(path).convert("RGBA")
     log.info(f"Base map size: {img.size[0]}x{img.size[1]}")
 
+    # Keep labels separate so later flood fills and overlays cannot paint over them.
     text_layer = Image.new("RGBA", img.size, (255, 255, 255, 0))
     draw = ImageDraw.Draw(text_layer)
 
@@ -193,6 +196,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             except KeyError:
                 if map_type == 'default' or map_type == 'world':
                     log.info(f"No filling color for '{info}'; using random")
+                    # Repeated answers share a color so categories remain recognizable.
                     try:
                         color = random_colors[info]
                     except KeyError:
@@ -206,9 +210,11 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
         log.info(f"[{index}/{total}] Painting {name} -> {info}")
 
-        # filling
+        # Flag maps retain their original artwork. Other maps use every seed point
+        # to fill disconnected pieces of a region, such as islands.
         if map_type == 'default' or map_type == 'world':
             for coord in points:
+                # Tolerances are tuned to the shading in the source map images.
                 if name == "south_America":
                     thresh = 15
                 elif name == "asia":
@@ -218,6 +224,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
                 ImageDraw.floodfill(img, xy=coord, value=color, thresh=thresh)
 
+        # The first fill seed also anchors the region's single label.
         x, y = points[0]
 
         info = str(info)
@@ -299,13 +306,14 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         relief = Image.open(Path(__file__).parent.parent / "./resources/maps/map_relief.png").convert("RGBA")
         relief = relief.resize(img.size)
 
+        # Reduce relief opacity to preserve the generated region colors beneath it.
         r, g, b, a = relief.split()
         new_alpha = a.point(lambda p: int(p * 0.3))
         relief.putalpha(new_alpha)
 
         result = Image.alpha_composite(img, relief)
 
-        # Second borders layer
+        # Restore borders above the relief, then put readable labels on top.
         borders = Image.open(
             Path(__file__).parent.parent / "./resources/maps/default_map_blured.png"
         ).convert("RGBA")
@@ -327,10 +335,11 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
 
     if io_res:
-        # FOR WEB
+        # Return an in-memory PNG for the web API instead of writing result.png.
 
         buffer = io.BytesIO()
         result.save(buffer, format='PNG')
+        # Consumers should be able to read the PNG from its first byte.
         buffer.seek(0)
 
         return buffer

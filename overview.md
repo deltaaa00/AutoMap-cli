@@ -56,12 +56,14 @@ Set `GEMINI_API_KEY` in the environment or a local `.env` file. The CLI accepts
 ```sh
 python cli.py make "Population of European countries" -m number -mp default
 python main.py
+python -m pip install -r requirements-test.txt
 python -m pytest -q
 ```
 
 `pip install -e .` exposes the `automap` command. Dependencies are declared in both
-`requirements.txt` and `pyproject.toml`; their lists and constraints currently
-differ, so inspect both when changing dependencies. The existing test checks JSON
+`requirements.txt` and `pyproject.toml`; keep their runtime lists and constraints
+in sync. `requirements-test.txt` includes runtime dependencies plus test tools.
+The existing test checks JSON
 parsing using local fixtures and does not call Gemini. Map generation requires a
 working key; media operations require additional tools and integration checks.
 

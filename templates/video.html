@@ -138,7 +138,12 @@
         }
 
         .stage-scrim {
-            background: linear-gradient(to bottom, rgba(0,0,0,.65), rgba(0,0,0,.27) 50%, rgba(0,0,0,.65));
+            background: linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,.10) 50%, rgba(0,0,0,.35));
+        }
+        #stageBgPreview { transform: scale(1.02); }
+        .video-preview-stage.effects-on #stageBgPreview { filter: blur(2.5px); }
+        .effects-on #stageMapPreview, .effects-on #stageWatermarkImage {
+            filter: drop-shadow(0 8px 10px rgba(0,0,0,.8));
         }
 
         #stageCompositeBox {
@@ -148,16 +153,37 @@
             height: 1920px;
             transform-origin: top left;
             justify-content: flex-start;
-            gap: 48px;
-            padding: 120px 36px 160px;
+            gap: 16px;
+            padding: 70px 20px 160px;
         }
+        #stageCompositeBox.has-branding { padding-bottom: 470px; }
 
         #stageTitleBanner {
-            width: 936px;
+            width: 1040px;
             flex: none;
         }
 
-        #stageTitleBanner img { display: block; width: 936px; }
+        #stageTitleBanner img { display: block; width: 1040px; }
+        #stageWatermarkImage {
+            position: absolute; left: 50%; top: 1470px;
+            width: 230px; height: 230px; object-fit: cover; border-radius: 50%; transform: translateX(-50%);
+        }
+        #watermarkThumbPreview {
+            width: 88px; height: 88px; object-fit: cover; border-radius: 50%;
+            border: 2px solid #34d399; margin: 0 auto 10px;
+            background: repeating-conic-gradient(#334155 0% 25%, #1e293b 0% 50%) 50% / 16px 16px;
+        }
+        #watermarkDropzone.has-logo { border-style: solid; border-color: #34d399; }
+        #stageWatermarkText { position: absolute; left: 72px; top: 1740px; width: 936px; }
+        #stageWatermarkText img { display: block; width: 936px; }
+        #watermarkDropzone {
+            padding: 16px; border: 2px dashed #475569; border-radius: 12px;
+            cursor: pointer; text-align: center; transition: border-color .15s, background .15s;
+        }
+        #watermarkDropzone.drag-active, #watermarkDropzone:focus-visible {
+            border-color: #34d399; background: rgba(52, 211, 153, .1); outline: none;
+        }
+        .codec-card:disabled { opacity: .4; cursor: not-allowed; }
         #stageMapArea {
             display: flex;
             flex: 1;
@@ -642,11 +668,11 @@
 
                     </div>
 
-                    <!-- TITLE OVERLAY & HARDWARE CODEC SELECTOR (2-Column Grid) -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Separate title and watermark panels, followed by compact codec controls. -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 items-start gap-4">
 
                         <!-- Video Title Banner Input -->
-                        <div class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 flex flex-col justify-between gap-2.5">
+                        <div id="titlePanel" class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 flex flex-col gap-2.5">
                             <div>
                                 <div class="flex items-center justify-between mb-2">
                                     <label for="videoTitleInput" class="text-xs font-semibold text-slate-200 flex items-center gap-2">
@@ -678,7 +704,7 @@
                                     <input id="titleFirstLineColor" type="color" value="#ffffff" oninput="updateTitleStyle()" class="mt-1 block w-full h-9 p-1 bg-slate-950 border border-slate-700 rounded-lg cursor-pointer">
                                 </label>
                                 <label for="titleOtherLinesColor" class="text-xs text-slate-300">Lower lines
-                                    <input id="titleOtherLinesColor" type="color" value="#a7f3d0" oninput="updateTitleStyle()" class="mt-1 block w-full h-9 p-1 bg-slate-950 border border-slate-700 rounded-lg cursor-pointer">
+                                    <input id="titleOtherLinesColor" type="color" value="#ffe735" oninput="updateTitleStyle()" class="mt-1 block w-full h-9 p-1 bg-slate-950 border border-slate-700 rounded-lg cursor-pointer">
                                 </label>
                             </div>
                             <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1 gap-2">
@@ -687,11 +713,49 @@
                             </div>
                             <p class="text-[10px] text-slate-500">Size at 1080×1920. Long titles shrink automatically to fit.</p>
                             <p class="text-[10px] text-slate-500">Enter starts a new line. Colors also apply to automatically wrapped lines.</p>
+                            <p class="text-[10px] text-slate-500">Headlines use uppercase lettering for the reference layout.</p>
+                            <label class="flex items-center gap-2 text-xs text-slate-300">
+                                <input id="visualEffects" type="checkbox" checked onchange="updateVisualEffects()" class="accent-emerald-400">
+                                Bold text outline, soft shadows &amp; background blur
+                            </label>
                             <p id="titlePreviewStatus" role="status" aria-live="polite" class="text-[11px] text-slate-400"></p>
                         </div>
 
+                        <!-- Watermark image and text controls -->
+                        <div id="watermarkPanel" class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 flex flex-col gap-3">
+                                <h3 class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                    <i class="fa-solid fa-stamp text-emerald-400"></i> Watermark
+                                    <span class="ml-auto text-[10px] font-normal text-slate-500">Optional</span>
+                                </h3>
+                                <div id="watermarkDropzone" role="button" tabindex="0" aria-label="Upload watermark image" aria-describedby="watermarkUploadHint">
+                                    <img id="watermarkThumbPreview" alt="Selected watermark logo" class="hidden">
+                                    <p id="watermarkUploadPrompt" class="text-xs text-slate-200">Drop your watermark image here, or click to browse</p>
+                                    <p id="watermarkUploadHint" class="mt-1 text-[10px] text-slate-500">PNG, JPEG or WebP · up to 10 MB</p>
+                                </div>
+                                <input id="watermarkFileInput" type="file" accept="image/png,image/jpeg,image/webp" onchange="selectWatermark(this.files[0])" class="hidden">
+                                <div class="flex items-center justify-between gap-2 text-[11px]">
+                                    <span id="watermarkFileName" class="text-xs font-medium text-slate-200 truncate">No logo selected</span>
+                                    <button type="button" onclick="clearWatermarkImage()" class="text-emerald-400">Remove logo</button>
+                                </div>
+                                <label class="block text-xs text-slate-300" for="watermarkTextInput">Watermark text
+                                    <input id="watermarkTextInput" type="text" maxlength="80" placeholder="YOUR CHANNEL" oninput="updateWatermarkPreview()" class="mt-1 w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white">
+                                </label>
+                                <label class="block text-xs text-slate-300" for="watermarkFontSelect">Watermark text font
+                                    <select id="watermarkFontSelect" onchange="updateWatermarkPreview()" class="mt-1 w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white">
+                                        {% for font in title_fonts %}
+                                        <option value="{{ font }}" {% if font == 'DIN Condensed.ttf' %}selected{% endif %}>{{ font.rsplit('.', 1)[0] }}{% if font in ['kodchasan.ttf', 'arialroundedmtbold.ttf'] %} (Latin){% endif %}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <label class="block text-xs text-slate-300" for="watermarkColor">Text color
+                                    <input id="watermarkColor" type="color" value="#a4e9ee" oninput="updateWatermarkPreview()" class="mt-1 block w-full h-9 p-1 bg-slate-950 border border-slate-700 rounded-lg">
+                                </label>
+                                <p class="text-[10px] text-slate-500">Your logo is center-cropped to a circle below the map. Watermark text uses its own font near the bottom.</p>
+                                <p id="watermarkPreviewStatus" role="status" aria-live="polite" class="text-[11px] text-slate-400"></p>
+                        </div>
+
                         <!-- Codec Selection (Synced Visual Cards + Original Select) -->
-                        <div class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 flex flex-col justify-between gap-2.5">
+                        <div id="codecPanel" class="md:col-span-2 self-start p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 flex flex-col gap-3">
                             <div class="flex items-center justify-between">
                                 <label for="codecSelect" class="text-xs font-semibold text-slate-200 flex items-center gap-2">
                                     <span class="w-5 h-5 rounded-md bg-sky-500/20 border border-sky-500/40 text-sky-300 font-mono text-[10px] font-bold flex items-center justify-center">F4</span>
@@ -701,8 +765,8 @@
                                 <select id="codecSelect" onchange="syncCodecCards(this.value)"
                                     class="px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-sky-300 focus:outline-none focus:border-sky-500 transition">
                                     <option value="libx264" selected>libx264</option>
-                                    <option value="h264_nvenc">h264_nvenc</option>
-                                    <option value="h264_videotoolbox">h264_videotoolbox</option>
+                                    <option value="h264_nvenc" disabled>h264_nvenc</option>
+                                    <option value="h264_videotoolbox" disabled>h264_videotoolbox</option>
                                 </select>
                             </div>
 
@@ -716,7 +780,7 @@
                                     </div>
                                     <div class="text-[10px] text-slate-400 mt-0.5 truncate">Universal CPU</div>
                                 </button>
-                                <button type="button" data-codec="h264_nvenc" onclick="selectCodecCard('h264_nvenc')"
+                                <button type="button" data-codec="h264_nvenc" disabled onclick="selectCodecCard('h264_nvenc')"
                                     class="codec-card p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 text-left transition">
                                     <div class="flex items-center justify-between">
                                         <span class="text-[11px] font-mono font-bold text-slate-200">nvenc</span>
@@ -724,7 +788,7 @@
                                     </div>
                                     <div class="text-[10px] text-slate-400 mt-0.5 truncate">NVIDIA GPU</div>
                                 </button>
-                                <button type="button" data-codec="h264_videotoolbox" onclick="selectCodecCard('h264_videotoolbox')"
+                                <button type="button" data-codec="h264_videotoolbox" disabled onclick="selectCodecCard('h264_videotoolbox')"
                                     class="codec-card p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 text-left transition">
                                     <div class="flex items-center justify-between">
                                         <span class="text-[11px] font-mono font-bold text-slate-200">videotoolbox</span>
@@ -733,6 +797,8 @@
                                     <div class="text-[10px] text-slate-400 mt-0.5 truncate">Apple Silicon</div>
                                 </button>
                             </div>
+                            <p id="codecStatus" role="status" aria-live="polite" class="text-[11px] text-slate-400">Checking encoders on the render worker…</p>
+                            <p id="studioSaveStatus" role="status" class="text-[11px] text-slate-500">Settings and selected files are saved automatically on this device.</p>
                         </div>
 
                     </div>
@@ -755,7 +821,7 @@
                         </div>
 
                         <!-- Stage Screen -->
-                        <div class="video-preview-stage relative z-10 mx-auto rounded-xl bg-slate-950 border border-slate-800/90 shadow-2xl overflow-hidden flex items-center justify-center">
+                        <div class="video-preview-stage effects-on relative z-10 mx-auto rounded-xl bg-slate-950 border border-slate-800/90 shadow-2xl overflow-hidden flex items-center justify-center">
                             <!-- Background video live preview (when user selects bgFileInput) -->
                             <video id="stageBgPreview" class="hidden absolute inset-0 w-full h-full object-cover" muted loop playsinline></video>
                             <div class="stage-scrim absolute inset-0 pointer-events-none"></div>
@@ -773,8 +839,11 @@
                                         <p class="text-[10px] font-mono text-slate-600">Rendered MP4 will appear here for instant cinema playback</p>
                                     </div>
                                 </div>
+                                <img id="stageWatermarkImage" alt="Watermark logo preview" class="hidden">
+                                <div id="stageWatermarkText" class="hidden"></div>
                             </div>
 
+                            <!-- Watermarks share the same 1080×1920 coordinate space as the map. -->
                             <!-- Rendered Final Video Player (revealed when /api/render_video succeeds) -->
                             <video id="renderedVideoPlayer" class="hidden absolute inset-0 z-20 w-full h-full object-contain bg-black" controls playsinline></video>
                         </div>
@@ -846,7 +915,107 @@
     </div>
 
     <!-- Application JavaScript -->
+    <script src="{{ url_for('static', filename='studio-storage.js') }}"></script>
     <script>
+        const VIDEO_SETTINGS_KEY = 'automap_video_settings_v1';
+        const VIDEO_SETTING_IDS = ['musicUrlInput', 'cutStartInput', 'cutDurationInput',
+            'videoTitleInput', 'titleFontSelect', 'titleFontSize', 'titleFirstLineColor',
+            'titleOtherLinesColor', 'visualEffects', 'watermarkTextInput',
+            'watermarkFontSelect', 'watermarkColor', 'codecSelect'];
+        let videoSettingsReady = false;
+        const materialVersions = {mapFileInput: 0, bgFileInput: 0};
+        let pendingAssetSaves = Promise.resolve();
+
+        function saveVideoSettings() {
+            if (!videoSettingsReady) return;
+            const values = Object.fromEntries(VIDEO_SETTING_IDS.map(id => {
+                const input = document.getElementById(id);
+                return [id, input.type === 'checkbox' ? input.checked : input.value];
+            }));
+            try {
+                localStorage.setItem(VIDEO_SETTINGS_KEY, JSON.stringify(values));
+            } catch (error) {
+                document.getElementById('studioSaveStatus').textContent = 'Settings cannot be saved in this browser.';
+            }
+        }
+
+        function rememberVideoAsset(key, file) {
+            // Serialize writes so a removal cannot be overtaken by an earlier upload.
+            pendingAssetSaves = pendingAssetSaves.then(() => StudioStorage.setAsset(key, file)).catch(() => {
+                document.getElementById('studioSaveStatus').textContent = 'Some files could not be saved. You can still render this video.';
+            });
+            return pendingAssetSaves;
+        }
+
+        async function restoreVideoStudio() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(VIDEO_SETTINGS_KEY) || '{}');
+                if (saved && typeof saved === 'object') {
+                    VIDEO_SETTING_IDS.forEach(id => {
+                        const input = document.getElementById(id);
+                        const value = saved[id];
+                        if (input.type === 'checkbox') {
+                            if (typeof value === 'boolean') input.checked = value;
+                        } else if (typeof value === 'string') {
+                            if (input.tagName === 'SELECT' && ![...input.options].some(option => option.value === value)) return;
+                            input.value = input.maxLength > 0 ? value.slice(0, input.maxLength) : value;
+                        }
+                    });
+                }
+            } catch (error) {
+                // Invalid or unavailable saved settings should not prevent opening the studio.
+            }
+            videoSettingsReady = true;
+            setCutDuration(document.getElementById('cutDurationInput').value);
+            updateVisualEffects();
+            try {
+                const [latest, selected, background, logo] = await Promise.all([
+                    StudioStorage.getAsset('latest-map'), StudioStorage.getAsset('video-map'),
+                    StudioStorage.getAsset('video-background'), StudioStorage.getAsset('video-watermark'),
+                ]);
+                // A newer generated map wins. A manually selected or removed map
+                // remains the user's choice until another map is generated.
+                const map = latest && (!selected || latest.updatedAt > selected.updatedAt) ? latest : selected;
+                if (map?.file && materialVersions.mapFileInput === 0) {
+                    const file = map === latest ? await prepareGeneratedMap(map.file) : map.file;
+                    if (materialVersions.mapFileInput === 0) {
+                        acceptFile('mapFileInput', file, map === latest);
+                    }
+                }
+                if (background?.file && materialVersions.bgFileInput === 0) {
+                    acceptFile('bgFileInput', background.file, false);
+                }
+                if (logo?.file && watermarkUploadVersion === 0) await selectWatermark(logo.file, false);
+            } catch (error) {
+                document.getElementById('studioSaveStatus').textContent = 'Saved files could not be restored. You can upload them again.';
+            }
+        }
+
+        async function prepareGeneratedMap(file) {
+            if (file.size <= MAX_MATERIAL_BYTES) return file;
+            // Full-resolution generated PNGs can exceed the video upload limit.
+            // Keep the original in Map Studio and resize only the video copy.
+            const url = URL.createObjectURL(file);
+            try {
+                const image = new Image();
+                image.src = url;
+                await image.decode();
+                const canvas = document.createElement('canvas');
+                let scale = Math.min(1, 2160 / Math.max(image.naturalWidth, image.naturalHeight));
+                let blob;
+                do {
+                    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+                    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+                    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+                    blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                    if (!blob) throw new Error('Could not prepare generated map.');
+                    scale *= .75;
+                } while (blob.size > MAX_MATERIAL_BYTES);
+                return new File([blob], file.name, {type: 'image/png', lastModified: file.lastModified});
+            } finally {
+                URL.revokeObjectURL(url);
+            }
+        }
         // --- Music Downloader ---
         let musicDataUrl = null;   // populated with data:audio/mpeg;base64,... from the API
         let musicFileName = 'music_automap';  // filename stem taken from the API "title" field
@@ -1086,6 +1255,7 @@
             });
 
             updateCutRangePreview();
+            saveVideoSettings();
         }
 
         // Parse "MM:SS" (or a bare number of seconds) into total seconds. Returns null if invalid.
@@ -1117,6 +1287,7 @@
             if (!input) return;
             input.value = timecode;
             onCutStartInput(input);
+            saveVideoSettings();
         }
 
         // Lightweight input mask: keep digits and a single colon, auto-insert colon.
@@ -1343,6 +1514,7 @@
                 title_font_size: Number(document.getElementById('titleFontSize').value),
                 title_first_line_color: document.getElementById('titleFirstLineColor').value,
                 title_other_lines_color: document.getElementById('titleOtherLinesColor').value,
+                visual_effects: document.getElementById('visualEffects').checked,
             };
         }
 
@@ -1376,14 +1548,154 @@
         function updateTitleStyle() {
             document.getElementById('titleFontSizeValue').textContent = `${titleSettings().title_font_size} px`;
             updateStageTitlePreview(document.getElementById('videoTitleInput').value);
+            updateWatermarkPreview();
+            saveVideoSettings();
         }
 
         function resetTitleStyle() {
             document.getElementById('titleFontSelect').value = 'DIN Condensed.ttf';
             document.getElementById('titleFontSize').value = '100';
             document.getElementById('titleFirstLineColor').value = '#ffffff';
-            document.getElementById('titleOtherLinesColor').value = '#a7f3d0';
+            document.getElementById('titleOtherLinesColor').value = '#ffe735';
             updateTitleStyle();
+        }
+
+        let watermarkFile = null;
+        let watermarkImageUrl;
+        let watermarkTextUrl;
+        let watermarkPreviewTimer;
+        let watermarkPreviewRequest;
+        let watermarkPreviewVersion = 0;
+        let watermarkUploadVersion = 0;
+
+        function watermarkSettings() {
+            return {
+                watermark_text: document.getElementById('watermarkTextInput').value.trim(),
+                watermark_color: document.getElementById('watermarkColor').value,
+                watermark_font: document.getElementById('watermarkFontSelect').value,
+            };
+        }
+
+        function syncBrandingLayout() {
+            document.getElementById('stageCompositeBox').classList.toggle('has-branding',
+                Boolean(watermarkFile || watermarkSettings().watermark_text));
+            fitStageMap();
+        }
+
+        function updateVisualEffects() {
+            document.querySelector('.video-preview-stage').classList.toggle('effects-on',
+                document.getElementById('visualEffects').checked);
+            updateTitleStyle();
+        }
+
+        function clearWatermarkImage(persist = true) {
+            watermarkUploadVersion++;
+            watermarkFile = null;
+            document.getElementById('watermarkFileInput').value = '';
+            document.getElementById('watermarkFileName').textContent = 'No logo selected';
+            const image = document.getElementById('stageWatermarkImage');
+            image.removeAttribute('src');
+            image.classList.add('hidden');
+            const thumbnail = document.getElementById('watermarkThumbPreview');
+            thumbnail.removeAttribute('src');
+            thumbnail.classList.add('hidden');
+            document.getElementById('watermarkDropzone').classList.remove('has-logo');
+            document.getElementById('watermarkUploadPrompt').textContent = 'Drop your watermark image here, or click to browse';
+            if (watermarkImageUrl) URL.revokeObjectURL(watermarkImageUrl);
+            watermarkImageUrl = null;
+            showLiveComposite();
+            syncBrandingLayout();
+            if (persist) rememberVideoAsset('video-watermark', null);
+        }
+
+        async function selectWatermark(file, persist = true) {
+            const input = document.getElementById('watermarkFileInput');
+            const version = ++watermarkUploadVersion;
+            if (!file) return;
+            if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > MAX_MATERIAL_BYTES) {
+                showToast('Choose a PNG, JPEG or WebP logo up to 10 MB.', 'error');
+                input.value = '';
+                return;
+            }
+            const url = URL.createObjectURL(file);
+            const probe = new Image();
+            probe.src = url;
+            try {
+                await probe.decode();
+                if (probe.naturalWidth * probe.naturalHeight > 20000000) throw new Error('Logo is too large.');
+                // Ignore a decode that finished after a different selection or removal.
+                if (version !== watermarkUploadVersion) { URL.revokeObjectURL(url); return; }
+                clearWatermarkImage(false);
+                watermarkFile = file;
+                watermarkImageUrl = url;
+                document.getElementById('watermarkFileName').textContent = file.name;
+                const image = document.getElementById('stageWatermarkImage');
+                image.src = url;
+                image.classList.remove('hidden');
+                const thumbnail = document.getElementById('watermarkThumbPreview');
+                thumbnail.src = url;
+                thumbnail.classList.remove('hidden');
+                document.getElementById('watermarkDropzone').classList.add('has-logo');
+                document.getElementById('watermarkUploadPrompt').textContent = 'Logo selected · drop or click to replace';
+                syncBrandingLayout();
+                if (persist) rememberVideoAsset('video-watermark', file);
+            } catch (error) {
+                URL.revokeObjectURL(url);
+                if (version !== watermarkUploadVersion) return;
+                input.value = '';
+                showToast('Choose a valid logo image up to 20 megapixels.', 'error');
+            }
+        }
+
+        function updateWatermarkPreview() {
+            const settings = watermarkSettings();
+            const banner = document.getElementById('stageWatermarkText');
+            const status = document.getElementById('watermarkPreviewStatus');
+            clearTimeout(watermarkPreviewTimer);
+            if (watermarkPreviewRequest) watermarkPreviewRequest.abort();
+            const version = ++watermarkPreviewVersion;
+            showLiveComposite();
+            syncBrandingLayout();
+            if (!settings.watermark_text) {
+                banner.replaceChildren();
+                banner.classList.add('hidden');
+                if (watermarkTextUrl) URL.revokeObjectURL(watermarkTextUrl);
+                watermarkTextUrl = null;
+                status.textContent = '';
+                return;
+            }
+            status.textContent = 'Updating watermark…';
+            watermarkPreviewTimer = setTimeout(async () => {
+                const controller = new AbortController();
+                watermarkPreviewRequest = controller;
+                let url;
+                try {
+                    const response = await fetch('/api/video_title_preview', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        signal: controller.signal,
+                        body: JSON.stringify({video_title: settings.watermark_text,
+                            preview_kind: 'watermark', ...titleSettings(), ...settings}),
+                    });
+                    if (!response.ok) throw new Error((await response.json()).error || 'Watermark preview unavailable.');
+                    url = URL.createObjectURL(await response.blob());
+                    const image = new Image();
+                    image.alt = settings.watermark_text;
+                    image.src = url;
+                    await image.decode();
+                    if (version !== watermarkPreviewVersion) { URL.revokeObjectURL(url); return; }
+                    banner.replaceChildren(image);
+                    banner.classList.remove('hidden');
+                    if (watermarkTextUrl) URL.revokeObjectURL(watermarkTextUrl);
+                    watermarkTextUrl = url;
+                    status.textContent = 'Preview matches rendered watermark';
+                } catch (error) {
+                    if (url) URL.revokeObjectURL(url);
+                    if (version === watermarkPreviewVersion && error.name !== 'AbortError') {
+                        status.textContent = error.message;
+                        banner.classList.add('hidden');
+                    }
+                }
+            }, 180);
         }
 
         function updateStageTitlePreview(val) {
@@ -1446,28 +1758,76 @@
 
         function selectCodecCard(codec) {
             const select = document.getElementById('codecSelect');
-            if (select) {
+            if (select && availableCodecs.includes(codec)) {
                 select.value = codec;
                 syncCodecCards(codec);
             }
         }
 
         function syncCodecCards(codec) {
+            const select = document.getElementById('codecSelect');
+            if (!availableCodecs.includes(codec)) codec = availableCodecs[0] || '';
+            select.value = codec;
             const badge = document.getElementById('stageCodecBadge');
-            if (badge) badge.textContent = codec;
+            if (badge) badge.textContent = codec || 'Unavailable';
             document.querySelectorAll('.codec-card').forEach((card) => {
                 const isMatch = card.dataset.codec === codec;
+                card.setAttribute('aria-pressed', String(isMatch));
                 if (isMatch) {
                     card.className = 'codec-card p-2 rounded-xl border border-sky-500/50 bg-sky-500/10 text-left transition';
                 } else {
                     card.className = 'codec-card p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 text-left transition';
                 }
             });
+            saveVideoSettings();
         }
 
         // --- Render Video ---
         const MAX_MATERIAL_BYTES = 10 * 1024 * 1024;  // 10 MB per input file
         const ALLOWED_CODECS = ['libx264', 'h264_nvenc', 'h264_videotoolbox'];
+        let availableCodecs = ['libx264'];
+
+        async function loadCodecs() {
+            const status = document.getElementById('codecStatus');
+            try {
+                const response = await fetch('/api/codecs');
+                const result = await response.json();
+                if (!response.ok || !Array.isArray(result.codecs)) throw new Error('Codec check failed.');
+                availableCodecs = ALLOWED_CODECS.filter(codec => result.codecs.includes(codec));
+                status.textContent = availableCodecs.length
+                    ? `Available on render worker: ${availableCodecs.join(', ')}. Disabled encoders are unavailable here.`
+                    : 'No usable encoders found on the render worker.';
+            } catch (error) {
+                availableCodecs = ['libx264'];
+                status.textContent = 'Could not check encoders. Using libx264 (CPU).';
+            }
+            document.querySelectorAll('#codecSelect option, .codec-card').forEach(element => {
+                const codec = element.dataset.codec || element.value;
+                element.disabled = !availableCodecs.includes(codec);
+                element.title = element.disabled ? 'Unavailable on the render worker' : '';
+            });
+            syncCodecCards(document.getElementById('codecSelect').value);
+        }
+
+        function setupWatermarkDropzone() {
+            const zone = document.getElementById('watermarkDropzone');
+            const input = document.getElementById('watermarkFileInput');
+            zone.addEventListener('click', () => input.click());
+            zone.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    input.click();
+                }
+            });
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(name => {
+                zone.addEventListener(name, event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    zone.classList.toggle('drag-active', name === 'dragenter' || name === 'dragover');
+                    if (name === 'drop') selectWatermark(event.dataTransfer?.files[0]);
+                });
+            });
+        }
 
         // Selected files for the render, keyed by input id.
         const renderFiles = { mapFileInput: null, bgFileInput: null };
@@ -1526,7 +1886,8 @@
             }
         }
 
-        function acceptFile(inputId, file) {
+        function acceptFile(inputId, file, persist = true) {
+            materialVersions[inputId]++;
             // Size guard: reject material files larger than 10 MB.
             if (file.size > MAX_MATERIAL_BYTES) {
                 showToast(`${file.name} is ${humanSize(file.size)} — max allowed is 10 MB.`, 'error');
@@ -1554,11 +1915,13 @@
 
             // Update live Cinema Stage preview
             updateCinemaStagePreview(inputId, file);
+            if (persist) rememberVideoAsset(inputId === 'mapFileInput' ? 'video-map' : 'video-background', file);
 
             logToConsole(`[File] Selected ${file.name} (${humanSize(file.size)})`, 'info');
         }
 
         function resetDropzone(inputId) {
+            materialVersions[inputId]++;
             renderFiles[inputId] = null;
             const input = document.getElementById(inputId);
             if (input) input.value = '';
@@ -1570,6 +1933,7 @@
             filled.classList.remove('flex');
 
             updateCinemaStagePreview(inputId, null);
+            rememberVideoAsset(inputId === 'mapFileInput' ? 'video-map' : 'video-background', null);
         }
 
         function updateCinemaStagePreview(inputId, file) {
@@ -1664,8 +2028,8 @@
                 document.getElementById('videoTitleInput').focus();
                 return;
             }
-            if (!ALLOWED_CODECS.includes(codec)) {
-                showToast("Unsupported codec selected.", 'error');
+            if (!availableCodecs.includes(codec)) {
+                showToast("Select an available render worker codec.", 'error');
                 return;
             }
             // Final size double-check before uploading.
@@ -1686,7 +2050,10 @@
 
             try {
                 // Encode both materials as base64 data URLs.
-                const [mapB64, bgB64] = await Promise.all([fileToDataUrl(mapFile), fileToDataUrl(bgFile)]);
+                const [mapB64, bgB64, watermarkB64] = await Promise.all([
+                    fileToDataUrl(mapFile), fileToDataUrl(bgFile),
+                    watermarkFile ? fileToDataUrl(watermarkFile) : '',
+                ]);
 
                 // Everything (files as base64 + user args + selected duration) goes in a single JSON body.
                 const payload = {
@@ -1696,6 +2063,8 @@
                     codec: codec,
                     duration: parseInt(durationSecs, 10),
                     ...titleSettings(),
+                    ...watermarkSettings(),
+                    watermark_image: watermarkB64,
                 };
 
                 const response = await fetch('/api/render_video', {
@@ -1776,6 +2145,12 @@
         document.addEventListener('DOMContentLoaded', () => {
             setupDropzone('mapDropzone');
             setupDropzone('bgDropzone');
+            setupWatermarkDropzone();
+            window.videoStudioReady = restoreVideoStudio();
+            loadCodecs();
+            ['input', 'change'].forEach(name => document.addEventListener(name, event => {
+                if (VIDEO_SETTING_IDS.includes(event.target.id)) saveVideoSettings();
+            }));
             const stage = document.querySelector('.video-preview-stage');
             const composite = document.getElementById('stageCompositeBox');
             new ResizeObserver(() => {
@@ -1791,9 +2166,13 @@
                 // Keep blob URLs alive when the browser caches this page for Back.
                 if (event.persisted) return;
                 if (titlePreviewRequest) titlePreviewRequest.abort();
+                if (watermarkPreviewRequest) watermarkPreviewRequest.abort();
                 clearTimeout(titlePreviewTimer);
+                clearTimeout(watermarkPreviewTimer);
                 Object.values(materialPreviewUrls).forEach(url => url && URL.revokeObjectURL(url));
                 if (titlePreviewUrl) URL.revokeObjectURL(titlePreviewUrl);
+                if (watermarkImageUrl) URL.revokeObjectURL(watermarkImageUrl);
+                if (watermarkTextUrl) URL.revokeObjectURL(watermarkTextUrl);
             });
         });
 
