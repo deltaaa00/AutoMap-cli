@@ -540,14 +540,18 @@
                     <!-- Color Filling Studio Quick Preview Bar -->
                     <div class="p-3 rounded-xl bg-slate-950/75 border border-slate-800/90 flex items-center justify-between gap-3">
                         <div class="min-w-0">
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs font-semibold text-slate-200">Color Filling Rules</span>
-                                <span id="fillingSummaryBadge" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">6 rules</span>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-xs font-semibold text-slate-200">Color &amp; Label Style</span>
+                                <span id="fillingSummaryBadge" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Auto-Detect ON</span>
                             </div>
-                            <p class="text-[11px] text-slate-400 truncate mt-0.5">Configure <code class="text-slate-300">filling_txt</code> &amp; <code class="text-slate-300">filling_num</code> swatches</p>
+                            <p id="fillingSidebarSubtext" class="text-[11px] text-slate-400 truncate mt-0.5">Auto-detects map numbers/words, palette &amp; text style</p>
                         </div>
-                        <div class="flex items-center gap-2 shrink-0">
+                        <div class="flex items-center gap-1.5 shrink-0">
                             <div id="miniSwatchPreview" class="flex -space-x-1.5"></div>
+                            <button type="button" id="quickAutoDetectBtn" onclick="autoDetectMapColorsAndStyle(false)" class="px-2 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition flex items-center gap-1" title="Inspect current map / topic and auto-generate colors &amp; style">
+                                <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+                                <span>Auto</span>
+                            </button>
                             <button type="button" onclick="openFillingStudio()" class="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-indigo-600/20 text-indigo-300 border border-slate-700 hover:border-indigo-500/50 text-xs font-medium transition">
                                 Customize
                             </button>
@@ -841,79 +845,174 @@
             </div>
 
             <!-- Modal Body -->
-            <div class="p-6 overflow-y-auto grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
-                <!-- Left 7 Cols: Rule Builders -->
-                <div class="lg:col-span-7 space-y-6">
-                    <!-- Section A: filling_txt -->
-                    <div class="bg-slate-950/70 border border-slate-800/90 rounded-xl p-4">
-                        <div class="flex items-center justify-between mb-3">
+            <div class="p-6 overflow-y-auto flex flex-col gap-5 flex-1">
+                <!-- Smart Map Inspector & Auto-Style Control Bar -->
+                <div id="smartMapInspectorPanel" class="bg-gradient-to-r from-indigo-950/70 via-slate-900/90 to-purple-950/60 border border-indigo-500/35 rounded-xl p-4 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                            <input type="checkbox" id="autoStyleFromMapToggle" checked onchange="onAutoStyleToggleChange()" class="w-4 h-4 rounded accent-indigo-500 cursor-pointer">
                             <div>
-                                <h4 class="text-xs font-semibold text-white flex items-center gap-2">
-                                    <i class="fa-solid fa-font text-indigo-400"></i>
-                                    <span>Text Category Rules (<code class="font-mono text-indigo-300">filling_txt</code>)</span>
-                                </h4>
-                                <p class="text-[11px] text-slate-400">Case-insensitive exact label match -> RGBA fill color</p>
+                                <div class="text-xs font-semibold text-white flex items-center gap-2">
+                                    <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+                                    <span>Smart Map Inspector: Auto-Detect Numbers/Words, Colors &amp; Label Style</span>
+                                </div>
+                                <p class="text-[11px] text-slate-300">Automatically inspects map numbers, dates, or words to assign a harmonious palette &amp; typography style</p>
                             </div>
-                            <button type="button" onclick="addTextFillingRule()" class="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-medium transition flex items-center gap-1">
-                                <i class="fa-solid fa-plus text-[10px]"></i>
-                                <span>Add Label</span>
+                        </label>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <input type="file" id="inspectMapImageInput" accept="image/*" class="hidden" onchange="handleInspectUploadedMapImage(event)">
+                            <button type="button" id="inspectMapImageBtn" onclick="document.getElementById('inspectMapImageInput').click()" class="px-2.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-sky-300 border border-sky-500/35 text-xs font-medium transition flex items-center gap-1.5" title="Upload or pick a map image file to detect its words/numbers and style">
+                                <i class="fa-solid fa-camera-retro text-[11px]"></i>
+                                <span>Inspect Map Image...</span>
+                            </button>
+                            <button type="button" id="autoDetectMapBtn" onclick="autoDetectMapColorsAndStyle(true)" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20">
+                                <i id="autoDetectMapIcon" class="fa-solid fa-magnifying-glass-chart text-[11px]"></i>
+                                <span>Detect from Map / Topic</span>
                             </button>
                         </div>
-                        <div id="fillingTxtList" class="space-y-2 max-h-52 overflow-y-auto pr-1"></div>
                     </div>
 
-                    <!-- Section B: filling_num -->
-                    <div class="bg-slate-950/70 border border-slate-800/90 rounded-xl p-4">
-                        <div class="flex items-center justify-between mb-3">
-                            <div>
-                                <h4 class="text-xs font-semibold text-white flex items-center gap-2">
-                                    <i class="fa-solid fa-hashtag text-emerald-400"></i>
-                                    <span>Numeric Range Rules (<code class="font-mono text-emerald-300">filling_num</code>)</span>
-                                </h4>
-                                <p class="text-[11px] text-slate-400">Matches <code class="text-slate-300">low &lt; value &lt;= high</code> -> RGBA fill color</p>
-                            </div>
-                            <button type="button" onclick="addNumFillingRule()" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition flex items-center gap-1">
-                                <i class="fa-solid fa-plus text-[10px]"></i>
-                                <span>Add Range</span>
-                            </button>
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-1 border-t border-slate-800/80 items-center">
+                        <div class="sm:col-span-5">
+                            <label for="fillingPaletteTheme" class="block text-[10px] font-mono uppercase tracking-wider text-slate-400 mb-1">Palette Theme Mode</label>
+                            <select id="fillingPaletteTheme" onchange="onPaletteThemeChange()" class="w-full px-2.5 py-1.5 bg-slate-950/90 border border-slate-700/90 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
+                                <option value="auto">✨ Auto Smart Theme (By Map Data &amp; Topic)</option>
+                                <option value="viridis">🌌 Cyber Viridis (Cyan → Indigo → Rose)</option>
+                                <option value="heatmap">🔥 Heatmap (Cobalt → Emerald → Crimson)</option>
+                                <option value="emerald_gold">💎 Economy Emerald-Gold (Coral → Gold → Emerald)</option>
+                                <option value="festive">🎄 Festive &amp; Dates (Royal Blue, Pine, Gold, Crimson)</option>
+                                <option value="oceanic">🌊 Oceanic (Sky → Cobalt → Violet)</option>
+                                <option value="categorical">🎨 High-Contrast Categorical (12 Vivid Swatches)</option>
+                            </select>
                         </div>
-                        <div id="fillingNumList" class="space-y-2 max-h-52 overflow-y-auto pr-1"></div>
+                        <div id="detectedMapStatsBar" class="sm:col-span-7 flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-slate-300 bg-slate-950/75 border border-slate-800/90 rounded-lg px-3 py-2 min-h-[42px]">
+                            <span class="text-indigo-300"><i class="fa-solid fa-circle-info mr-1"></i>Click "Detect from Map / Topic" or generate a map to auto-populate rules.</span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Right 5 Cols: Live Swatch Glow Preview & JSON Export -->
-                <div class="lg:col-span-5 flex flex-col gap-4">
-                    <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-4 flex-1 flex flex-col">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                                <i class="fa-solid fa-code text-indigo-400"></i>
-                                <span>Live <code class="font-mono">filling.json</code> Output</span>
-                            </span>
-                            <div class="flex items-center gap-1.5">
-                                <button type="button" onclick="copyFillingJson()" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition flex items-center gap-1">
-                                    <i class="fa-regular fa-copy"></i>
-                                    <span>Copy JSON</span>
-                                </button>
-                                <button type="button" onclick="downloadFillingJson()" class="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-1">
-                                    <i class="fa-solid fa-download"></i>
-                                    <span>Download</span>
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+                    <!-- Left 7 Cols: Rule Builders -->
+                    <div class="lg:col-span-7 space-y-5">
+                        <!-- Section A: filling_txt -->
+                        <div class="bg-slate-950/70 border border-slate-800/90 rounded-xl p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <div>
+                                    <h4 class="text-xs font-semibold text-white flex items-center gap-2">
+                                        <i class="fa-solid fa-font text-indigo-400"></i>
+                                        <span>Text Category Rules (<code class="font-mono text-indigo-300">filling_txt</code>)</span>
+                                    </h4>
+                                    <p class="text-[11px] text-slate-400">Case-insensitive exact label match -> RGBA fill color</p>
+                                </div>
+                                <button type="button" onclick="addTextFillingRule()" class="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-medium transition flex items-center gap-1">
+                                    <i class="fa-solid fa-plus text-[10px]"></i>
+                                    <span>Add Label</span>
                                 </button>
                             </div>
+                            <div id="fillingTxtList" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
                         </div>
-                        <pre id="fillingJsonPreview" class="flex-1 p-3 rounded-lg bg-slate-900/90 border border-slate-800 font-mono text-[11px] text-emerald-300 overflow-auto max-h-80 leading-relaxed select-all"></pre>
+
+                        <!-- Section B: filling_num -->
+                        <div class="bg-slate-950/70 border border-slate-800/90 rounded-xl p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <div>
+                                    <h4 class="text-xs font-semibold text-white flex items-center gap-2">
+                                        <i class="fa-solid fa-hashtag text-emerald-400"></i>
+                                        <span>Numeric Range Rules (<code class="font-mono text-emerald-300">filling_num</code>)</span>
+                                    </h4>
+                                    <p class="text-[11px] text-slate-400">Matches <code class="text-slate-300">low &lt; value &lt;= high</code> -> RGBA fill color</p>
+                                </div>
+                                <button type="button" onclick="addNumFillingRule()" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition flex items-center gap-1">
+                                    <i class="fa-solid fa-plus text-[10px]"></i>
+                                    <span>Add Range</span>
+                                </button>
+                            </div>
+                            <div id="fillingNumList" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right 5 Cols: Auto-Determined Label Typography Style & Live JSON Output -->
+                    <div class="lg:col-span-5 flex flex-col gap-4">
+                        <!-- Section C: Auto-Determined Map Label Style -->
+                        <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-4 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-spell-check text-amber-400"></i>
+                                    <span>Map Label Style (Auto-Tuned)</span>
+                                </span>
+                                <button type="button" id="applyDetectedStyleToFormBtn" onclick="applyRecommendedFontAndSize()" class="text-[10px] px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 font-mono transition" title="Apply recommended font and size modifier to the main form">
+                                    Sync Font/Size
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2.5 text-xs">
+                                <div class="p-2 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                                    <span class="text-[11px] text-slate-400">Text Fill</span>
+                                    <div class="flex items-center gap-1.5">
+                                        <input type="color" id="labelStyleTextColor" value="#ffffff" onchange="updateLabelStyleField('text_color', this.value)" class="w-6 h-6 rounded cursor-pointer">
+                                        <code id="labelStyleTextHex" class="text-[10px] font-mono text-slate-300">#ffffff</code>
+                                    </div>
+                                </div>
+                                <div class="p-2 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                                    <span class="text-[11px] text-slate-400">Outline</span>
+                                    <div class="flex items-center gap-1.5">
+                                        <input type="color" id="labelStyleStrokeColor" value="#090d16" onchange="updateLabelStyleField('stroke_color', this.value)" class="w-6 h-6 rounded cursor-pointer">
+                                        <code id="labelStyleStrokeHex" class="text-[10px] font-mono text-slate-300">#090d16</code>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between gap-3 text-xs bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-2">
+                                <span class="text-[11px] text-slate-400 shrink-0">Stroke Width</span>
+                                <input type="range" id="labelStyleStrokeWidth" min="3" max="22" value="15" oninput="updateLabelStyleField('stroke_width', this.value)" class="flex-1 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                                <span id="labelStyleStrokeWidthVal" class="text-[11px] font-mono text-indigo-300 w-9 text-right">15px</span>
+                            </div>
+                            <div class="flex items-center justify-between gap-2 text-[11px] text-slate-300">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="labelStyleAutoFit" checked onchange="updateLabelStyleField('auto_fit', this.checked)" class="w-3.5 h-3.5 rounded accent-indigo-500">
+                                    <span>Auto-fit &amp; center long words inside countries</span>
+                                </label>
+                                <span id="recommendedFontBadge" class="text-[10px] font-mono text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded">Font: Bips.ttf</span>
+                            </div>
+                        </div>
+
+                        <!-- Live filling.json Output -->
+                        <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-4 flex-1 flex flex-col">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-code text-indigo-400"></i>
+                                    <span>Live <code class="font-mono">filling.json</code> Output</span>
+                                </span>
+                                <div class="flex items-center gap-1.5">
+                                    <button type="button" onclick="copyFillingJson()" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition flex items-center gap-1">
+                                        <i class="fa-regular fa-copy"></i>
+                                        <span>Copy JSON</span>
+                                    </button>
+                                    <button type="button" onclick="downloadFillingJson()" class="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-1">
+                                        <i class="fa-solid fa-download"></i>
+                                        <span>Download</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <pre id="fillingJsonPreview" class="flex-1 p-3 rounded-lg bg-slate-900/90 border border-slate-800 font-mono text-[11px] text-emerald-300 overflow-auto max-h-52 leading-relaxed select-all"></pre>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Modal Footer -->
-            <div class="px-6 py-3.5 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between">
+            <div class="px-6 py-3.5 border-t border-slate-800 bg-slate-950/80 flex flex-wrap items-center justify-between gap-2">
                 <button type="button" onclick="resetFillingDefaults()" class="text-xs text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5">
                     <i class="fa-solid fa-rotate-left"></i>
                     <span>Restore Default Palette</span>
                 </button>
-                <button type="button" onclick="closeFillingStudio(true)" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
-                    Done &amp; Save Preview
-                </button>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="restyleCurrentMapBtn" onclick="restyleCurrentMapFromStudio()" class="px-3.5 py-2 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/40 text-emerald-200 border border-emerald-500/40 text-xs font-semibold transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-paintbrush"></i>
+                        <span>Apply &amp; Re-Paint Current Map</span>
+                    </button>
+                    <button type="button" onclick="closeFillingStudio(true)" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
+                        Done &amp; Save Preview
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -954,6 +1053,16 @@
 
         let fillingTxtRules = JSON.parse(JSON.stringify(DEFAULT_FILLING_TXT));
         let fillingNumRules = JSON.parse(JSON.stringify(DEFAULT_FILLING_NUM));
+        let labelStyleConfig = {
+            recommended_font: "Bips.ttf",
+            recommended_gsm: 15,
+            text_color: "#ffffff",
+            stroke_color: "#090d16",
+            stroke_width: 15,
+            auto_fit: true
+        };
+        let lastMapValues = null;
+        let lastMapAnalysis = null;
 
         // --- Initialize on Load ---
         window.addEventListener('DOMContentLoaded', () => {
@@ -1122,6 +1231,20 @@
         }
 
         // --- Get Current Form Values ---
+        function buildFillingDictionaries() {
+            const filling_txt = {};
+            const filling_num = {};
+            fillingTxtRules.forEach(r => {
+                if (r.key && r.key.trim()) {
+                    filling_txt[r.key.trim()] = hexToRgbArray(r.hex, r.alpha);
+                }
+            });
+            fillingNumRules.forEach(r => {
+                filling_num[`(${Number(r.low) || 0}, ${Number(r.high) || 0})`] = hexToRgbArray(r.hex, r.alpha);
+            });
+            return { filling_txt, filling_num };
+        }
+
         function getFormState() {
             const mode = document.querySelector('input[name="mode"]:checked')?.value || 'text';
             const mapType = document.querySelector('input[name="map_type"]:checked')?.value || 'default';
@@ -1131,8 +1254,26 @@
             const font = document.getElementById('fontSelect').value;
             const topic = document.getElementById('topicInput').value.trim();
             const apiKey = document.getElementById('apiKeyInput').value.trim();
+            const autoStyleEl = document.getElementById('autoStyleFromMapToggle');
+            const auto_style = autoStyleEl ? !!autoStyleEl.checked : true;
+            const palette_theme = document.getElementById('fillingPaletteTheme')?.value || 'auto';
+            const { filling_txt, filling_num } = buildFillingDictionaries();
 
-            return { mode, map_type: mapType, gsm, extra_option: extraOption, model, font, topic, api_key: apiKey };
+            return {
+                mode,
+                map_type: mapType,
+                gsm,
+                extra_option: extraOption,
+                model,
+                font,
+                topic,
+                api_key: apiKey,
+                auto_style,
+                palette_theme,
+                filling_txt,
+                filling_num,
+                label_style: { ...labelStyleConfig }
+            };
         }
 
         // --- Sync Global Size Modifier Slider & Number Input ---
@@ -1359,6 +1500,16 @@
                     if (result.command) logToConsole(`[Server] ${result.command}`, 'info');
                     logToConsole(`[Success] Map generated and loaded (${describeDataUrl(result.image_url)})`, 'success');
 
+                    if (result.map_values) {
+                        lastMapValues = result.map_values;
+                    }
+                    if (result.analysis) {
+                        applyAnalysisToFillingStudio(result.analysis, result.map_values, false);
+                        const st = result.analysis.stats || {};
+                        const ls = result.analysis.label_style || {};
+                        logToConsole(`[Auto-Style] Detected ${result.analysis.detected_type} map (${st.total_regions || 0} regions, ${st.unique_values || 0} unique values) -> theme "${result.analysis.resolved_theme}", recommended font "${ls.recommended_font || 'Bips.ttf'}"`, 'info');
+                    }
+
                     // Display actual image returned by Flask (data URL)
                     const imgEl = document.getElementById('serverMapImage');
                     const emptyEl = document.getElementById('emptyState');
@@ -1372,7 +1523,7 @@
                     try {
                         const blob = await (await fetch(result.image_url)).blob();
                         await StudioStorage.setAsset('latest-map', new File([blob], 'generated-map.png', {type: 'image/png'}));
-                        showToast("Map generated! It is ready in Video Studio.", "success");
+                        showToast("Map generated & auto-styled! Ready in Video Studio.", "success");
                     } catch (error) {
                         showToast("Map generated, but automatic transfer could not be saved. Download it to use in Video Studio.", "warn");
                     }
@@ -1434,7 +1585,7 @@
             showToast("Downloading PNG map...", "success");
         }
 
-        // --- Color Filling Studio (`filling_txt` & `filling_num`) ---
+        // --- Color Filling Studio (`filling_txt`, `filling_num`, & Smart Map Inspector) ---
         function hexToRgbArray(hex, alpha = 255) {
             const clean = (hex || '#6366f1').replace('#', '');
             const num = parseInt(clean, 16);
@@ -1456,7 +1607,226 @@
             modal.classList.add('hidden');
             modal.classList.remove('flex');
             if (notify) {
-                showToast("Color filling palette updated", "success");
+                showToast("Color filling & label style saved", "success");
+            }
+        }
+
+        function onAutoStyleToggleChange() {
+            renderFillingStudio();
+            const isAuto = !!document.getElementById('autoStyleFromMapToggle')?.checked;
+            showToast(isAuto ? "Smart Auto-Detect from Map enabled" : "Manual custom rules mode active", "info");
+        }
+
+        function onPaletteThemeChange() {
+            if (lastMapValues && Object.keys(lastMapValues).length > 0) {
+                autoDetectMapColorsAndStyle(true);
+            } else {
+                renderFillingStudio();
+            }
+        }
+
+        function updateLabelStyleField(field, val) {
+            if (field === 'stroke_width') {
+                labelStyleConfig.stroke_width = Math.max(2, Math.min(25, parseInt(val, 10) || 15));
+            } else if (field === 'auto_fit') {
+                labelStyleConfig.auto_fit = !!val;
+            } else {
+                labelStyleConfig[field] = val;
+            }
+            renderFillingStudio();
+        }
+
+        function applyRecommendedFontAndSize() {
+            const recFont = labelStyleConfig.recommended_font || 'Bips.ttf';
+            const recGsm = typeof labelStyleConfig.recommended_gsm === 'number' ? labelStyleConfig.recommended_gsm : 15;
+            const fontSelect = document.getElementById('fontSelect');
+            if (fontSelect && Array.from(fontSelect.options).some(o => o.value === recFont)) {
+                fontSelect.value = recFont;
+            }
+            syncGsm(recGsm);
+            showToast(`Applied recommended style: ${recFont} (GSM ${recGsm})`, 'success');
+        }
+
+        function applyAnalysisToFillingStudio(analysis, mapValues = null, notifyToast = true) {
+            if (!analysis) return;
+            lastMapAnalysis = analysis;
+            if (analysis.inspection_only || !mapValues || typeof mapValues !== 'object') {
+                lastMapValues = null;
+            } else {
+                lastMapValues = mapValues;
+            }
+            if (Array.isArray(analysis.ui_txt_rules) && analysis.ui_txt_rules.length > 0) {
+                fillingTxtRules = analysis.ui_txt_rules.map(r => ({
+                    key: r.key,
+                    hex: r.hex || '#6366f1',
+                    alpha: typeof r.alpha === 'number' ? r.alpha : 255
+                }));
+            }
+            if (Array.isArray(analysis.ui_num_rules) && analysis.ui_num_rules.length > 0) {
+                fillingNumRules = analysis.ui_num_rules.map(r => ({
+                    low: Number(r.low) || 0,
+                    high: Number(r.high) || 0,
+                    hex: r.hex || '#38bdf8',
+                    alpha: typeof r.alpha === 'number' ? r.alpha : 255
+                }));
+            }
+            if (analysis.label_style) {
+                labelStyleConfig = {
+                    ...labelStyleConfig,
+                    ...analysis.label_style
+                };
+            }
+
+            const statsBar = document.getElementById('detectedMapStatsBar');
+            if (statsBar) {
+                const st = analysis.stats || {};
+                const samples = Array.isArray(st.sample_values) ? st.sample_values.slice(0, 6).join(', ') : '';
+                const rangeBadge = (st.min_value !== null && st.min_value !== undefined)
+                    ? `<span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Range: ${st.min_value} .. ${st.max_value}</span>`
+                    : '';
+                statsBar.innerHTML = `
+                    <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold">Type: ${analysis.detected_type || 'auto'}</span>
+                    <span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">Theme: ${analysis.resolved_theme || 'auto'}</span>
+                    <span class="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">${st.total_regions || 0} regions (${st.unique_values || 0} unique)</span>
+                    ${rangeBadge}
+                    ${samples ? `<span class="text-slate-400 truncate max-w-full">On Map: <strong class="text-slate-200">${samples}</strong></span>` : ''}
+                `;
+            }
+
+            renderFillingStudio();
+            if (notifyToast) {
+                if (analysis.inspection_only) {
+                    showToast(`Extracted ${analysis.ui_txt_rules?.length || 0} palette colors from uploaded map (palette-only inspection).`, 'success');
+                } else {
+                    showToast(`Detected ${analysis.detected_type} map values -> applied ${analysis.resolved_theme} palette & style!`, 'success');
+                }
+            }
+        }
+
+        async function autoDetectMapColorsAndStyle(insideModal = false) {
+            const state = getFormState();
+            const btnIcon = document.getElementById('autoDetectMapIcon');
+            if (btnIcon) btnIcon.className = 'fa-solid fa-circle-notch fa-spin text-[11px]';
+
+            try {
+                const serverImg = document.getElementById('serverMapImage');
+                const hasMapImg = serverImg && !serverImg.classList.contains('hidden') && serverImg.src && serverImg.src.startsWith('data:image/');
+                const payload = {
+                    topic: state.topic,
+                    mode: state.mode,
+                    map_type: state.map_type,
+                    palette_theme: document.getElementById('fillingPaletteTheme')?.value || 'auto',
+                    api_key: state.api_key,
+                    model: state.model,
+                    prefer_cached: true,
+                    map_values: lastMapValues,
+                    image_data: (!lastMapValues && hasMapImg) ? serverImg.src : undefined
+                };
+
+                const res = await fetch('/api/analyze_map', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok || data.status !== 'success') {
+                    throw new Error(data.error || 'Could not analyze map');
+                }
+                applyAnalysisToFillingStudio(data.analysis, data.map_values, true);
+                if (!insideModal) {
+                    openFillingStudio();
+                }
+            } catch (err) {
+                logToConsole(`[Auto-Style] ${err.message}`, 'warn');
+                showToast(err.message || 'Auto-detect failed', 'warn');
+            } finally {
+                if (btnIcon) btnIcon.className = 'fa-solid fa-magnifying-glass-chart text-[11px]';
+            }
+        }
+
+        async function handleInspectUploadedMapImage(event) {
+            const file = event.target?.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async () => {
+                const dataUrl = reader.result;
+                // Show the inspected map on the stage as well
+                const imgEl = document.getElementById('serverMapImage');
+                const emptyEl = document.getElementById('emptyState');
+                if (imgEl) {
+                    imgEl.src = dataUrl;
+                    imgEl.classList.remove('hidden');
+                }
+                if (emptyEl) emptyEl.classList.add('hidden');
+
+                showToast(`Extracting color palette from "${file.name}"...`, 'info');
+                const state = getFormState();
+                try {
+                    const res = await fetch('/api/analyze_map', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            image_data: dataUrl,
+                            topic: state.topic,
+                            mode: 'auto',
+                            map_type: state.map_type,
+                            palette_theme: document.getElementById('fillingPaletteTheme')?.value || 'auto',
+                            api_key: state.api_key,
+                            model: state.model,
+                            prefer_cached: false
+                        })
+                    });
+                    const data = await res.json();
+                    if (!res.ok || data.status !== 'success') {
+                        throw new Error(data.error || 'Map image inspection failed');
+                    }
+                    applyAnalysisToFillingStudio(data.analysis, data.map_values, true);
+                    logToConsole(`[Map Inspector] Extracted ${data.analysis?.ui_txt_rules?.length || 0} palette colors from "${file.name}" (palette-only)`, 'success');
+                } catch (err) {
+                    showToast(err.message || 'Could not inspect map image', 'error');
+                } finally {
+                    event.target.value = '';
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function restyleCurrentMapFromStudio() {
+            if (!lastMapValues || lastMapAnalysis?.inspection_only) {
+                showToast('Generate a map first to re-paint it live (uploaded images only extract palette colors).', 'warn');
+                return;
+            }
+            const state = getFormState();
+            const btn = document.getElementById('restyleCurrentMapBtn');
+            if (btn) btn.disabled = true;
+            try {
+                const res = await fetch('/api/restyle_map', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ...state,
+                        auto_style: false,
+                        map_values: lastMapValues
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || data.status !== 'success') {
+                    throw new Error(data.error || 'Generate a map first to re-paint it live.');
+                }
+                const imgEl = document.getElementById('serverMapImage');
+                const emptyEl = document.getElementById('emptyState');
+                if (imgEl) {
+                    imgEl.src = data.image_url;
+                    imgEl.classList.remove('hidden');
+                }
+                if (emptyEl) emptyEl.classList.add('hidden');
+                logToConsole('[Auto-Style] Re-painted active map with updated Color Filling Studio rules & typography style.', 'success');
+                showToast('Map re-painted with new colors & label style!', 'success');
+                closeFillingStudio(false);
+            } catch (err) {
+                showToast(err.message || 'Could not re-paint map', 'warn');
+            } finally {
+                if (btn) btn.disabled = false;
             }
         }
 
@@ -1466,6 +1836,27 @@
             const jsonPreview = document.getElementById('fillingJsonPreview');
             const miniSwatches = document.getElementById('miniSwatchPreview');
             const summaryBadge = document.getElementById('fillingSummaryBadge');
+            const sidebarSub = document.getElementById('fillingSidebarSubtext');
+            const isAuto = !!document.getElementById('autoStyleFromMapToggle')?.checked;
+
+            // Sync Label Style UI controls
+            const txtColorEl = document.getElementById('labelStyleTextColor');
+            const txtHexEl = document.getElementById('labelStyleTextHex');
+            const strColorEl = document.getElementById('labelStyleStrokeColor');
+            const strHexEl = document.getElementById('labelStyleStrokeHex');
+            const strWidthEl = document.getElementById('labelStyleStrokeWidth');
+            const strWidthValEl = document.getElementById('labelStyleStrokeWidthVal');
+            const autoFitEl = document.getElementById('labelStyleAutoFit');
+            const recFontBadge = document.getElementById('recommendedFontBadge');
+
+            if (txtColorEl) txtColorEl.value = labelStyleConfig.text_color || '#ffffff';
+            if (txtHexEl) txtHexEl.textContent = labelStyleConfig.text_color || '#ffffff';
+            if (strColorEl) strColorEl.value = labelStyleConfig.stroke_color || '#090d16';
+            if (strHexEl) strHexEl.textContent = labelStyleConfig.stroke_color || '#090d16';
+            if (strWidthEl) strWidthEl.value = labelStyleConfig.stroke_width || 15;
+            if (strWidthValEl) strWidthValEl.textContent = `${labelStyleConfig.stroke_width || 15}px`;
+            if (autoFitEl) autoFitEl.checked = labelStyleConfig.auto_fit !== false;
+            if (recFontBadge) recFontBadge.textContent = `Font: ${labelStyleConfig.recommended_font || 'Bips.ttf'}`;
 
             if (txtList) {
                 txtList.innerHTML = fillingTxtRules.map((item, idx) => `
@@ -1489,10 +1880,10 @@
                         <input type="color" value="${item.hex}" onchange="updateNumRule(${idx}, 'hex', this.value)"
                             class="w-7 h-7 rounded-lg cursor-pointer shrink-0" style="box-shadow: 0 0 12px ${item.hex}66">
                         <div class="flex items-center gap-1.5 flex-1 min-w-0">
-                            <input type="number" value="${item.low}" oninput="updateNumRule(${idx}, 'low', this.value)"
+                            <input type="number" step="any" value="${item.low}" oninput="updateNumRule(${idx}, 'low', this.value)"
                                 class="w-20 px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-emerald-500">
                             <span class="text-xs text-slate-500 font-mono">to</span>
-                            <input type="number" value="${item.high}" oninput="updateNumRule(${idx}, 'high', this.value)"
+                            <input type="number" step="any" value="${item.high}" oninput="updateNumRule(${idx}, 'high', this.value)"
                                 class="w-24 px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-emerald-500">
                         </div>
                         <button type="button" onclick="removeNumRule(${idx})" class="text-slate-500 hover:text-rose-400 p-1 transition" title="Remove">
@@ -1502,19 +1893,19 @@
                 `).join('');
             }
 
-            // Build JSON structure matching map/filling.json
+            // Build JSON structure matching map/filling.json + label_style metadata
+            const { filling_txt, filling_num } = buildFillingDictionaries();
             const fillingObj = {
-                filling_txt: {},
-                filling_num: {}
-            };
-            fillingTxtRules.forEach(r => {
-                if (r.key && r.key.trim()) {
-                    fillingObj.filling_txt[r.key.trim()] = hexToRgbArray(r.hex, r.alpha);
+                filling_txt,
+                filling_num,
+                label_style: {
+                    text_color: labelStyleConfig.text_color,
+                    stroke_color: labelStyleConfig.stroke_color,
+                    stroke_width: labelStyleConfig.stroke_width,
+                    auto_fit: labelStyleConfig.auto_fit,
+                    recommended_font: labelStyleConfig.recommended_font
                 }
-            });
-            fillingNumRules.forEach(r => {
-                fillingObj.filling_num[`(${Number(r.low) || 0}, ${Number(r.high) || 0})`] = hexToRgbArray(r.hex, r.alpha);
-            });
+            };
 
             if (jsonPreview) {
                 jsonPreview.textContent = JSON.stringify(fillingObj, null, 2);
@@ -1526,8 +1917,12 @@
                     `<span class="w-4 h-4 rounded-full border border-slate-950 shadow" style="background:${hex}"></span>`
                 ).join('');
             }
+            const totalRules = fillingTxtRules.length + fillingNumRules.length;
             if (summaryBadge) {
-                summaryBadge.textContent = `${fillingTxtRules.length + fillingNumRules.length} rules`;
+                summaryBadge.textContent = isAuto ? `Auto • ${totalRules} rules` : `Custom • ${totalRules} rules`;
+            }
+            if (sidebarSub && lastMapAnalysis) {
+                sidebarSub.textContent = `Detected ${lastMapAnalysis.detected_type} (${lastMapAnalysis.resolved_theme}) • Font: ${labelStyleConfig.recommended_font}`;
             }
         }
 
@@ -1566,8 +1961,16 @@
         function resetFillingDefaults() {
             fillingTxtRules = JSON.parse(JSON.stringify(DEFAULT_FILLING_TXT));
             fillingNumRules = JSON.parse(JSON.stringify(DEFAULT_FILLING_NUM));
+            labelStyleConfig = {
+                recommended_font: "Bips.ttf",
+                recommended_gsm: 15,
+                text_color: "#ffffff",
+                stroke_color: "#090d16",
+                stroke_width: 15,
+                auto_fit: true
+            };
             renderFillingStudio();
-            showToast("Default filling palette restored", "info");
+            showToast("Default filling palette & style restored", "info");
         }
 
         function copyFillingJson() {

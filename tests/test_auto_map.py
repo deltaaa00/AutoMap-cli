@@ -156,3 +156,148 @@ def test_font_objects_are_cached_within_render(scene, monkeypatch):
     monkeypatch.setattr(renderer.ImageFont, 'truetype', load_font)
     render()
     assert load_font.call_count == 1
+
+
+def test_auto_fill_from_ai_detects_numbers_and_words():
+    txt_rules, num_rules = renderer._auto_fill_from_ai(
+        {'ukraine': 38, 'poland': 37, 'germany': 84, 'estonia': 1},
+        mode='number',
+    )
+    assert not txt_rules
+    assert len(num_rules) >= 2
+
+    txt_rules_w, num_rules_w = renderer._auto_fill_from_ai(
+        {'ukraine': '6 Dec', 'russia': '19 Dec', 'netherlands': '5 Dec'},
+        mode='text',
+    )
+    assert not num_rules_w
+    assert '6 Dec' in txt_rules_w
+    assert '19 Dec' in txt_rules_w
+    assert txt_rules_w['6 Dec'] != txt_rules_w['19 Dec']
+
+    # Short-form numeric strings in text mode should be grouped into gradient buckets,
+    # not assigned a distinct color per unique string.
+    short_txt, _ = renderer._auto_fill_from_ai(
+        {f'r{i}': f'{i}k' for i in range(1, 21)},
+        mode='text',
+    )
+    assert len(set(short_txt.values())) <= 5
+    assert short_txt['1k'] == short_txt['2k']
+    assert short_txt['1k'] != short_txt['20k']
+
+
+def test_auto_map_applies_request_color_and_label_overrides(scene, monkeypatch):
+    answer, _, real_open = scene
+    answer.return_value = {'one': 'CustomLabel', 'two': 'OtherLabel', 'three': ''}
+    orig_text = ImageDraw.ImageDraw.text
+    text_calls = []
+
+    def spy_text(self, *args, **kwargs):
+        text_calls.append((args, kwargs))
+        return orig_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(ImageDraw.ImageDraw, 'text', spy_text)
+
+    buf = render(
+        filling_txt_override={'CustomLabel': [12, 34, 56, 255], 'OtherLabel': [65, 43, 21, 255]},
+        label_style={'text_color': '#ff1122', 'stroke_color': '#010203', 'stroke_width': 9, 'auto_fit': True},
+        auto_style=False,
+        palette_theme='emerald',
+    )
+    image = real_open(buf)
+    assert image.getpixel((80, 600)) == (12, 34, 56, 255)
+    assert image.getpixel((290, 600)) == (65, 43, 21, 255)
+    assert len(text_calls) == 2
+    assert text_calls[0][1]['fill'] == (255, 17, 34, 255)
+    assert text_calls[0][1]['stroke_fill'] == (1, 2, 3, 255)
+    assert text_calls[0][1]['stroke_width'] == 9
+    assert buf.map_meta['label_style']['text_color'] == '#ff1122'
+    assert buf.map_meta['used_txt']['CustomLabel'] == [12, 34, 56, 255]
+
+
+def test_numeric_auto_style_ignores_untouched_four_ui_defaults(scene):
+    answer, _, real_open = scene
+    answer.return_value = {'one': 1, 'two': 50, 'three': 99}
+    untouched_ui_num = {
+        '(0, 100)': [56, 189, 248, 255],
+        '(100, 1000)': [99, 102, 241, 255],
+        '(1000, 10000)': [168, 85, 247, 255],
+        '(10000, 100000000)': [244, 63, 94, 255],
+    }
+    buf = render(
+        mode='number',
+        filling_num_override=untouched_ui_num,
+        auto_style=True,
+        palette_theme='auto',
+    )
+    image = real_open(buf)
+    assert len(buf.map_meta['used_num']) == 3
+    assert image.getpixel((80, 600)) != image.getpixel((290, 600))
+    assert image.getpixel((290, 600)) != image.getpixel((500, 600))
+
+
+def test_auto_map_restyle_override_skips_ai_request(scene):
+    answer, _, real_open = scene
+    buf = render(
+        ai_answer_override={'one': 'Alpha', 'two': 'Beta', 'three': 'Alpha'},
+        filling_txt_override={'Alpha': [10, 200, 100, 255], 'Beta': [200, 10, 100, 255]},
+        auto_style=False,
+    )
+    answer.assert_not_called()
+    image = real_open(buf)
+    assert image.getpixel((80, 600)) == (10, 200, 100, 255)
+    assert image.getpixel((290, 600)) == (200, 10, 100, 255)
+
+
+@pytest.mark.parametrize('theme', ['auto', 'oceanic'])
+def test_auto_style_preserves_explicit_text_rule_case_insensitively(scene, theme):
+    scene[0].return_value = {'one': 'Yes', 'two': 'Other', 'three': 'yes'}
+    output = render(auto_style=True, palette_theme=theme,
+                    filling_txt_override={' YES ': '#123456'})
+    image = scene[2](output)
+    assert image.getpixel((80, 600)) == (18, 52, 86, 255)
+    assert image.getpixel((500, 600)) == (18, 52, 86, 255)
+    assert image.getpixel((290, 600)) != (18, 52, 86, 255)
+
+
+def test_explicit_theme_replaces_untouched_default_text_rules(scene):
+    scene[0].return_value = {'one': 'Yes', 'two': 'No', 'three': 'Tea'}
+    defaults = {'yes': '#2ecc71', 'no': '#e74c3c', 'tea': '#10b981', 'coffee': '#f59e0b'}
+    output = render(auto_style=True, palette_theme='oceanic', filling_txt_override=defaults)
+    image = scene[2](output)
+    assert image.getpixel((80, 600)) == (56, 189, 248, 255)
+    assert image.getpixel((290, 600)) == (14, 165, 233, 255)
+
+
+def test_numeric_auto_style_keeps_manual_range_and_fills_unmatched_values(scene):
+    scene[0].return_value = {'one': 1, 'two': 50, 'three': 99}
+    output = render(mode='number', auto_style=True,
+                    filling_num_override={'(0, 10)': '#123456'})
+    image = scene[2](output)
+    assert image.getpixel((80, 600)) == (18, 52, 86, 255)
+    assert image.getpixel((290, 600)) != (160, 160, 160, 255)
+    assert image.getpixel((500, 600)) != (160, 160, 160, 255)
+    assert len(output.map_meta['used_num']) == 3
+
+
+@pytest.mark.parametrize('stroke,expected', [('bad', 15), (None, 15), (-1, 0), (100, 40)])
+def test_label_stroke_validation_keeps_rendering_usable(scene, stroke, expected):
+    output = render(label_style={'stroke_width': stroke})
+    assert scene[2](output).format == 'PNG'
+    assert output.map_meta['label_style']['stroke_width'] == expected
+
+
+@pytest.mark.parametrize('map_type', ['default', 'world'])
+def test_long_labels_auto_fit_without_changing_their_text(scene, monkeypatch, map_type):
+    label = 'A very long region label'
+    scene[0].return_value = {'one': label}
+    text = Mock()
+    monkeypatch.setattr(ImageDraw.ImageDraw, 'text', text)
+    render(map_type=map_type, label_style={'auto_fit': False})
+    original_size = text.call_args.kwargs['font'].size
+    render(map_type=map_type, label_style={'auto_fit': True})
+    assert text.call_args.args[1] == label
+    assert text.call_args.kwargs['font'].size < original_size
+
+
+

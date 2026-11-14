@@ -99,10 +99,7 @@ def spinner(message: str = "Working..."):
     and collapses into a success/failure line when the block finishes.
     """
     with console.status(f"[bold cyan]{message}", spinner="dots") as status:
-        try:
-            # Keep the status active for the caller's block; errors propagate
-            # after the status context has had a chance to stop the animation.
-            yield status
-        except Exception:
-            raise
+        # Keep the status active for the caller's block; errors propagate
+        # after the status context has had a chance to stop the animation.
+        yield status
 
