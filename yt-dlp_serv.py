@@ -816,18 +816,25 @@ def make_video() -> tuple[object, int]:
             if not hasattr(automap_rs, "render_video_rs"):
                 raise ImportError("automap_rs native extension not built")
 
-            def _to_rgba_bytes(arr: np.ndarray) -> bytes:
-                # Ensure 4-channel RGBA layout before passing raw bytes to Rust.
-                if arr.shape[2] == 3:
+            def _clip_to_rgba_bytes(clip_obj, sample_t: float = 0.0) -> bytes:
+                # MoviePy splits RGBA inputs into 3-channel clip.img + float clip.mask.
+                arr = np.asarray(clip_obj.img, dtype=np.uint8)
+                if arr.ndim == 3 and arr.shape[2] == 4:
+                    return arr.tobytes()
+                if getattr(clip_obj, "mask", None) is not None:
+                    mask_frame = np.asarray(clip_obj.mask.get_frame(sample_t))
+                    alpha = np.clip(mask_frame * 255.0, 0, 255).astype(np.uint8)
+                    if alpha.ndim == 2:
+                        alpha = alpha[:, :, None]
+                else:
                     alpha = np.full((arr.shape[0], arr.shape[1], 1), 255, dtype=np.uint8)
-                    arr = np.concatenate([arr, alpha], axis=2)
-                return arr.tobytes()
+                return np.concatenate([arr[:, :, :3], alpha], axis=2).tobytes()
 
             static_rgba = None
             dynamic_overlays = []
             veil_duration = 0.0
 
-            # Skip clips[0] (background_video); Rust decodes it directly from bg_path.
+            # Skip clips[0] (background_video); Rust decodes it directly from prepared_bg_path.
             for clip in clips[1:]:
                 if not hasattr(clip, "img"):
                     continue
@@ -836,7 +843,7 @@ def make_video() -> tuple[object, int]:
                 is_full_canvas = clip.img.shape[:2] == (canvas_h, canvas_w)
 
                 if not is_dynamic and is_full_canvas:
-                    static_rgba = _to_rgba_bytes(clip.img)
+                    static_rgba = _clip_to_rgba_bytes(clip, 0.0)
                 elif is_dynamic and is_full_canvas and clip.img.shape[2] == 3:
                     # Full-canvas 3-channel black clip represents the intro fade veil.
                     veil_duration = float(clip.duration or 0.0)
@@ -846,11 +853,11 @@ def make_video() -> tuple[object, int]:
                     h, w = clip.img.shape[:2]
                     x = (canvas_w - w) // 2 if pos[0] == "center" else int(pos[0])
                     y = (canvas_h - h) // 2 if pos[1] == "center" else int(pos[1])
-                    dynamic_overlays.append((_to_rgba_bytes(clip.img), x, y, int(w), int(h), 0.0, 0.0))
+                    dynamic_overlays.append((_clip_to_rgba_bytes(clip, float(bg_duration)), x, y, int(w), int(h), 0.0, 0.0))
 
-            if static_rgba is not None and bg_path:
+            if static_rgba is not None and prepared_bg_path:
                 automap_rs.render_video_rs(
-                    bg_path,
+                    prepared_bg_path,
                     static_rgba,
                     dynamic_overlays,
                     veil_duration,
