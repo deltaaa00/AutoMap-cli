@@ -104,10 +104,38 @@ def test_numeric_ranges_use_exclusive_low_inclusive_high(scene, value, expected)
     assert real_open(render(mode='number')).getpixel((80, 600)) == expected
 
 
-def test_short_form_changes_ai_prompt(scene):
+@pytest.mark.parametrize('mode', ['text', 'number'])
+def test_short_form_changes_ai_prompt_and_abbreviates_large_numbers(scene, monkeypatch, mode):
     answer, _, _ = scene
-    render(optional_feature='short_form')
+    answer.return_value = {'one': 4_000_000, 'two': '30,000', 'three': '10B'}
+    draw_text = Mock()
+    monkeypatch.setattr(ImageDraw.ImageDraw, 'text', draw_text)
+    buf = render(mode=mode, optional_feature='short_form', auto_style=True)
     assert '1000000=1M' in answer.call_args.args[0]
+    assert [call.args[1] for call in draw_text.call_args_list] == ['4M', '30k', '10B']
+    assert buf.map_meta['ai_answer'] == {'one': '4M', 'two': '30k', 'three': '10B'}
+
+
+@pytest.mark.parametrize('raw,expected', [
+    (999, 999),
+    (1_000, '1k'),
+    (30_000, '30k'),
+    ('30K', '30K'),
+    (999_950, '1M'),
+    (4_000_000, '4M'),
+    ('38,450,000', '38.5M'),
+    ('10B', '10B'),
+    ('10b', '10b'),
+    ('1,500,000,000', '1.5B'),
+    (13_000_000_000_000, '13T'),
+    ('13T', '13T'),
+    ('6 Dec', '6 Dec'),
+    ('Yes', 'Yes'),
+    (None, None),
+    (True, True),
+])
+def test_format_short_number_handles_plain_and_short_values(raw, expected):
+    assert renderer._format_short_number(raw) == expected
 
 
 def test_fractional_measurements_use_actual_range_at_integer_boundary(scene):
@@ -144,7 +172,7 @@ def test_fractional_measurements_get_distinct_automatic_colors(scene):
 
 
 @pytest.mark.parametrize('mode,map_type,feature', [
-    ('number', 'default', 'short_form'), ('text', 'default', 'show_most_least'),
+    ('text', 'default', 'show_most_least'),
     ('number', 'world', 'show_most_least'),
 ])
 def test_incompatible_options_are_disabled(scene, monkeypatch, mode, map_type, feature):

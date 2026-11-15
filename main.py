@@ -47,6 +47,7 @@ from dotenv import dotenv_values
 from map.auto_map import (
     auto_map,
     _auto_fill_from_ai,
+    _format_short_number,
     _parse_short_number,
     _parse_filling_overrides,
     _resolve_theme_name,
@@ -279,26 +280,35 @@ def _auto_map_with_ai_cache(*, refresh: bool, provider: str, api_key, **kwargs):
         identity = str(session.get('web_identity', '') or '')
     except RuntimeError:
         identity = ''
-    cache_key = ai_cache.make_key(
-        ai_cache.scope(identity, api_key),
+    short_form = kwargs.get('optional_feature') == 'short_form'
+    scope = ai_cache.scope(identity, api_key)
+    base_fields = dict(
         prompt=str(kwargs.get('prompt') or ''),
         map_type=str(kwargs.get('map_type') or ''),
         model=str(kwargs.get('model') or ''),
         provider=provider,
         temperature=temperature,
-        short_form=kwargs.get('optional_feature') == 'short_form',
         web_search=bool(kwargs.get('web_search', False)),
         max_search_requests=kwargs.get('max_search_requests', 5),
     )
+    cache_key = ai_cache.make_key(scope, short_form=short_form, **base_fields)
     cached = None if refresh else ai_cache.get(cache_key)
+    if cached is None and not refresh and short_form:
+        raw_cached = ai_cache.get(ai_cache.make_key(scope, short_form=False, **base_fields))
+        if raw_cached and any(_parse_short_number(v) is not None for v in raw_cached.values()):
+            cached = {k: _format_short_number(v) for k, v in raw_cached.items()}
     if cached is not None:
         kwargs['ai_answer_override'] = cached
     buffer = auto_map(api_key=api_key, **kwargs)
-    if cached is None and buffer is not None:
+    if buffer is not None:
         meta = getattr(buffer, 'map_meta', None)
         answer = meta.get('ai_answer') if isinstance(meta, dict) else None
         if isinstance(answer, dict):
-            ai_cache.put(cache_key, answer)
+            if short_form:
+                answer = {k: _format_short_number(v) for k, v in answer.items()}
+                meta['ai_answer'] = answer
+            if not refresh:
+                ai_cache.put(cache_key, answer)
     return buffer, cached is not None
 
 
