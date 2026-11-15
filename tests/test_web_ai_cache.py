@@ -83,6 +83,24 @@ def test_search_settings_bypass_cache_but_visual_changes_reuse_it(monkeypatch):
     assert render.call_args_list[3].kwargs['ai_answer_override'] == {'france': 1}
 
 
+def test_toggling_short_form_abbreviates_cached_large_numbers_on_regenerate(monkeypatch):
+    calls = []
+
+    def render(**kwargs):
+        calls.append(kwargs)
+        ans = kwargs.get('ai_answer_override') or {'ukraine': 38_000_000, 'germany': 84_500_000}
+        return _buffer(ans)
+
+    monkeypatch.setattr(web, 'auto_map', render)
+    client = web.app.test_client()
+    first = client.post('/api/generate', json=_body(mode='number', extra_option='none')).get_json()
+    second = client.post('/api/generate', json=_body(mode='number', extra_option='short_form')).get_json()
+    assert first['map_values'] == {'ukraine': 38_000_000, 'germany': 84_500_000}
+    assert second['ai_cached'] is True
+    assert second['map_values'] == {'ukraine': '38M', 'germany': '84.5M'}
+    assert calls[1]['ai_answer_override'] == {'ukraine': '38M', 'germany': '84.5M'}
+
+
 def test_render_video_accepts_binary_multipart(monkeypatch):
     upstream = Mock(status_code=200)
     upstream.json.return_value = {'status': 'success'}

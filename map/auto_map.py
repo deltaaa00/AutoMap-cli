@@ -517,8 +517,16 @@ def _parse_filling_overrides(
     return txt_out, num_out
 
 
+_SHORT_UNITS: tuple[tuple[float, str], ...] = (
+    (1_000_000_000_000.0, "T"),
+    (1_000_000_000.0, "B"),
+    (1_000_000.0, "M"),
+    (1_000.0, "k"),
+)
+
+
 def _parse_short_number(val: object) -> float | None:
-    """Parse plain numbers or short-form numbers like '10k', '2.5M', '1B'."""
+    """Parse plain numbers or English short-form numbers like '10k', '30K', '4M', '10B', '13T'."""
     if isinstance(val, bool) or val is None:
         return None
     s = str(val).replace(",", "").replace(" ", "").strip()
@@ -532,11 +540,50 @@ def _parse_short_number(val: object) -> float | None:
         mult, s = 1_000_000.0, s[:-1]
     elif low.endswith("b"):
         mult, s = 1_000_000_000.0, s[:-1]
+    elif low.endswith("t"):
+        mult, s = 1_000_000_000_000.0, s[:-1]
     try:
         num = float(s) * mult
     except ValueError:
         return None
     return num if math.isfinite(num) else None
+
+
+def _format_number_value(num: float) -> str:
+    """Format a finite float (>= 1,000 in magnitude) using compact English k/M/B/T suffixes."""
+    abs_num = abs(num)
+    for idx, (threshold, suffix) in enumerate(_SHORT_UNITS):
+        if abs_num >= threshold:
+            scaled = round(num / threshold, 1)
+            if abs(scaled) >= 1_000.0 and idx > 0:
+                prev_threshold, prev_suffix = _SHORT_UNITS[idx - 1]
+                scaled = round(num / prev_threshold, 1)
+                suffix = prev_suffix
+            if float(scaled).is_integer():
+                return f"{int(scaled)}{suffix}"
+            return f"{scaled:.1f}".rstrip("0").rstrip(".") + suffix
+    return str(int(num)) if float(num).is_integer() else str(round(num, 2))
+
+
+def _format_short_number(val: object) -> object:
+    """Abbreviate large numeric values (>= 1,000) into compact English k/M/B/T strings."""
+    if val is None or isinstance(val, bool):
+        return val
+    if isinstance(val, str):
+        clean = val.strip()
+        if clean and clean[-1].lower() in ("k", "m", "b", "t"):
+            try:
+                coeff = float(clean[:-1].replace(",", "").replace(" ", ""))
+                if math.isfinite(coeff) and 0 < abs(coeff) < 1_000.0:
+                    return clean
+            except ValueError:
+                pass
+    parsed = _parse_short_number(val)
+    if parsed is None:
+        return val.strip() if isinstance(val, str) else val
+    if abs(parsed) >= 1_000.0:
+        return _format_number_value(parsed)
+    return val.strip() if isinstance(val, str) else val
 
 
 def _auto_fill_from_ai(
@@ -698,10 +745,6 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
     # Most least and short form conflict solution
     # @TODO Make most/least and short form compatible
 
-    if optional_feature == "short_form" and mode == "number":
-        showwarning("Warning", "Short form feature is only available for text mode. It will be disabled.")
-        optional_feature = None
-
     if optional_feature == "show_most_least" and mode == "text":
         showwarning("Warning", "Most/least feature may be incompatible with text mode. Turning off...")
         optional_feature = None
@@ -711,7 +754,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         optional_feature = None
 
     if optional_feature == "short_form" and ai_answer_override is None:
-        prompt += " Write in short form, for example 1000=1k, 1000000=1M etc."
+        prompt += " Write in English short form only (k, M, B, T), for example 1000=1k, 1000000=1M, 1000000000=1B, 1000000000000=1T etc."
 
     random_colors = {}
 
@@ -765,6 +808,10 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         showerror("Error", "No information or bad info received from AI")
         return
 
+    raw_ai_answer = dict(ai_answer)
+    if optional_feature == "short_form":
+        ai_answer = {k: _format_short_number(v) for k, v in ai_answer.items()}
+
     log.success(f"Got information from AI ({len(ai_answer)} entries)")
 
     resolved_theme = _resolve_theme_name(palette_theme, prompt=prompt, mode=mode)
@@ -783,7 +830,8 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             if req_txt and (not theme_requested or req_keys_low != _DEFAULT_UI_TXT_KEYS):
                 ci_to_orig = {k.strip().lower(): k for k in merged_txt}
                 for rk, rv in req_txt.items():
-                    target_k = ci_to_orig.get(rk.strip().lower(), rk)
+                    short_rk = str(_format_short_number(rk)).strip() if optional_feature == "short_form" else rk
+                    target_k = ci_to_orig.get(short_rk.lower(), ci_to_orig.get(rk.strip().lower(), short_rk))
                     merged_txt[target_k] = rv
             filling_txt = merged_txt
             filling_txt_ci = {str(k).strip().lower(): v for k, v in filling_txt.items()}
@@ -801,6 +849,12 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             filling_txt_ci = {str(k).strip().lower(): v for k, v in filling_txt.items()}
         if not filling_num and auto_num:
             filling_num = auto_num
+
+    if optional_feature == "short_form":
+        for k, v in list(filling_txt.items()):
+            short_k = str(_format_short_number(k)).strip().lower()
+            if short_k:
+                filling_txt_ci.setdefault(short_k, v)
 
     most_least = None
     extrema = _numeric_extrema(ai_answer) if optional_feature == "show_most_least" else None
@@ -842,13 +896,20 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
     if map_type == "world_countries":
         ai_answer_norm = _world_countries_answer_norm(ai_answer or {}, dict_.keys())
+        raw_ai_answer_norm = _world_countries_answer_norm(raw_ai_answer or {}, dict_.keys())
     else:
         ai_answer_norm = {
             str(k).strip().lower().replace(" ", "_").replace("-", "_"): v
             for k, v in (ai_answer or {}).items()
         }
+        raw_ai_answer_norm = {
+            str(k).strip().lower().replace(" ", "_").replace("-", "_"): v
+            for k, v in (raw_ai_answer or {}).items()
+        }
         if "oceania" in ai_answer_norm and "australia" not in ai_answer_norm:
             ai_answer_norm["australia"] = ai_answer_norm["oceania"]
+        if "oceania" in raw_ai_answer_norm and "australia" not in raw_ai_answer_norm:
+            raw_ai_answer_norm["australia"] = raw_ai_answer_norm["oceania"]
 
     region_colors: dict[int, tuple[int, int, int, int]] = {}
 
@@ -864,6 +925,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
                 info = ai_answer_norm[name_key]
                 color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
                 num_value = _parse_short_number(info)
+                raw_num_value = _parse_short_number(raw_ai_answer_norm.get(name_key))
                 if num_value is None:
                     log.warning(f"Non-numeric value for {name}: {info!r}; using random color")
 
@@ -871,11 +933,14 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
                     # Pick the colour of the first matching range. Ranges are
                     # treated as (low < value <= high) per the docs.
                     matched_bounds = None
-                    for (low_lim, high_lim), color_tup in filling_num.items():
-                        if low_lim < num_value <= high_lim:
-                            color = color_tup
-                            matched_bounds = (low_lim, high_lim)
-                            break
+                    for candidate in (num_value, raw_num_value):
+                        if candidate is None or matched_bounds is not None:
+                            continue
+                        for (low_lim, high_lim), color_tup in filling_num.items():
+                            if low_lim < candidate <= high_lim:
+                                color = color_tup
+                                matched_bounds = (low_lim, high_lim)
+                                break
                     if matched_bounds is None and auto_style is True and auto_num:
                         for (low_lim, high_lim), color_tup in auto_num.items():
                             if low_lim < num_value <= high_lim:

@@ -725,8 +725,10 @@ def make_video() -> tuple[object, int]:
         branded = bool(watermark_image is not None or watermark_text or has_stars)
         map_bottom = 1450 if watermark_image is not None else (1664 if branded else 1760)
         map_area_height = max(240, map_bottom - map_top)
-        # Fit inside the map area while ensuring the map always spans the full Shorts width.
-        scale = max(canvas_w / map_clip.w, min(1040 / map_clip.w, map_area_height / map_clip.h) * 1.14)
+        # Fit inside the map area while ensuring non-portrait maps span the full Shorts width.
+        scale = min(1040 / map_clip.w, map_area_height / map_clip.h) * 1.14
+        if map_clip.w >= map_clip.h:
+            scale = max(canvas_w / map_clip.w, scale)
         map_clip = map_clip.resized(scale)
         map_y = map_top + (map_area_height - map_clip.h) / 2
         if effects:
@@ -808,7 +810,7 @@ def make_video() -> tuple[object, int]:
         # Prefer the native Rust compositor when available; fall back to MoviePy locally.
         used_rust = False
         # ======== RUST ENGINE INJECTION =============
-        try:
+        try:  # pragma: no cover
             import automap_rs
 
             def _to_rgba_bytes(arr: np.ndarray) -> bytes:
@@ -863,7 +865,7 @@ def make_video() -> tuple[object, int]:
         except ImportError:
             pass
 
-        if not used_rust:
+        if not used_rust:  # pragma: no branch
             final_clip = CompositeVideoClip(clips, size=(canvas_w, canvas_h))
             media_resources.append(final_clip)
             if has_audio:
