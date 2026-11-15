@@ -374,6 +374,7 @@
                     <span class="text-indigo-400 font-semibold">03 Frame &amp; Render</span>
                 </div>
 
+                <button type="button" id="clearAllDataBtn" onclick="clearAllUserData(this)" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-rose-950 text-rose-300 border border-rose-500/30 text-xs font-semibold transition-all shrink-0">Clear all data</button>
                 {% if config.WEB_AUTH_ENABLED and session.get('web_identity') %}
                 <form method="post" action="{{ url_for('web_logout') }}">
                     <input type="hidden" name="csrf_token" value="{{ session.get('logout_csrf', '') }}">

@@ -1,6 +1,7 @@
 /* Shared browser storage for generated maps and selected video materials. */
 window.StudioStorage = (() => {
     let connection;
+    let clearing = false;
     function open() {
         if (!connection) {
             connection = new Promise((resolve, reject) => {
@@ -43,7 +44,9 @@ window.StudioStorage = (() => {
     }
 
     async function setAsset(key, file, metadata = {}) {
+        if (clearing) return;
         const db = await open();
+        if (clearing) return;
         const record = {
             blob: file, name: file?.name, type: file?.type,
             lastModified: file?.lastModified, updatedAt: Date.now(),
@@ -62,7 +65,9 @@ window.StudioStorage = (() => {
 
     /* Run a read/write history transaction, pruning entries older than 24 hours. */
     async function historyTransaction(action) {
+        if (clearing) return [];
         const db = await open();
+        if (clearing) return [];
         return new Promise((resolve, reject) => {
             const transaction = db.transaction('history', 'readwrite');
             const store = transaction.objectStore('history');
@@ -98,10 +103,47 @@ window.StudioStorage = (() => {
         });
     }
 
-    return {getAsset, setAsset, HISTORY_RETENTION_MS,
+    async function clearAll() {
+        clearing = true;
+        try {
+            const db = await open();
+            await new Promise((resolve, reject) => {
+                const transaction = db.transaction(['assets', 'history'], 'readwrite');
+                transaction.objectStore('assets').clear();
+                transaction.objectStore('history').clear();
+                transaction.oncomplete = resolve;
+                transaction.onabort = () => reject(transaction.error || new Error('Could not clear browser data.'));
+                transaction.onerror = () => reject(transaction.error);
+            });
+        } catch (error) {
+            clearing = false;
+            throw error;
+        }
+    }
+
+    return {getAsset, setAsset, clearAll, HISTORY_RETENTION_MS,
         getHistory: () => historyTransaction(),
         pruneHistory: () => historyTransaction({prune: true}),
         addHistory: entry => historyTransaction({entry}),
         clearHistory: () => historyTransaction({clear: true}),
     };
 })();
+
+/* Reset both studios together; cookies and server credentials are unaffected. */
+async function clearAllUserData(button) {
+    if (!window.confirm('Clear all data? This removes saved API keys, topics, settings, run history, maps, and selected video/audio materials from this browser. This cannot be undone.')) return;
+    button.disabled = true;
+    try {
+        await StudioStorage.clearAll();
+        for (const storage of [localStorage, sessionStorage]) {
+            for (const key of Object.keys(storage)) {
+                if (/^automap[-_]/.test(key)) storage.removeItem(key);
+            }
+        }
+        // Navigate to a fresh document so inputs and in-memory previews reset too.
+        window.location.replace(window.location.pathname);
+    } catch (error) {
+        button.disabled = false;
+        window.alert('Could not clear all data. Please allow browser storage and try again.');
+    }
+}

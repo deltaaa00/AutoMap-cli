@@ -666,3 +666,31 @@ def test_new_stickers_exist_on_both_sides_and_preview_offline(studio):
     page.wait_for_function("document.querySelector('#stageTopLeftSticker img')?.naturalWidth > 0")
     page.wait_for_function("document.querySelector('#stageTopRightSticker img')?.naturalWidth > 0")
     assert page.locator('#stageCompositeBox').evaluate("el => el.classList.contains('has-top-stickers')")
+
+
+def test_clear_all_data_requires_confirmation_and_clears_both_studios(studio):
+    page, _ = studio
+    page.evaluate("""async () => {
+        localStorage.setItem('automap-gemini-api-key', 'private-key');
+        localStorage.setItem('automap-map-topic', 'saved topic');
+        localStorage.setItem('unrelated-setting', 'keep');
+        sessionStorage.setItem('automap-test', 'session value');
+        await StudioStorage.setAsset('latest-map', new File(['map'], 'map.png'));
+        await StudioStorage.addHistory({id: 'test', createdAt: Date.now(), state: {topic: 'saved topic'}});
+    }""")
+    page.once('dialog', lambda dialog: dialog.dismiss())
+    page.locator('#clearAllDataBtn').click()
+    assert page.evaluate("localStorage.getItem('automap-gemini-api-key')") == 'private-key'
+    assert page.evaluate("async () => (await StudioStorage.getHistory()).length") == 1
+    page.once('dialog', lambda dialog: dialog.accept())
+    with page.expect_navigation():
+        page.locator('#clearAllDataBtn').click()
+    assert page.evaluate("localStorage.getItem('automap-gemini-api-key')") is None
+    assert page.evaluate("localStorage.getItem('automap-map-topic')") is None
+    assert page.evaluate("sessionStorage.getItem('automap-test')") is None
+    assert page.evaluate("localStorage.getItem('unrelated-setting')") == 'keep'
+    assert page.evaluate("async () => await StudioStorage.getAsset('latest-map')") is None
+    assert page.evaluate("async () => await StudioStorage.getHistory()") == []
+    page.goto('http://automap.test/')
+    assert page.locator('#clearAllDataBtn').is_visible()
+    assert page.locator('#topicInput').input_value() == ''
