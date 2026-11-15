@@ -15,7 +15,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 
-COPY yt-dlp_serv.py sticker_themes.py extra_stickers.py server_runtime.py render_progress.py ./
+COPY yt-dlp_serv.py sticker_themes.py extra_stickers.py server_runtime.py render_progress.py video_text.py video_stickers.py video_render.py ./
 COPY resources/fonts/ resources/fonts/
 
 EXPOSE 8080
