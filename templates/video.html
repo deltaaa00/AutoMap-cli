@@ -1692,6 +1692,20 @@
             }
         }
 
+        function normalizeMusicCookies(contents) {
+            const lines = contents.replace(/^\uFEFF/, '').split(/\r\n|\r|\n/);
+            const rows = lines.filter(line => line.trim() && (!line.startsWith('#') || line.startsWith('#HttpOnly_')));
+            if (!rows.length || rows.some(line => {
+                const fields = line.split('\t');
+                return fields.length !== 7 || !fields[0] || !/^(TRUE|FALSE)$/.test(fields[1])
+                    || !/^(TRUE|FALSE)$/.test(fields[3]) || !/^\d*$/.test(fields[4]);
+            })) {
+                throw new Error('Please export cookies in Netscape cookies.txt format (not JSON or a Cookie request header).');
+            }
+            // yt-dlp requires this header. Preserve tabs, including empty cookie values.
+            return '# Netscape HTTP Cookie File\n' + rows.join('\n') + '\n';
+        }
+
         async function handleMusicCookiesUpload(input) {
             const file = input.files[0];
             if (!file) return;
@@ -1703,16 +1717,12 @@
             status.textContent = 'Reading cookies file...';
             try {
                 if (file.size > 1024 * 1024) throw new Error('Cookies file must be smaller than 1 MB.');
-                const contents = (await file.text()).replace(/^\uFEFF/, '').trim();
-                const rows = contents.split(/\r?\n/).filter(line => line.trim() && (!line.startsWith('#') || line.startsWith('#HttpOnly_')));
-                if (!rows.length || rows.some(line => line.split('\t').length !== 7)) {
-                    throw new Error('Please export cookies in Netscape cookies.txt format.');
-                }
+                const contents = normalizeMusicCookies(await file.text());
                 const textarea = document.getElementById('musicCookiesInput');
                 textarea.value = contents;
                 textarea.dispatchEvent(new Event('input', { bubbles: true }));
                 saveVideoSettings();
-                status.textContent = `Loaded ${file.name}. Cookies are ready for the next download.`;
+                status.textContent = `Loaded ${file.name}. File format checked; YouTube will verify the session during download.`;
             } catch (error) {
                 status.textContent = error.message || 'Could not read the cookies file.';
                 showToast(status.textContent, 'warn');
@@ -1742,6 +1752,7 @@
 
             btn.disabled = true;
             document.getElementById('musicFileInput').disabled = true;
+            document.getElementById('musicCookiesFileInput').disabled = true;
             audioSelectionVersion++;
             btn.classList.add('opacity-70');
             btnText.textContent = "Downloading...";
@@ -1752,7 +1763,8 @@
             logToConsole(`[Music] POST /api/music_download ${url}`, 'cmd');
 
             try {
-                const cookies = (document.getElementById('musicCookiesInput')?.value || '').trim();
+                const rawCookies = document.getElementById('musicCookiesInput').value;
+                const cookies = rawCookies.trim() ? normalizeMusicCookies(rawCookies) : '';
                 // Single request: backend downloads + converts and returns the audio directly.
                 const response = await fetch('/api/music_download', {
                     method: 'POST',
@@ -1780,12 +1792,16 @@
                 showToast("Music downloaded! Click Save to store the MP3.", "success");
             } catch (error) {
                 logToConsole(`[API Error] ${error.message}`, 'error');
+                const cookieStatus = document.getElementById('musicCookiesFileStatus');
+                cookieStatus.textContent = error.message;
+                cookieStatus.closest('details').open = true;
                 showToast("Music download failed. Check console logs.", "error");
                 metaBadge.textContent = "Error";
                 setEqualizerActive(false, 'Download Failed');
             } finally {
                 btn.disabled = false;
                 document.getElementById('musicFileInput').disabled = false;
+                document.getElementById('musicCookiesFileInput').disabled = false;
                 btn.classList.remove('opacity-70');
                 btnText.textContent = "Download MP3";
                 btnIcon.className = "fa-solid fa-download";

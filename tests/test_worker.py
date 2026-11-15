@@ -81,6 +81,18 @@ def test_download_requires_url(worker, payload):
     assert worker.app.test_client().post('/api/music_download', json=payload).status_code == 400
 
 
+@pytest.mark.parametrize('stderr, expected', [
+    (b'The provided YouTube account cookies are no longer valid.', 'session is no longer valid'),
+    (b'Sign in to confirm you\xe2\x80\x99re not a bot.', 'server connection'),
+])
+def test_download_explains_youtube_authentication_failure(worker, monkeypatch, stderr, expected):
+    failure = subprocess.CalledProcessError(1, 'yt-dlp', stderr=stderr)
+    monkeypatch.setattr(worker.subprocess, 'run', Mock(side_effect=failure))
+    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://www.youtube.com/watch?v=test'})
+    assert response.status_code == 500
+    assert expected in response.json['error']
+
+
 def test_download_moves_audio_across_filesystems(worker, monkeypatch, tmp_path):
     import errno
 

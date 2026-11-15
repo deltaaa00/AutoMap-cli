@@ -230,7 +230,7 @@ def music_download():
     # yt-dlp with `-x` writes to a temp file, so pipe through the temp dir and
     # read the produced .mp3 back. `-o -` is unreliable when extracting audio.
 
-    cookies = str(data.get('cookies') or '').strip()
+    cookies = str(data.get('cookies') or '').strip('\r\n')
     download_dir = tempfile.mkdtemp(prefix="automap_download_")
     cookie_args = []
     if cookies:
@@ -296,6 +296,15 @@ def music_download():
 
     except subprocess.CalledProcessError as e:
         error_message = (e.stderr or b'').decode("utf-8", errors="ignore").strip()
+        if 'cookies are no longer valid' in error_message:
+            error_message = ('YouTube rejected the account cookies because the session is no longer valid. '
+                             'Export fresh youtube.com cookies from a new private/incognito session, '
+                             'close that window, then upload the new cookies.txt file.')
+        elif 'Sign in to confirm' in error_message and 'bot' in error_message:
+            error_message = ('YouTube requires a sign-in/bot check for this request. '
+                             'Upload fresh YouTube account cookies. If they are already fresh, '
+                             'YouTube may also be challenging the server connection; '
+                             'a correctly formatted cookies file alone cannot guarantee access.')
         return jsonify({"status": "error",
                         "error": f"yt-dlp ERROR: {error_message}"}), 500
 

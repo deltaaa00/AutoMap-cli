@@ -1112,7 +1112,7 @@ def music_download():
     if not url:
         return jsonify({"status": "error", "error": "Missing 'url' in request body."}), 400
 
-    cookies = str(data.get('cookies') or '').strip()
+    cookies = str(data.get('cookies') or '').strip('\r\n')
     forward_payload = {"url": url, "cookies": cookies} if cookies else {"url": url}
 
     # Another service downloads music from YouTube and converts it to mp3.
