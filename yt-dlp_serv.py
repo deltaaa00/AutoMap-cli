@@ -811,6 +811,9 @@ def make_video() -> tuple[object, int]:
         try:
             import automap_rs
 
+            if not hasattr(automap_rs, "render_video_rs"):
+                raise ImportError("automap_rs native extension not built")
+
             def _to_rgba_bytes(arr: np.ndarray) -> bytes:
                 # Ensure 4-channel RGBA layout before passing raw bytes to Rust.
                 if arr.shape[2] == 3:
