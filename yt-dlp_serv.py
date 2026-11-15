@@ -797,40 +797,102 @@ def make_video() -> tuple[object, int]:
 
         # Static layers are composed once into a single RGBA foreground.
         clips = _flatten_static_layers(clips, (canvas_w, canvas_h), dynamic_layers, bg_duration)
-        final_clip = CompositeVideoClip(clips, size=(canvas_w, canvas_h))
-        media_resources.append(final_clip)
 
-        # Attach the selected cut or full track when available; otherwise render silently.
-        if audio_bytes or (audio_title and os.path.isfile(audio_path)):
+        has_audio = bool(audio_bytes or (audio_title and os.path.isfile(audio_path)))
+        render_duration = bg_duration
+        if has_audio:
             audio_clip = AudioFileClip(audio_path)
             media_resources.append(audio_clip)
-            audio_duration = min(bg_duration, audio_clip.duration or bg_duration)
-            final_clip = final_clip.with_audio(audio_clip.subclipped(0, audio_duration))
-            final_clip = final_clip.with_duration(audio_duration)
-        else:
-            final_clip = final_clip.with_duration(bg_duration)
+            render_duration = min(bg_duration, audio_clip.duration or bg_duration)
 
-        # Draft renders keep the 1080x1920 layout and scale only at encode time.
-        encode_options = {}
-        if codec == 'libx264':
-            encode_options['preset'] = _x264_preset()
-        if data.get('draft') is True:
-            encode_options['ffmpeg_params'] = ['-vf', 'scale=720:1280:flags=bicubic']
-        final_clip.write_videofile(
-            output_path,
-            codec=codec,
-            audio_codec="aac",
-            fps=30,
-            threads=_render_threads(),
-            logger=render_progress.logger(),
-            **encode_options,
-        )
+        # Prefer the native Rust compositor when available; fall back to MoviePy locally.
+        used_rust = False
+        # ======== RUST ENGINE INJECTION =============
+        try:
+            import automap_rs
+
+            def _to_rgba_bytes(arr: np.ndarray) -> bytes:
+                # Ensure 4-channel RGBA layout before passing raw bytes to Rust.
+                if arr.shape[2] == 3:
+                    alpha = np.full((arr.shape[0], arr.shape[1], 1), 255, dtype=np.uint8)
+                    arr = np.concatenate([arr, alpha], axis=2)
+                return arr.tobytes()
+
+            static_rgba = None
+            dynamic_overlays = []
+            veil_duration = 0.0
+
+            # Skip clips[0] (background_video); Rust decodes it directly from bg_path.
+            for clip in clips[1:]:
+                if not hasattr(clip, "img"):
+                    continue
+
+                is_dynamic = id(clip) in dynamic_layers
+                is_full_canvas = clip.img.shape[:2] == (canvas_h, canvas_w)
+
+                if not is_dynamic and is_full_canvas:
+                    static_rgba = _to_rgba_bytes(clip.img)
+                elif is_dynamic and is_full_canvas and clip.img.shape[2] == 3:
+                    # Full-canvas 3-channel black clip represents the intro fade veil.
+                    veil_duration = float(clip.duration or 0.0)
+                elif is_dynamic:
+                    # Resolve MoviePy position ("center" or pixel offset) into top-left (x, y).
+                    pos = clip.pos(0) if callable(getattr(clip, "pos", None)) else getattr(clip, "pos", (0, 0))
+                    h, w = clip.img.shape[:2]
+                    x = (canvas_w - w) // 2 if pos[0] == "center" else int(pos[0])
+                    y = (canvas_h - h) // 2 if pos[1] == "center" else int(pos[1])
+                    dynamic_overlays.append((_to_rgba_bytes(clip.img), x, y, int(w), int(h), 0.0, 0.0))
+
+            if static_rgba is not None and bg_path:
+                automap_rs.render_video_rs(
+                    bg_path,
+                    static_rgba,
+                    dynamic_overlays,
+                    veil_duration,
+                    audio_path if has_audio else None,
+                    output_path,
+                    canvas_w,
+                    canvas_h,
+                    30,
+                    float(render_duration),
+                    codec,
+                    _x264_preset() if codec == 'libx264' else None,
+                    data.get('draft') is True,
+                )
+                used_rust = True
+        except ImportError:
+            pass
+
+        if not used_rust:
+            final_clip = CompositeVideoClip(clips, size=(canvas_w, canvas_h))
+            media_resources.append(final_clip)
+            if has_audio:
+                final_clip = final_clip.with_audio(audio_clip.subclipped(0, render_duration))
+                final_clip = final_clip.with_duration(render_duration)
+            else:
+                final_clip = final_clip.with_duration(bg_duration)
+
+            # Draft renders keep the 1080x1920 layout and scale only at encode time.
+            encode_options = {}
+            if codec == 'libx264':
+                encode_options['preset'] = _x264_preset()
+            if data.get('draft') is True:
+                encode_options['ffmpeg_params'] = ['-vf', 'scale=720:1280:flags=bicubic']
+            final_clip.write_videofile(
+                output_path,
+                codec=codec,
+                audio_codec="aac",
+                fps=30,
+                threads=_render_threads(),
+                logger=render_progress.logger(),
+                **encode_options,
+            )
 
         return jsonify({
             "status": "success",
             "file_path": output_path,
             "download_url": "/api/download_video?" + urlencode({'path': output_path}),
-            "has_audio": final_clip.audio is not None,
+            "has_audio": has_audio,
         }), 200
     
     except Exception as e:
