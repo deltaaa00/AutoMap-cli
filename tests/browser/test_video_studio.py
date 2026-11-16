@@ -19,15 +19,15 @@ checks, not visual regression tests of external Tailwind/font assets.
 """
 import base64
 import json
-from pathlib import Path
 from urllib.parse import urlsplit
 from unittest.mock import Mock
 
 import pytest
 import requests
 from PIL import Image
-from playwright.sync_api import sync_playwright
 from werkzeug.wrappers import Request
+
+from test_map_palettes import get_browser
 
 pytestmark = pytest.mark.browser
 
@@ -76,39 +76,38 @@ def studio(web, worker, monkeypatch):
         response.status_code, response._content = result.status_code, result.data
         return response
     monkeypatch.setattr(requests, 'get', Mock(side_effect=get_upstream))
-    with sync_playwright() as playwright:
-        chrome = Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
-        kwargs = {'executable_path': str(chrome)} if chrome.exists() else {}
-        browser = playwright.chromium.launch(headless=True, **kwargs)
-        page = browser.new_page(viewport={'width': 1200, 'height': 900})
-        errors = []
-        previews = []
-        page.on('pageerror', lambda error: errors.append(str(error)))
+    context = get_browser().new_context(viewport={'width': 1200, 'height': 900})
+    page = context.new_page()
+    errors = []
+    previews = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
 
-        def route_request(route):
-            request = route.request
-            url = urlsplit(request.url)
-            if url.hostname == 'automap.test':
-                if url.path == '/api/video_title_preview':
-                    previews.append(request.post_data_json)
-                result = web.app.test_client().open(
-                    url.path + ('?' + url.query if url.query else ''),
-                    method=request.method, data=request.post_data_buffer,
-                    content_type=request.headers.get('content-type'),
-                )
-                route.fulfill(status=result.status_code, body=result.data,
-                              content_type=result.content_type)
-            elif url.hostname == 'cdn.tailwindcss.com':
-                route.fulfill(content_type='application/javascript', body='window.tailwind = {};')
-            else:
-                route.fulfill(content_type='text/css', body='')
+    def route_request(route):
+        request = route.request
+        url = urlsplit(request.url)
+        if url.hostname == 'automap.test':
+            if url.path == '/api/video_title_preview':
+                previews.append(request.post_data_json)
+            result = web.app.test_client().open(
+                url.path + ('?' + url.query if url.query else ''),
+                method=request.method, data=request.post_data_buffer,
+                content_type=request.headers.get('content-type'),
+            )
+            route.fulfill(status=result.status_code, body=result.data,
+                          content_type=result.content_type)
+        elif url.hostname == 'cdn.tailwindcss.com':
+            route.fulfill(content_type='application/javascript', body='window.tailwind = {};')
+        else:
+            route.fulfill(content_type='text/css', body='')
 
-        page.route('**/*', route_request)
+    page.route('**/*', route_request)
+    try:
         page.goto('http://automap.test/studio')
         page.add_style_tag(content=OFFLINE_CSS)
         yield page, previews
         assert not errors, errors
-        browser.close()
+    finally:
+        context.close()
 
 
 def wait_for_title(page):
@@ -671,10 +670,12 @@ def test_slow_map_restore_does_not_replace_a_title_edited_in_the_meantime(studio
 
 def test_new_stickers_exist_on_both_sides_and_preview_offline(studio):
     page, previews = studio
+    expected = {'mountain', 'volcano', 'island', 'rainbow', 'moon', 'rain', 'robot', 'satellite',
+                'laptop', 'graduation', 'medal', 'cat', 'dog', 'fish', 'burger', 'train'}
     for side in ('Left', 'Right'):
-        for kind in ('mountain', 'volcano', 'island', 'rainbow', 'moon', 'rain', 'robot', 'satellite',
-                     'laptop', 'graduation', 'medal', 'cat', 'dog', 'fish', 'burger', 'train'):
-            assert page.locator(f'#top{side}StickerSelect option[value="{kind}"]').count() == 1
+        values = page.locator(f'#top{side}StickerSelect option').evaluate_all(
+            'opts => opts.map(o => o.value)')
+        assert expected.issubset(values)
     page.locator('#topLeftStickerSelect').select_option('robot')
     page.locator('#topRightStickerSelect').select_option('mountain')
     page.wait_for_function("document.querySelector('#stageTopLeftSticker img')?.naturalWidth > 0")

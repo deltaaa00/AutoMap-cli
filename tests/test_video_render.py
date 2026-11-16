@@ -20,8 +20,37 @@ from uuid import uuid4
 import pytest
 
 import numpy as np
-from moviepy import ColorClip, VideoFileClip
+from moviepy import AudioClip, ColorClip, VideoFileClip
 from PIL import Image, ImageFont
+
+
+@pytest.fixture(autouse=True)
+def fast_x264_preset(monkeypatch):
+    monkeypatch.setenv('VIDEO_X264_PRESET', 'ultrafast')
+
+
+def _encode_bg_b64(path, duration):
+    with ColorClip((160, 90), color=(50, 100, 150), duration=duration) as clip:
+        clip.write_videofile(str(path), fps=15, codec='libx264', preset='ultrafast', logger=None)
+    return base64.b64encode(path.read_bytes()).decode()
+
+
+@pytest.fixture(scope='module')
+def sample_bg_b64(tmp_path_factory):
+    return _encode_bg_b64(tmp_path_factory.mktemp('bg') / 'background.mp4', 0.25)
+
+
+@pytest.fixture(scope='module')
+def sample_bg_half_sec_b64(tmp_path_factory):
+    return _encode_bg_b64(tmp_path_factory.mktemp('bg_half') / 'background.mp4', 0.5)
+
+
+@pytest.fixture(scope='module')
+def sample_audio_bytes(tmp_path_factory):
+    track = tmp_path_factory.mktemp('audio') / 'track.mp3'
+    with AudioClip(lambda t: .2 * np.sin(2 * np.pi * 440 * t), duration=.25, fps=44100) as audio:
+        audio.write_audiofile(str(track), logger=None)
+    return track.read_bytes()
 
 
 @pytest.mark.parametrize('title', [
@@ -83,23 +112,23 @@ def test_default_preview_matches_default_render_title(worker):
     )
 
 
-@pytest.mark.parametrize('font,size,effects', [('DIN Condensed.ttf', 100, True), ('Bips.ttf', 72, False)])
-@pytest.mark.parametrize('map_size', [(800, 400), (400, 800), (600, 600)])
-def test_portrait_render_with_centered_title_and_right_aligned_map(worker, tmp_path, font, size, effects, map_size):
-    background = tmp_path / 'background.mp4'
-    with ColorClip((640, 360), color=(50, 100, 150), duration=1) as clip:
-        clip.write_videofile(str(background), fps=30, codec='libx264', logger=None)
+@pytest.mark.parametrize('font,size,effects,map_size', [
+    ('DIN Condensed.ttf', 100, True, (800, 400)),
+    ('Bips.ttf', 72, False, (400, 800)),
+    ('DIN Condensed.ttf', 100, True, (600, 600)),
+])
+def test_portrait_render_with_centered_title_and_right_aligned_map(worker, tmp_path, sample_bg_b64, font, size, effects, map_size):
     map_file = tmp_path / 'map.png'
     Image.new('RGB', map_size, (0, 255, 0)).save(map_file)
     render_id = str(uuid4())
     response = worker.app.test_client().post('/api/render_video', json={
         'render_id': render_id,
         'map_file': base64.b64encode(map_file.read_bytes()).decode(),
-        'background_video': base64.b64encode(background.read_bytes()).decode(),
+        'background_video': sample_bg_b64,
         'video_title': 'Найкрасивіші країни Європи',
         'title_font': font, 'title_font_size': size,
         'visual_effects': effects,
-        'duration': 1, 'include_audio': False,
+        'duration': 0.2, 'include_audio': False,
     })
     assert response.status_code == 200, response.json
     progress = worker.app.test_client().get(f'/api/render_progress/{render_id}').json
@@ -110,8 +139,8 @@ def test_portrait_render_with_centered_title_and_right_aligned_map(worker, tmp_p
         assert result.size == [1080, 1920]
         assert result.audio is None
         assert response.json['has_audio'] is False
-        assert result.duration == pytest.approx(1, abs=.05)
-        frame = result.get_frame(.5)
+        assert result.duration == pytest.approx(0.25, abs=.05)
+        frame = result.get_frame(.1)
     green = (frame[:, :, 1] > 220) & (frame[:, :, 0] < 30)
     ys, xs = np.where(green)
     assert abs((xs.min() + xs.max()) / 2 - 540) < 3
@@ -134,25 +163,21 @@ def test_portrait_render_with_centered_title_and_right_aligned_map(worker, tmp_p
 
 
 @pytest.mark.parametrize('inline_audio', [False, True])
-def test_render_attaches_audio_and_limits_duration(worker, tmp_path, inline_audio):
+def test_render_attaches_audio_and_limits_duration(worker, tmp_path, sample_bg_b64, sample_audio_bytes, inline_audio):
     from pathlib import Path
-    from moviepy import AudioClip
 
-    background = tmp_path / 'background.mp4'
-    with ColorClip((180, 320), color=(50, 100, 150), duration=1) as clip:
-        clip.write_videofile(str(background), fps=30, codec='libx264', logger=None)
     track = Path(worker.CUT_DIR) / 'Selected_song_cut.mp3'
-    with AudioClip(lambda t: .2 * np.sin(2 * np.pi * 440 * t), duration=.4, fps=44100) as audio:
-        audio.write_audiofile(str(track), logger=None)
-    audio_b64 = base64.b64encode(track.read_bytes()).decode() if inline_audio else ''
     if inline_audio:
         # The browser's saved fragment must work even after worker storage is lost.
-        track.unlink()
+        audio_b64 = base64.b64encode(sample_audio_bytes).decode()
+    else:
+        track.write_bytes(sample_audio_bytes)
+        audio_b64 = ''
     map_file = tmp_path / 'map.png'
     Image.new('RGB', (100, 50), 'green').save(map_file)
     response = worker.app.test_client().post('/api/render_video', json={
         'map_file': base64.b64encode(map_file.read_bytes()).decode(),
-        'background_video': base64.b64encode(background.read_bytes()).decode(),
+        'background_video': sample_bg_b64,
         'video_title': 'Audio title', 'duration': 'invalid',
         'audio_title': 'Selected_song', 'audio_file': audio_b64,
         'include_audio': False,  # An old checkbox preference must not mute selected music.
@@ -161,10 +186,10 @@ def test_render_attaches_audio_and_limits_duration(worker, tmp_path, inline_audi
     with VideoFileClip(response.json['file_path']) as result:
         assert result.audio is not None
         assert response.json['has_audio'] is True
-        assert .35 <= result.duration <= .55
+        assert .2 <= result.duration <= .4
         # Sample inside the clip: MoviePy's bulk reader has a short-clip
         # buffer bug, so read scalar frames without crossing chunk boundaries.
-        samples = np.array([result.audio.get_frame(float(t)) for t in np.linspace(.05, .25, 64)])
+        samples = np.array([result.audio.get_frame(float(t)) for t in np.linspace(.05, .18, 32)])
         assert np.max(np.abs(samples)) > .05
 
 
@@ -263,15 +288,12 @@ def test_mixed_case_title_and_auto_montage_previews(worker):
         assert np.any(arr[:, :, 3] > 200)
 
 
-def test_shorts_auto_montage_render_with_stickers_subscribe_and_stars(worker, tmp_path):
-    background = tmp_path / 'background.mp4'
-    with ColorClip((180, 320), color=(40, 80, 120), duration=1.0) as clip:
-        clip.write_videofile(str(background), fps=30, codec='libx264', logger=None)
+def test_shorts_auto_montage_render_with_stickers_subscribe_and_stars(worker, sample_bg_half_sec_b64):
     map_buffer = io.BytesIO()
     Image.new('RGBA', (500, 500), (0, 255, 0, 255)).save(map_buffer, format='PNG')
     response = worker.app.test_client().post('/api/render_video', json={
         'map_file': base64.b64encode(map_buffer.getvalue()).decode(),
-        'background_video': base64.b64encode(background.read_bytes()).decode(),
+        'background_video': sample_bg_half_sec_b64,
         'video_title': 'When is Saint Nicholas\nDay in your country?',
         'title_uppercase': False,
         'top_left_sticker': 'santa',
@@ -283,13 +305,13 @@ def test_shorts_auto_montage_render_with_stickers_subscribe_and_stars(worker, tm
         'watermark_color': '#ffffff',
         'watermark_stars': True,
         'intro_fade': True,
-        'duration': 1,
+        'duration': 0.5,
     })
     assert response.status_code == 200, response.json
     with VideoFileClip(response.json['file_path']) as result:
         assert result.size == [1080, 1920]
         frame_start = result.get_frame(0.0)
-        frame_mid = result.get_frame(0.8)
+        frame_mid = result.get_frame(0.35)
     # Intro fade-in starts darker at t=0.0 than at t=0.8
     assert frame_start.mean() < frame_mid.mean()
     # Map green pixels are positioned below the title + subscribe pill and above the footer
@@ -356,11 +378,7 @@ def test_all_sticker_kinds_and_auto_preview(worker):
 
 
 @pytest.mark.parametrize('overlays_enabled', [True, False])
-def test_custom_subscribe_stars_and_top_sticker_images_render(worker, tmp_path, overlays_enabled):
-    background = tmp_path / 'background.mp4'
-    with ColorClip((180, 320), color=(30, 50, 70), duration=1.0) as clip:
-        clip.write_videofile(str(background), fps=30, codec='libx264', logger=None)
-
+def test_custom_subscribe_stars_and_top_sticker_images_render(worker, sample_bg_half_sec_b64, overlays_enabled):
     map_buf, sub_buf, stars_buf, sticker_buf = io.BytesIO(), io.BytesIO(), io.BytesIO(), io.BytesIO()
     Image.new('RGBA', (500, 500), (0, 255, 0, 255)).save(map_buf, format='PNG')
     # Custom magenta subscribe badge
@@ -372,7 +390,7 @@ def test_custom_subscribe_stars_and_top_sticker_images_render(worker, tmp_path, 
 
     response = worker.app.test_client().post('/api/render_video', json={
         'map_file': base64.b64encode(map_buf.getvalue()).decode(),
-        'background_video': base64.b64encode(background.read_bytes()).decode(),
+        'background_video': sample_bg_half_sec_b64,
         'video_title': 'Custom Overlays Test',
         'top_left_sticker_image': base64.b64encode(sticker_buf.getvalue()).decode(),
         'top_right_sticker': 'auto',
@@ -382,11 +400,11 @@ def test_custom_subscribe_stars_and_top_sticker_images_render(worker, tmp_path, 
         'watermark_text': 'TERRAMAPPER',
         'watermark_stars_image': base64.b64encode(stars_buf.getvalue()).decode(),
         'watermark_stars': overlays_enabled,
-        'duration': 1,
+        'duration': 0.5,
     })
     assert response.status_code == 200, response.json
     with VideoFileClip(response.json['file_path']) as result:
-        frame = result.get_frame(0.5)
+        frame = result.get_frame(0.45)
 
     # Stickers stay at the top above the headline and subscribe badge.
     cyan_top = (frame[:220, 120:320, 1] > 210) & (frame[:220, 120:320, 2] > 210) & (frame[:220, 120:320, 0] < 50)

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Exercise palette selection and request ordering in the actual map UI."""
+import atexit
 import base64
 import io
 from pathlib import Path
@@ -27,43 +28,65 @@ pytestmark = pytest.mark.browser
 VALUES = {'ukraine': 'Alpha', 'poland': 'Beta'}
 
 
-@pytest.fixture
-def map_page(web):
-    with sync_playwright() as playwright:
+_PLAYWRIGHT = None
+_BROWSER = None
+
+
+def _close_browser():
+    global _PLAYWRIGHT, _BROWSER
+    if _BROWSER is not None:
+        _BROWSER.close()
+        _BROWSER = None
+    if _PLAYWRIGHT is not None:
+        _PLAYWRIGHT.stop()
+        _PLAYWRIGHT = None
+
+
+def get_browser():
+    global _PLAYWRIGHT, _BROWSER
+    if _BROWSER is None:
+        _PLAYWRIGHT = sync_playwright().start()
         chrome = Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
         kwargs = {'executable_path': str(chrome)} if chrome.exists() else {}
-        browser = playwright.chromium.launch(headless=True, **kwargs)
-        page = browser.new_page()
-        errors = []
-        page.on('pageerror', lambda error: errors.append(str(error)))
+        _BROWSER = _PLAYWRIGHT.chromium.launch(headless=True, **kwargs)
+        atexit.register(_close_browser)
+    return _BROWSER
 
-        def route_request(route):
-            request = route.request
-            url = urlsplit(request.url)
-            if url.hostname == 'automap.test':
-                response = web.app.test_client().open(
-                    url.path + ('?' + url.query if url.query else ''), method=request.method, data=request.post_data,
-                    content_type=request.headers.get('content-type'))
-                route.fulfill(status=response.status_code, body=response.data,
-                              content_type=response.content_type)
-            elif url.hostname == 'cdn.tailwindcss.com':
-                route.fulfill(content_type='application/javascript', body='window.tailwind = {};')
-            else:
-                route.fulfill(content_type='text/css', body='')
 
-        page.route('**/*', route_request)
-        try:
-            page.goto('http://automap.test/')
-            page.add_style_tag(content='.hidden {display:none!important}')
-            page.evaluate('''({analysis, values}) => {
-                applyAnalysisToFillingStudio(analysis, values, false);
-            }''', {'analysis': web._build_analysis_from_ai(
-                VALUES, mode='text', palette_theme='heatmap'), 'values': VALUES})
-            page.click('#openFillingStudioBtn')
-            yield page
-            assert not errors, errors
-        finally:
-            browser.close()
+@pytest.fixture
+def map_page(web):
+    context = get_browser().new_context()
+    page = context.new_page()
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+
+    def route_request(route):
+        request = route.request
+        url = urlsplit(request.url)
+        if url.hostname == 'automap.test':
+            response = web.app.test_client().open(
+                url.path + ('?' + url.query if url.query else ''), method=request.method, data=request.post_data,
+                content_type=request.headers.get('content-type'))
+            route.fulfill(status=response.status_code, body=response.data,
+                          content_type=response.content_type)
+        elif url.hostname == 'cdn.tailwindcss.com':
+            route.fulfill(content_type='application/javascript', body='window.tailwind = {};')
+        else:
+            route.fulfill(content_type='text/css', body='')
+
+    page.route('**/*', route_request)
+    try:
+        page.goto('http://automap.test/')
+        page.add_style_tag(content='.hidden {display:none!important}')
+        page.evaluate('''({analysis, values}) => {
+            applyAnalysisToFillingStudio(analysis, values, false);
+        }''', {'analysis': web._build_analysis_from_ai(
+            VALUES, mode='text', palette_theme='heatmap'), 'values': VALUES})
+        page.click('#openFillingStudioBtn')
+        yield page
+        assert not errors, errors
+    finally:
+        context.close()
 
 
 def test_auto_preview_is_not_reused_as_manual_generation_rules(map_page):
@@ -212,23 +235,12 @@ def test_repaint_shows_busy_state_until_image_or_error_is_ready(map_page, status
 
 def test_new_palette_is_selectable_and_analyzed(map_page):
     page = map_page
+    labels = page.locator('#fillingPaletteTheme option').all_inner_texts()
     for label in ('Greens', 'Blues', 'Reds', 'Oranges', 'Yellows', 'Purples', 'Teals', 'Pinks', 'Earth Tones'):
-        assert page.locator('#fillingPaletteTheme option', has_text=label).count() == 1
+        assert sum(label in text for text in labels) == 1
     page.select_option('#fillingPaletteTheme', 'greens')
     page.wait_for_function("lastMapAnalysis.resolved_theme === 'greens' && !paletteAnalysisPending")
     assert set(page.evaluate('fillingTxtRules.map(rule => rule.hex)')) == {'#bbf7d0', '#86efac'}
-
-
-def test_selected_palette_survives_reload_and_is_used_for_next_generation(map_page):
-    page = map_page
-    page.select_option('#fillingPaletteTheme', 'greens')
-    page.wait_for_function("!paletteAnalysisPending && lastMapAnalysis.resolved_theme === 'greens'")
-    page.reload()
-    assert page.locator('#fillingPaletteTheme').input_value() == 'greens'
-    state = page.evaluate('getFormState()')
-    assert state['palette_theme'] == 'greens'
-    assert state['auto_style'] is True
-    assert 'filling_txt' not in state
 
 
 def test_removed_saved_palette_falls_back_to_auto(map_page):
@@ -285,6 +297,10 @@ def test_theme_menu_selection_is_sent_on_first_generation(map_page):
     assert 'filling_txt' not in payloads[0]
     page.reload()
     assert page.locator('#fillingPaletteTheme').input_value() == 'greens'
+    state = page.evaluate('getFormState()')
+    assert state['palette_theme'] == 'greens'
+    assert state['auto_style'] is True
+    assert 'filling_txt' not in state
     assert page.locator('#aiTemperature').input_value() == '0'
     assert page.locator('#aiTemperatureValue').inner_text() == '0.00'
     assert '--temperature 0' in page.locator('#cliCommandDisplay').inner_text()

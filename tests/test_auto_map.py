@@ -24,25 +24,31 @@ renderer = importlib.import_module('map.auto_map')
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.fixture
-def scene(monkeypatch, tmp_path):
-    """Small real Pillow images keep compositing tests quick and deterministic."""
-    monkeypatch.chdir(ROOT)
-    monkeypatch.setattr(renderer, '__file__', str(tmp_path / 'map' / 'auto_map.py'))
+@pytest.fixture(scope='module')
+def _scene_assets(tmp_path_factory):
+    """Create minimal 640x640 PNGs once per module so renderer caches hit across tests."""
+    root = tmp_path_factory.mktemp('automap_scene')
+    (root / 'map').mkdir()
+    maps_dir = root / 'resources' / 'maps'
+    maps_dir.mkdir(parents=True)
     base = Image.new('RGBA', (640, 640), 'white')
     draw = ImageDraw.Draw(base)
     draw.line((210, 0, 210, 639), fill='black')
     draw.line((420, 0, 420, 639), fill='black')
-    real_open = Image.open
+    for name in ('default_map.png', 'flag_map.png', 'world_map.png'):
+        base.save(maps_dir / name)
+    empty = Image.new('RGBA', (640, 640))
+    for name in ('map_relief.png', 'default_map_blured.png', 'world_map_relief.png', 'world_map_blured.png'):
+        empty.save(maps_dir / name)
+    return root
 
-    def open_image(path, *args, **kwargs):
-        if isinstance(path, (str, Path)) and str(path).endswith('.png'):
-            if Path(path).name in ('default_map.png', 'flag_map.png', 'world_map.png'):
-                return base.copy()
-            return Image.new('RGBA', base.size)
-        return real_open(path, *args, **kwargs)
 
-    monkeypatch.setattr(Image, 'open', open_image)
+@pytest.fixture
+def scene(monkeypatch, _scene_assets):
+    """Small real Pillow images keep compositing tests quick and deterministic."""
+    monkeypatch.chdir(ROOT)
+    monkeypatch.setenv('AUTOMAP_REGION_CACHE_DIR', str(_scene_assets / 'rcache'))
+    monkeypatch.setattr(renderer, '__file__', str(_scene_assets / 'map' / 'auto_map.py'))
     coords = {'one': [(80, 80)], 'two': [(290, 80)], 'three': [(500, 80)]}
     monkeypatch.setattr(renderer, 'europe_coords', coords)
     monkeypatch.setattr(renderer, 'world_coords', coords)
@@ -54,7 +60,7 @@ def scene(monkeypatch, tmp_path):
     ))
     random = Mock(return_value=160)
     monkeypatch.setattr(renderer.random, 'randint', random)
-    return answer, random, real_open
+    return answer, random, Image.open
 
 
 def render(**changes):
@@ -214,12 +220,13 @@ def test_unknown_modes_return_no_image(scene, changes):
 
 
 @pytest.mark.parametrize('show', [False, True])
-def test_disk_output_and_optional_viewer(scene, monkeypatch, tmp_path, show):
+def test_disk_output_and_optional_viewer(scene, monkeypatch, _scene_assets, show):
     viewer = Mock()
     monkeypatch.setattr(Image.Image, 'show', viewer)
     output = render(io_res=False, show_result=show)
-    assert output == tmp_path / 'result.png'
+    assert output == _scene_assets / 'result.png'
     assert output.read_bytes().startswith(b'\x89PNG')
+    output.unlink(missing_ok=True)
     if show:
         viewer.assert_called_once_with('Map')
     else:
@@ -441,6 +448,8 @@ def test_global_label_shift_moves_all_labels_but_not_country_fill_seeds(scene, m
     output = render(map_type=map_type, label_style={'offset_x': offset})
     assert [call.args[0] for call in draw.call_args_list] == [(x + offset, y) for x, y in baseline]
     assert [call.kwargs['xy'] for call in fill.call_args_list] == seeds
+    if map_type != 'flag':
+        assert scene[2](output).getpixel((80, 600)) == (255, 0, 0, 255)
     assert output.map_meta['label_style']['offset_x'] == offset
 
 
