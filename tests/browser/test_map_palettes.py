@@ -20,7 +20,7 @@ from urllib.parse import urlsplit
 
 import pytest
 from PIL import Image
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 
 pytestmark = pytest.mark.browser
@@ -369,7 +369,8 @@ def test_map_inputs_work_when_browser_storage_is_blocked(map_page):
     page.locator('#apiKeyInput').fill('test-key')
     page.locator('#topicInput').fill('Test topic')
     assert page.evaluate('getFormState().api_key') == 'test-key'
-    assert 'Test topic' in page.locator('#cliCommandDisplay').inner_text()
+    # The preview updates after typing settles; storage may still be blocked.
+    expect(page.locator('#cliCommandDisplay')).to_contain_text('Test topic')
 
 
 def test_batch_selection_restores_parameters_before_repainting(map_page, web):
