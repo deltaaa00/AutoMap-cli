@@ -674,6 +674,115 @@ def _numeric_extrema(values):
     return max(numeric, key=numeric.get), min(numeric, key=numeric.get)
 
 
+def _format_legend_bound(val: float) -> str:
+    """Format a numeric legend bound compactly so ranges fit in open sea space."""
+    abs_val = abs(val)
+    if abs_val >= 1_000_000_000:
+        scaled, suffix = val / 1_000_000_000, "B"
+    elif abs_val >= 1_000_000:
+        scaled, suffix = val / 1_000_000, "M"
+    elif abs_val >= 10_000:
+        scaled, suffix = val / 1_000, "k"
+    elif float(val).is_integer():
+        return str(int(val))
+    else:
+        return f"{val:g}"
+    rounded = round(scaled, 1)
+    if float(rounded).is_integer():
+        return f"{int(rounded)}{suffix}"
+    return f"{rounded:g}{suffix}"
+
+
+def _format_legend_range(lo: float, hi: float) -> str:
+    """Format a ``(lo, hi)`` numeric interval for the floating map legend."""
+    if lo <= -1e12 and hi >= 1e12:
+        return "All"
+    if lo <= -1e12:
+        return f"< {_format_legend_bound(hi)}"
+    if hi >= 1e12:
+        return f"{_format_legend_bound(lo)}+"
+    return f"{_format_legend_bound(lo)} - {_format_legend_bound(hi)}"
+
+
+def _draw_legend_overlay(
+    size: tuple[int, int],
+    entries: list[tuple[tuple[int, int, int, int], str]],
+    get_font,
+    label_fill: tuple[int, int, int, int],
+    label_stroke_fill: tuple[int, int, int, int],
+    label_stroke_width: int,
+    map_type: str,
+    has_most_least: bool,
+) -> Image.Image | None:
+    """Render a floating color legend in the open sea on the left side of the map."""
+    if not entries:
+        return None
+    w, h = size
+    is_world = map_type in ("world", "world_countries")
+    if is_world:
+        x = int(w * 0.025)
+        start_y = int(h * (0.44 if has_most_least else 0.56))
+        max_h = int(h * (0.34 if has_most_least else 0.40))
+        max_w = int(w * 0.22)
+        base_size = max(20, int(h * 0.032))
+        min_size = 14
+    else:
+        x = 80
+        start_y = 1640 if has_most_least else 1240
+        max_h = max(300, 2750 - start_y)
+        max_w = 560
+        base_size = 86
+        min_size = 32
+
+    measure = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    count = len(entries)
+    font_size = base_size
+    while font_size > min_size:
+        fits_height = count * int(font_size * 1.32) <= max_h
+        swatch_try = max(14, int(font_size * 0.76))
+        gap_try = max(10, int(font_size * 0.30))
+        font_try = get_font(font_size)
+        widest = max(measure.textlength(text, font=font_try) for _, text in entries)
+        fits_width = swatch_try + gap_try + widest <= max_w
+        if fits_height and fits_width:
+            break
+        font_size -= 4
+
+    row_step = int(font_size * 1.28)
+    swatch = max(14, int(font_size * 0.76))
+    gap = max(10, int(font_size * 0.30))
+    radius = max(4, swatch // 5)
+    stroke_w = min(label_stroke_width, max(2, font_size // 5)) if label_stroke_width > 0 else 0
+    outline_w = max(2, min(6, font_size // 14))
+
+    layer = Image.new("RGBA", size, (255, 255, 255, 0))
+    draw = ImageDraw.Draw(layer)
+    font = get_font(font_size)
+
+    for idx, (color, text) in enumerate(entries):
+        row_y = start_y + idx * row_step
+        if row_y + swatch > h - 10:
+            break
+        swatch_y = row_y + max(0, (font_size - swatch) // 2)
+        rgba = (int(color[0]), int(color[1]), int(color[2]), 255)
+        draw.rounded_rectangle(
+            (x, swatch_y, x + swatch, swatch_y + swatch),
+            radius=radius,
+            fill=rgba,
+            outline=label_stroke_fill,
+            width=outline_w,
+        )
+        draw.text(
+            (x + swatch + gap, row_y),
+            text,
+            font=font,
+            fill=label_fill,
+            stroke_width=stroke_w,
+            stroke_fill=label_stroke_fill,
+        )
+    return layer
+
+
 def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
              optional_feature: str, model: str, font_name: str,
              show_result: bool = True, io_res = False, api_key: str | None = None,
@@ -686,14 +795,16 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
              ai_answer_override: dict[str, object] | None = None,
              temperature: float | None = None,
              web_search: bool = False,
-             max_search_requests: int = 5):
+             max_search_requests: int = 5,
+             show_legend: bool = False,
+             progress_callback=None):
     """Create a map from an AI query and save it as ``result.png``.
 
     CLI options:
       mode             -- "text" or "number"
       map_type         -- "default", "flag", "world" or "world_countries"
       size_mod         -- global font size modifier (default 15)
-      optional_feature -- None, "show_most_least" or "short_form"
+      optional_feature -- None, "show_most_least", "short_form", or comma-separated flags
       model            -- Gemini model id
       font_name        -- font file name from resources/fonts
       show_result      -- open the result in the OS image viewer (GUI only)
@@ -742,18 +853,33 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
     except (TypeError, ValueError, OverflowError):
         label_offset_x = 0
 
-    # Most least and short form conflict solution
-    # @TODO Make most/least and short form compatible
+    def _parse_optional_features(value: object) -> set[str]:
+        """Normalize ``optional_feature`` (string or collection) into a set of active flags."""
+        if not value:
+            return set()
+        if isinstance(value, (list, tuple, set, frozenset)):
+            tokens = {str(item).strip().lower() for item in value}
+        else:
+            raw = str(value).strip().lower()
+            if raw == "both":
+                return {"show_most_least", "short_form"}
+            tokens = {part.strip() for part in re.split(r"[,+\s]+", raw) if part.strip()}
+        tokens.discard("none")
+        return tokens
 
-    if optional_feature == "show_most_least" and mode == "text":
+    features = _parse_optional_features(optional_feature)
+    has_most_least = "show_most_least" in features
+    has_short_form = "short_form" in features
+
+    if has_most_least and mode == "text":
         showwarning("Warning", "Most/least feature may be incompatible with text mode. Turning off...")
-        optional_feature = None
+        has_most_least = False
 
-    if optional_feature == "show_most_least" and map_type == "world":
+    if has_most_least and map_type == "world":
         showwarning("Warning", "Most/Least feature is not available for world map. It will be disabled.")
-        optional_feature = None
+        has_most_least = False
 
-    if optional_feature == "short_form" and ai_answer_override is None:
+    if has_short_form and ai_answer_override is None:
         prompt += " Write in English short form only (k, M, B, T), for example 1000=1k, 1000000=1M, 1000000000=1B, 1000000000000=1T etc."
 
     random_colors = {}
@@ -793,6 +919,11 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
     text_layer = Image.new("RGBA", img.size, (255, 255, 255, 0))
     draw = ImageDraw.Draw(text_layer)
 
+    def _report(stage: int, label: str) -> None:
+        if progress_callback is not None:
+            progress_callback(stage, label)
+
+    _report(1, "Querying AI model...")
     if ai_answer_override is not None:
         ai_answer = dict(ai_answer_override)
     else:
@@ -809,7 +940,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         return
 
     raw_ai_answer = dict(ai_answer)
-    if optional_feature == "short_form":
+    if has_short_form:
         ai_answer = {k: _format_short_number(v) for k, v in ai_answer.items()}
 
     log.success(f"Got information from AI ({len(ai_answer)} entries)")
@@ -830,7 +961,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             if req_txt and (not theme_requested or req_keys_low != _DEFAULT_UI_TXT_KEYS):
                 ci_to_orig = {k.strip().lower(): k for k in merged_txt}
                 for rk, rv in req_txt.items():
-                    short_rk = str(_format_short_number(rk)).strip() if optional_feature == "short_form" else rk
+                    short_rk = str(_format_short_number(rk)).strip() if has_short_form else rk
                     target_k = ci_to_orig.get(short_rk.lower(), ci_to_orig.get(rk.strip().lower(), short_rk))
                     merged_txt[target_k] = rv
             filling_txt = merged_txt
@@ -850,15 +981,15 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         if not filling_num and auto_num:
             filling_num = auto_num
 
-    if optional_feature == "short_form":
+    if has_short_form:
         for k, v in list(filling_txt.items()):
             short_k = str(_format_short_number(k)).strip().lower()
             if short_k:
                 filling_txt_ci.setdefault(short_k, v)
 
     most_least = None
-    extrema = _numeric_extrema(ai_answer) if optional_feature == "show_most_least" else None
-    if optional_feature == "show_most_least" and extrema is None:
+    extrema = _numeric_extrema(raw_ai_answer) if has_most_least else None
+    if has_most_least and extrema is None:
         log.warning("No numeric values available; skipping most / least overlay")
     if extrema is not None:
         log.step("Computing most / least values")
@@ -890,6 +1021,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
                      stroke_fill=label_stroke_fill)
 
     total = len(dict_)
+    _report(2, "Painting regions & labels...")
     log.step(f"Painting {total} regions")
     used_txt_rules: dict[str, tuple[int, int, int, int]] = {}
     used_num_rules: dict[tuple[float, float], tuple[int, int, int, int]] = {}
@@ -1077,6 +1209,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
     render_meta = {
         "ai_answer": dict(ai_answer),
+        "raw_ai_answer": raw_ai_answer,
         "mode": mode,
         "resolved_theme": resolved_theme,
         "filling_txt": {str(k): list(v) for k, v in effective_txt.items()},
@@ -1099,6 +1232,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         img = _paint_regions(img, flat, ids, region_colors)
 
     # adding relief map
+    _report(3, "Adding relief, borders & overlays...")
     log.step("Compositing layers")
     _layer_assets = {
         "default": ("map_relief.png", "default_map_blured.png"),
@@ -1119,12 +1253,41 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         result = Image.alpha_composite(result, borders)
         result = Image.alpha_composite(result, text_layer)
 
-        if optional_feature == "show_most_least" and map_type != "world" and most_least is not None:
+        if has_most_least and map_type != "world" and most_least is not None:
             result = Image.alpha_composite(result, most_least)
     else:
         result = Image.alpha_composite(img, text_layer)
 
+    if show_legend:
+        if mode == "number":
+            legend_src = used_num_rules or effective_num
+            legend_entries = [
+                (tuple(c), _format_legend_range(lo, hi))
+                for (lo, hi), c in sorted(legend_src.items(), key=lambda item: (item[0][0], item[0][1]))
+            ]
+        else:
+            legend_src = used_txt_rules or effective_txt
+            legend_entries = [
+                (tuple(c), str(label).strip())
+                for label, c in legend_src.items()
+                if str(label).strip()
+            ]
+        has_ml = has_most_least and map_type != "world" and most_least is not None
+        legend_layer = _draw_legend_overlay(
+            img.size,
+            legend_entries,
+            get_font,
+            label_fill,
+            label_stroke_fill,
+            label_stroke_width,
+            map_type,
+            has_ml,
+        )
+        if legend_layer is not None:
+            result = Image.alpha_composite(result, legend_layer)
 
+
+    _report(4, "Encoding final PNG...")
     if io_res:
         # Return an in-memory PNG for the web API instead of writing result.png.
 

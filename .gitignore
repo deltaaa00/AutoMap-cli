@@ -61,5 +61,8 @@ playwright-report/
 instance/
 
 # Rust build artifacts
-target/
-automap_rs/target/
+/target/
+**/target/
+*.so
+*.dylib
+*.pyd

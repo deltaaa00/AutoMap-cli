@@ -112,7 +112,7 @@ def test_toggling_short_form_abbreviates_cached_large_numbers_on_regenerate(monk
     assert first['map_values'] == {'ukraine': 38_000_000, 'germany': 84_500_000}
     assert second['ai_cached'] is True
     assert second['map_values'] == {'ukraine': '38M', 'germany': '84.5M'}
-    assert calls[1]['ai_answer_override'] == {'ukraine': '38M', 'germany': '84.5M'}
+    assert calls[1]['ai_answer_override'] == {'ukraine': 38_000_000, 'germany': 84_500_000}
 
 
 def test_render_video_accepts_binary_multipart(monkeypatch):
@@ -131,3 +131,27 @@ def test_render_video_accepts_binary_multipart(monkeypatch):
     assert sent['map_file'] == 'data:image/png;base64,iVBORw=='
     assert sent['background_video'].startswith('data:video/mp4;base64,')
     assert sent['video_title'] == 'T' and sent['duration'] == 8
+
+
+def test_combined_features_keep_precision_across_cached_requests_and_repaint(monkeypatch):
+    calls = []
+    raw = {'france': 1001, 'germany': 1049}
+
+    def render(**kwargs):
+        calls.append(kwargs)
+        values = kwargs.get('ai_answer_override', raw)
+        buf = _buffer({k: web._format_short_number(v) for k, v in values.items()})
+        buf.map_meta['raw_ai_answer'] = dict(values)
+        return buf
+
+    monkeypatch.setattr(web, 'auto_map', render)
+    client = web.app.test_client()
+    body = _body(mode='number', extra_option='show_most_least,short_form')
+    for _ in range(2):
+        response = client.post('/api/generate', json=body)
+        assert response.status_code == 200
+        assert response.json['map_values'] == raw
+    assert calls[1]['ai_answer_override'] == raw
+    response = client.post('/api/restyle_map', json={**body, 'map_values': response.json['map_values']})
+    assert response.status_code == 200
+    assert calls[2]['ai_answer_override'] == raw

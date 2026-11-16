@@ -454,7 +454,7 @@ BATCH_CSV_OPTIONAL_COLUMNS: tuple[str, ...] = (
 BATCH_CSV_ALL_COLUMNS: tuple[str, ...] = BATCH_CSV_REQUIRED_COLUMNS + BATCH_CSV_OPTIONAL_COLUMNS
 _ALLOWED_MODES = frozenset({"text", "number"})
 _ALLOWED_MAP_TYPES = frozenset({"default", "flag", "world", "world_countries"})
-_ALLOWED_EXTRA_OPTIONS = frozenset({"none", "show_most_least", "short_form"})
+_ALLOWED_EXTRA_OPTIONS = frozenset({"none", "show_most_least", "short_form", "show_most_least,short_form", "short_form,show_most_least"})
 
 
 def slugify_prompt(prompt: str, max_len: int = 48) -> str:

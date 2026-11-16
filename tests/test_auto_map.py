@@ -442,3 +442,55 @@ def test_global_label_shift_moves_all_labels_but_not_country_fill_seeds(scene, m
     assert [call.args[0] for call in draw.call_args_list] == [(x + offset, y) for x, y in baseline]
     assert [call.kwargs['xy'] for call in fill.call_args_list] == seeds
     assert output.map_meta['label_style']['offset_x'] == offset
+
+
+@pytest.mark.parametrize('feature', ['show_most_least,short_form', 'short_form,show_most_least', 'both', ['short_form', 'show_most_least']])
+def test_combined_features_compare_unrounded_values(scene, monkeypatch, feature):
+    scene[0].return_value = {'one': 1001, 'two': 1049}
+    text = Mock()
+    monkeypatch.setattr(ImageDraw.ImageDraw, 'text', text)
+    result = render(mode='number', optional_feature=feature)
+    labels = [call.args[1] for call in text.call_args_list]
+    assert 'Most: Two\nLeast: One' in labels
+    assert result.map_meta['raw_ai_answer'] == {'one': 1001, 'two': 1049}
+    assert result.map_meta['ai_answer'] == {'one': '1k', 'two': '1k'}
+
+
+@pytest.mark.parametrize('mode', ['text', 'number'])
+def test_legend_and_progress_are_rendered(scene, monkeypatch, mode):
+    scene[0].return_value = {'one': 5, 'two': 15} if mode == 'number' else {'one': 'Yes', 'two': 'No'}
+    overlay = Mock(wraps=renderer._draw_legend_overlay)
+    monkeypatch.setattr(renderer, '_draw_legend_overlay', overlay)
+    progress = Mock()
+    result = render(mode=mode, show_legend=True, progress_callback=progress)
+    assert result.getvalue().startswith(b'\x89PNG')
+    assert overlay.call_args.args[1]
+    assert [call.args[0] for call in progress.call_args_list] == [1, 2, 3, 4]
+
+
+@pytest.mark.parametrize('value,expected', [(0, '0'), (1.25, '1.25'), (10000, '10k'), (12500, '12.5k'), (1000000, '1M'), (1500000000, '1.5B'), (-15000, '-15k')])
+def test_legend_formats_bounds(value, expected):
+    assert renderer._format_legend_bound(value) == expected
+
+
+@pytest.mark.parametrize('lo,hi,expected', [(-1e12, 1e12, 'All'), (-1e12, 20, '< 20'), (20, 1e12, '20+'), (10, 20, '10 - 20')])
+def test_legend_formats_ranges(lo, hi, expected):
+    assert renderer._format_legend_range(lo, hi) == expected
+
+
+@pytest.mark.parametrize('map_type', ['default', 'world', 'world_countries'])
+@pytest.mark.parametrize('has_ml', [False, True])
+def test_legend_draws_visible_swatches(map_type, has_ml):
+    font_path = renderer.FONTS_DIR / 'Bips.ttf'
+    font = lambda size: renderer.ImageFont.truetype(str(font_path), size)
+    layer = renderer._draw_legend_overlay((2000, 3000), [((255, 0, 0, 255), 'Yes'), ((0, 0, 255, 255), 'No')], font, (255,255,255,255), (0,0,0,255), 5, map_type, has_ml)
+    assert layer.getbbox() is not None
+    assert layer.mode == 'RGBA'
+
+
+def test_legend_empty_long_and_overflow_entries():
+    font = lambda size: renderer.ImageFont.truetype(str(renderer.FONTS_DIR / 'Bips.ttf'), size)
+    args = (font, (255,255,255,255), (0,0,0,255), 0, 'world', False)
+    assert renderer._draw_legend_overlay((100,100), [], *args) is None
+    layer = renderer._draw_legend_overlay((100,100), [((255,0,0,255), 'Long category ' * 20)] * 100, *args)
+    assert layer.size == (100,100)

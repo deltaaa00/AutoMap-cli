@@ -213,7 +213,8 @@ python cli.py make "GDP per capita by country" -m number -eop show_most_least --
 | `-m`, `--mode` | `text`, `number` | `text` |
 | `-mp`, `--map-type` | `default`, `flag`, `world` | `default` |
 | `-gsm`, `--global-size-modifier` | Integer font-size adjustment | `15` |
-| `-eop`, `--extra-option` | `none`, `show_most_least`, `short_form` | `none` |
+| `-eop`, `--extra-option` | `none`, `show_most_least`, `short_form`, `show_most_least,short_form` (either order) | `none` |
+| `--legend` | Draw a color legend | off |
 | `--model` | Supported model ID; see command help | `gemini-3.8-flash` |
 | `--font` | Bundled `.ttf` or `.otf` filename | `Bips.ttf` |
 | `--key` | Key for the selected model's provider | Provider environment/file key |
@@ -221,7 +222,7 @@ python cli.py make "GDP per capita by country" -m number -eop show_most_least --
 | `--show` / `--no-show` | Open the generated image; `make` only | `--no-show` |
 | `-v`, `--verbose` | Detailed progress output | Off |
 
-`show_most_least` is supported in **numeric mode on Europe maps** (`default` or `flag`). `short_form` asks the model for shortened values such as `1k` or `2M` and is supported in **text mode**. These are mutually exclusive extra options.
+`show_most_least` is supported in **numeric mode** on `default`, `flag`, and `world_countries` maps. `short_form` displays shortened values such as `1k` or `2M` in either mode. Combine them with `-eop show_most_least,short_form`; extrema use the original values before display rounding. Add `--legend` to show the color key.
 
 ### Batch generation
 

@@ -76,10 +76,10 @@ def main():
               help="Global font size modifier (default 15).")
 @click.option("-eop", "--extra-option",
               "optional_feature",
-              type=click.Choice(["none", "show_most_least", "short_form"], case_sensitive=False),
+              type=click.Choice(["none", "show_most_least", "short_form", "show_most_least,short_form", "short_form,show_most_least"], case_sensitive=False),
               default="none",
               show_default=True,
-              help="One extra option: none (default), show_most_least or short_form.")
+              help="Extra options: none, show_most_least, short_form, or both separated by a comma.")
 @click.option("--model",
               type=click.Choice(AVAILABLE_MODELS, case_sensitive=False),
               default=AVAILABLE_MODELS[0],
@@ -106,7 +106,8 @@ def main():
               help="API key for the selected model provider (overrides its environment key).")
 @click.option("--temperature", type=click.FloatRange(0, 2), default=None,
               help="AI sampling randomness, from 0 to 2. Omit to use the model default.")
-def make(prompt, mode, map_type, size_mod, optional_feature, model, font_name, show_result, verbose, api_key, temperature):
+@click.option("--legend", "show_legend", is_flag=True, help="Draw a color legend on the map.")
+def make(prompt, mode, map_type, size_mod, optional_feature, model, font_name, show_result, verbose, api_key, temperature, show_legend):
     """Generate a map from PROMPT and save it as result.png.
 
     Example:
@@ -119,6 +120,8 @@ def make(prompt, mode, map_type, size_mod, optional_feature, model, font_name, s
     from map.auto_map import auto_map
 
     ai_options = {}
+    if show_legend:
+        ai_options["show_legend"] = True
     if temperature is not None:
         from map.functions import validate_temperature
         try:
