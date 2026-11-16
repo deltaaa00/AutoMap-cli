@@ -24,6 +24,7 @@ import base64
 import io
 import os
 import re
+import threading
 import time
 
 from pathlib import Path
@@ -280,7 +281,7 @@ def _auto_map_with_ai_cache(*, refresh: bool, provider: str, api_key, **kwargs):
         identity = str(session.get('web_identity', '') or '')
     except RuntimeError:
         identity = ''
-    short_form = kwargs.get('optional_feature') == 'short_form'
+    short_form = 'short_form' in str(kwargs.get('optional_feature') or '')
     scope = ai_cache.scope(identity, api_key)
     base_fields = dict(
         prompt=str(kwargs.get('prompt') or ''),
@@ -541,6 +542,37 @@ def _parse_render_params(data: dict[str, object]) -> tuple[str, str | None, int]
     return str(font_name), extra_option, gsm
 
 
+_MAP_PROGRESS_LOCK = threading.Lock()
+_MAP_PROGRESS: dict[str, dict[str, object]] = {}
+
+
+def _set_map_progress(progress_id: str, stage: int, label: str, status: str = "running") -> None:
+    """Record the active map generation stage for ``progress_id``."""
+    if not progress_id:
+        return
+    now = time.time()
+    with _MAP_PROGRESS_LOCK:
+        stale = [k for k, v in _MAP_PROGRESS.items() if now - float(v.get("updated_at", 0)) > 300]
+        for k in stale:
+            _MAP_PROGRESS.pop(k, None)
+        _MAP_PROGRESS[progress_id] = {
+            "stage": stage,
+            "label": label,
+            "status": status,
+            "updated_at": now,
+        }
+
+
+@app.get('/api/generate_progress/<progress_id>')
+def api_generate_progress(progress_id: str):
+    """Return current map generation progress for ``progress_id``."""
+    with _MAP_PROGRESS_LOCK:
+        entry = dict(_MAP_PROGRESS.get(progress_id) or {"stage": 1, "label": "Querying AI model...", "status": "running"})
+    resp = jsonify(entry)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @app.route('/api/generate/', methods=['POST'])
 @app.route('/api/generate', methods=['POST'])
 def generate():
@@ -591,7 +623,17 @@ def generate():
     if temperature_options:
         command += f" --temperature {temperature_options['temperature']:g}"
 
-    style_kwargs: dict[str, object] = {}
+    show_legend = bool(data.get("show_legend", False))
+    if show_legend:
+        command += " --legend"
+
+    progress_id = str(data.get("progress_id") or "").strip()[:64]
+    if progress_id:
+        _set_map_progress(progress_id, 1, "Querying AI model...")
+
+    style_kwargs: dict[str, object] = {"show_legend": show_legend}
+    if progress_id:
+        style_kwargs["progress_callback"] = lambda stage, label: _set_map_progress(progress_id, stage, label)
     for style_key, kw_name in (
         ("filling_txt", "filling_txt_override"),
         ("filling_num", "filling_num_override"),
@@ -621,18 +663,29 @@ def generate():
             **style_kwargs,
         )
     except AIServiceError as error:
+        if progress_id:
+            _set_map_progress(progress_id, 1, str(error), status="error")
         return jsonify(status='error', command=command, error=str(error)), error.status_code
     except KeyError as e:
+        if progress_id:
+            _set_map_progress(progress_id, 1, f"Missing field: {e}", status="error")
         return jsonify({"status": "error", "command": command,
                         "error": f"Missing field: {e}"}), 400
     except Exception as e:  # noqa: BLE001 - surface failures to the UI
+        if progress_id:
+            _set_map_progress(progress_id, 1, str(e), status="error")
         return jsonify({"status": "error", "command": command,
                         "error": str(e)}), 500
 
     # auto_map returns None on AI failure / unknown map type.
     if buffer is None:
+        if progress_id:
+            _set_map_progress(progress_id, 1, "Map generation failed.", status="error")
         return jsonify({"status": "error", "command": command,
                         "error": "Map generation failed. Check the server logs."}), 500
+
+    if progress_id:
+        _set_map_progress(progress_id, 4, "Finalizing map...", status="done")
 
     # Encode the PNG buffer as a data URL the browser can load directly.
     encoded = base64.b64encode(buffer.getvalue()).decode('ascii')
@@ -1003,6 +1056,7 @@ def api_restyle_map():
             auto_style=auto_style,
             palette_theme=palette_theme,
             ai_answer_override=map_values,
+            show_legend=bool(data.get("show_legend", False)),
         )
     except Exception as e:  # noqa: BLE001
         return jsonify({"status": "error", "error": str(e)}), 500

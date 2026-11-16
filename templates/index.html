@@ -88,6 +88,25 @@ limitations under the License.
             background: rgba(99, 102, 241, 0.85);
         }
 
+        @keyframes checkPop {
+            0% {
+                opacity: 0;
+                transform: scale(0.35) rotate(-18deg);
+            }
+            65% {
+                opacity: 1;
+                transform: scale(1.25) rotate(4deg);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) rotate(0deg);
+            }
+        }
+        .check-pop {
+            display: inline-block;
+            animation: checkPop 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
         /* Ambient Aurora Backdrop Animations */
         @keyframes auroraFloat {
             0%, 100% {
@@ -383,7 +402,6 @@ limitations under the License.
                                 <i class="fa-solid fa-wand-magic-sparkles text-indigo-400"></i>
                                 Map Topic or AI Query
                             </label>
-                            <code class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">PROMPT</code>
                         </div>
                         <div class="relative group">
                             <input type="text" id="topicInput" placeholder="e.g., Population of European countries" 
@@ -480,7 +498,6 @@ limitations under the License.
                                 <i class="fa-solid fa-database text-indigo-400 text-[11px]"></i>
                                 Data Mode
                             </label>
-                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">-m, --mode</code>
                         </div>
                         <div class="grid grid-cols-2 gap-2.5">
                             <label class="cursor-pointer group relative">
@@ -529,7 +546,6 @@ limitations under the License.
                                 <i class="fa-solid fa-layer-group text-indigo-400 text-[11px]"></i>
                                 Map Canvas Type
                             </label>
-                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">-mp, --map-type</code>
                         </div>
                         <div class="grid grid-cols-2 gap-2.5">
                             <!-- Default Europe Map -->
@@ -572,8 +588,8 @@ limitations under the License.
                                     <div class="w-10 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-1.5 text-emerald-400 group-hover:scale-105 transition-transform">
                                         <i class="fa-solid fa-earth-americas text-sm"></i>
                                     </div>
-                                    <div class="text-xs font-semibold font-mono text-slate-100">world_countries</div>
-                                    <div class="text-[10px] text-slate-400 mt-0.5">World Countries</div>
+                                    <div class="text-xs font-semibold text-slate-100">World Countries</div>
+                                    <div class="text-[10px] text-slate-400 mt-0.5">All Nations</div>
                                 </div>
                             </label>
                         </div>
@@ -586,7 +602,6 @@ limitations under the License.
                                 <i class="fa-solid fa-text-height text-indigo-400 text-[11px]"></i>
                                 Global Size Modifier
                             </label>
-                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">-gsm, --global-size-modifier</code>
                         </div>
                         <div class="flex items-center gap-3 bg-slate-950/80 p-3 rounded-xl border border-slate-800">
                             <input type="range" id="gsmRange" min="-50" max="100" step="1" value="15" 
@@ -609,32 +624,35 @@ limitations under the License.
                                 <i class="fa-solid fa-sparkles text-indigo-400 text-[11px]"></i>
                                 Extra Display Options
                             </label>
-                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">-eop, --extra-option</code>
                         </div>
-                        <div class="grid grid-cols-3 gap-2">
+                        <div class="grid grid-cols-2 gap-2">
                             <label class="cursor-pointer">
-                                <input type="radio" name="extra_option" value="none" checked onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="px-2.5 py-2.5 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-indigo-600/20 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
-                                    <div class="text-xs font-mono font-semibold text-slate-200">none</div>
-                                    <div class="text-[10px] text-slate-400 mt-0.5">Standard</div>
-                                </div>
-                            </label>
-                            <label class="cursor-pointer">
-                                <input type="radio" name="extra_option" value="show_most_least" onchange="updateCommandPreview()" class="peer sr-only">
+                                <input type="checkbox" id="showMostLeastToggle" value="show_most_least" onchange="updateCommandPreview()" class="peer sr-only">
                                 <div class="px-2 py-2.5 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-indigo-600/20 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
-                                    <div class="text-xs font-mono font-semibold text-slate-200 truncate">show_most_least</div>
+                                    <div class="text-xs font-semibold text-slate-200 truncate">Show Most / Least</div>
                                     <div class="text-[10px] text-slate-400 mt-0.5">Min / Max HUD</div>
                                 </div>
                             </label>
                             <label class="cursor-pointer">
-                                <input type="radio" name="extra_option" value="short_form" onchange="updateCommandPreview()" class="peer sr-only">
+                                <input type="checkbox" id="shortFormToggle" value="short_form" onchange="updateCommandPreview()" class="peer sr-only">
                                 <div class="px-2.5 py-2.5 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-indigo-600/20 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
-                                    <div class="text-xs font-mono font-semibold text-slate-200">short_form</div>
+                                    <div class="text-xs font-semibold text-slate-200">Short Form</div>
                                     <div class="text-[10px] text-slate-400 mt-0.5">Compact (1k/1M)</div>
                                 </div>
                             </label>
                         </div>
                         <p id="extraOptionHint" class="text-[11px] text-slate-400 mt-1.5 hidden"></p>
+                        <label class="mt-2.5 flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-slate-700 transition cursor-pointer">
+                            <div>
+                                <div class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-list-ul text-indigo-400 text-[11px]"></i>
+                                    Legend Overlay
+                                </div>
+                                <div class="text-[10px] text-slate-400 mt-0.5">Float color legend in the left sea area</div>
+                            </div>
+                            <input type="checkbox" id="showLegendToggle" onchange="updateCommandPreview()"
+                                class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500">
+                        </label>
                     </div>
 
                     <!-- 5. Flag: --model & 6. Flag: --font in a responsive 2-col or stacked layout -->
@@ -643,7 +661,6 @@ limitations under the License.
                         <div>
                             <div class="flex justify-between items-center mb-1.5">
                                 <label for="modelSelect" class="text-xs font-semibold text-slate-200">AI Model</label>
-                                <code class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">--model</code>
                             </div>
                             <div class="flex gap-1.5">
                                 <div class="relative flex-1 min-w-0">
@@ -686,7 +703,6 @@ limitations under the License.
                         <div>
                             <div class="flex justify-between items-center mb-1.5">
                                 <label for="fontSelect" class="text-xs font-semibold text-slate-200">Map Font</label>
-                                <code class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800">--font</code>
                             </div>
                             <div class="flex gap-1.5">
                                 <div class="relative flex-1 min-w-0">
@@ -907,14 +923,18 @@ limitations under the License.
                             <div class="w-full mt-4 space-y-2 text-left bg-slate-950/80 p-3.5 rounded-xl border border-slate-800/80 font-mono text-[11px]">
                                 <div id="loadStage1" class="flex items-center justify-between text-indigo-300">
                                     <span class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin text-[10px]"></i> 1. AI Geospatial Query</span>
-                                    <span class="text-[10px] opacity-75">Active</span>
+                                    <span class="text-[10px] opacity-75">Running</span>
                                 </div>
                                 <div id="loadStage2" class="flex items-center justify-between text-slate-500">
-                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> 2. Region Flood-Fill &amp; Palette</span>
+                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> 2. Painting Regions &amp; Labels</span>
                                     <span class="text-[10px] opacity-75">Pending</span>
                                 </div>
                                 <div id="loadStage3" class="flex items-center justify-between text-slate-500">
-                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> 3. Relief &amp; Typography Composite</span>
+                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> 3. Adding Relief, Borders &amp; Overlays</span>
+                                    <span class="text-[10px] opacity-75">Pending</span>
+                                </div>
+                                <div id="loadStage4" class="flex items-center justify-between text-slate-500">
+                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> 4. Encoding Final PNG</span>
                                     <span class="text-[10px] opacity-75">Pending</span>
                                 </div>
                             </div>
@@ -1573,8 +1593,7 @@ limitations under the License.
             const mapRadio = document.querySelector(`input[name="map_type"][value="${mapType}"]`);
             if (mapRadio) mapRadio.checked = true;
 
-            const eopRadio = document.querySelector(`input[name="extra_option"][value="${extraOption}"]`);
-            if (eopRadio) eopRadio.checked = true;
+            setSelectedExtraOption(extraOption);
 
             updateCommandPreview();
             showToast(`Preset loaded: "${promptText}"`, 'info');
@@ -1698,11 +1717,12 @@ limitations under the License.
 
         function restoreBatchResultParameters(item) {
             changeAiProvider(item.provider || modelProvider(item.model), item.model);
-            for (const name of ['mode', 'map_type', 'extra_option']) {
+            for (const name of ['mode', 'map_type']) {
                 const input = Array.from(document.getElementsByName(name))
                     .find(input => input.value === item[name]);
                 if (input) input.checked = true;
             }
+            if (item.extra_option !== undefined) setSelectedExtraOption(item.extra_option);
             document.getElementById('topicInput').value = item.prompt || '';
             if (item.gsm !== undefined) syncGsm(item.gsm);
             for (const [field, id] of [['model', 'modelSelect'], ['font', 'fontSelect']]) {
@@ -2059,11 +2079,28 @@ limitations under the License.
             return { filling_txt, filling_num };
         }
 
+        function getSelectedExtraOption() {
+            const parts = [];
+            if (document.getElementById('showMostLeastToggle')?.checked) parts.push('show_most_least');
+            if (document.getElementById('shortFormToggle')?.checked) parts.push('short_form');
+            return parts.length ? parts.join(',') : 'none';
+        }
+
+        function setSelectedExtraOption(value) {
+            const raw = String(value || 'none').toLowerCase();
+            const showMostLeast = raw.includes('show_most_least') || raw === 'both';
+            const shortForm = raw.includes('short_form') || raw === 'both';
+            const mlEl = document.getElementById('showMostLeastToggle');
+            const sfEl = document.getElementById('shortFormToggle');
+            if (mlEl) mlEl.checked = showMostLeast;
+            if (sfEl) sfEl.checked = shortForm;
+        }
+
         function getFormState() {
             const mode = document.querySelector('input[name="mode"]:checked')?.value || 'text';
             const mapType = document.querySelector('input[name="map_type"]:checked')?.value || 'default';
             const gsm = parseInt(document.getElementById('gsmNumber').value, 10) || 15;
-            const extraOption = document.querySelector('input[name="extra_option"]:checked')?.value || 'none';
+            const extraOption = getSelectedExtraOption();
             const model = document.getElementById('modelSelect').value;
             const font = document.getElementById('fontSelect').value;
             const topic = document.getElementById('topicInput').value.trim();
@@ -2081,6 +2118,7 @@ limitations under the License.
                 map_type: mapType,
                 gsm,
                 extra_option: extraOption,
+                show_legend: !!document.getElementById('showLegendToggle')?.checked,
                 model,
                 font,
                 topic,
@@ -2150,6 +2188,7 @@ limitations under the License.
             // Match cli.py's signature: `cli.py make "<prompt>" -m ... -mp ... -gsm ... -eop ... --model ... --font ...`
             const escapedTopic = (state.topic || '').replace(/"/g, '\\"');
             let cmd = `python cli.py make "${escapedTopic}" -m ${state.mode} -mp ${state.map_type} -gsm ${state.gsm} -eop ${state.extra_option} --model ${state.model} --font "${state.font}" --temperature ${state.temperature}`;
+            if (state.show_legend) cmd += ' --legend';
 
             document.getElementById('cliCommandDisplay').textContent = cmd;
             updateActiveBadges(state);
@@ -2160,10 +2199,11 @@ limitations under the License.
         function updateCompatibilityHint(state) {
             const hint = document.getElementById('extraOptionHint');
             if (!hint) return;
-            if (state.extra_option === 'show_most_least' && state.mode === 'text') {
+            const hasMostLeast = String(state.extra_option || '').includes('show_most_least');
+            if (hasMostLeast && state.mode === 'text') {
                 hint.textContent = 'Note: show_most_least is designed for numeric mode (-m number).';
                 hint.className = 'text-[11px] text-amber-400/90 mt-1.5 block';
-            } else if (state.extra_option === 'show_most_least' && state.map_type === 'world') {
+            } else if (hasMostLeast && state.map_type === 'world') {
                 hint.textContent = 'Note: show_most_least overlay is supported on default, flag, and world_countries maps.';
                 hint.className = 'text-[11px] text-amber-400/90 mt-1.5 block';
             } else {
@@ -2192,6 +2232,7 @@ limitations under the License.
                 { label: `map: ${state.map_type}`, color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
                 { label: `gsm: ${state.gsm}`, color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
                 { label: `eop: ${state.extra_option}`, color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
+                ...(state.show_legend ? [{ label: 'legend', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' }] : []),
                 { label: state.model, color: 'bg-sky-500/20 text-sky-300 border-sky-500/30' },
                 { label: state.font, color: 'bg-slate-900/90 text-slate-300 border-slate-700' }
             ];
@@ -2268,34 +2309,93 @@ limitations under the License.
             }
         }
 
+        let loadingProgressPollInterval = null;
+        let lastRenderedLoadingStage = 0;
+
+        function renderLoadingStages(activeStage, labelText) {
+            const stepText = document.getElementById('loadingStepText');
+            if (stepText && labelText) stepText.textContent = labelText;
+            if (activeStage === lastRenderedLoadingStage) return;
+            lastRenderedLoadingStage = activeStage;
+
+            const stageNames = [
+                '1. AI Geospatial Query',
+                '2. Painting Regions & Labels',
+                '3. Adding Relief, Borders & Overlays',
+                '4. Encoding Final PNG'
+            ];
+
+            for (let i = 1; i <= 4; i++) {
+                const el = document.getElementById(`loadStage${i}`);
+                if (!el) continue;
+                const title = stageNames[i - 1];
+                const nextState = i < activeStage ? 'done' : (i === activeStage ? 'running' : 'pending');
+                if (el.dataset.state === nextState) continue;
+                el.dataset.state = nextState;
+                if (nextState === 'done') {
+                    el.className = 'flex items-center justify-between text-emerald-400';
+                    el.innerHTML = `<span class="flex items-center gap-2"><i class="fa-solid fa-check text-[10px] check-pop"></i> ${title}</span><span class="text-[10px] opacity-75">Done</span>`;
+                } else if (nextState === 'running') {
+                    el.className = 'flex items-center justify-between text-indigo-300';
+                    el.innerHTML = `<span class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin text-[10px]"></i> ${title}</span><span class="text-[10px] opacity-75">Running</span>`;
+                } else {
+                    el.className = 'flex items-center justify-between text-slate-500';
+                    el.innerHTML = `<span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> ${title}</span><span class="text-[10px] opacity-75">Pending</span>`;
+                }
+            }
+        }
+
         // --- Multi-Stage Loading Animation Helper ---
-        function startLoadingStages() {
+        function startLoadingStages(progressId = '') {
             const stepText = document.getElementById('loadingStepText');
             const timerEl = document.getElementById('loadingElapsedTimer');
-            const s1 = document.getElementById('loadStage1');
-            const s2 = document.getElementById('loadStage2');
-            const s3 = document.getElementById('loadStage3');
-
             const startTime = performance.now();
             clearInterval(loadingTimerInterval);
-            stepText.textContent = 'Waiting for the AI response and map rendering...';
-            if (s1 && s2 && s3) {
-                s1.className = 'flex items-center justify-between text-indigo-300';
-                s1.innerHTML = '<span class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin text-[10px]"></i> AI query &amp; map rendering</span><span class="text-[10px]">Running</span>';
-                s2.className = 'hidden';
-                s3.className = 'hidden';
+            clearInterval(loadingProgressPollInterval);
+            lastRenderedLoadingStage = 0;
+            for (let i = 1; i <= 4; i++) {
+                const el = document.getElementById(`loadStage${i}`);
+                if (el) delete el.dataset.state;
             }
+
+            renderLoadingStages(1, 'Querying AI model...');
+
             loadingTimerInterval = setInterval(() => {
                 const elapsed = (performance.now() - startTime) / 1000;
                 if (timerEl) timerEl.textContent = `${elapsed.toFixed(1)}s`;
-                if (elapsed >= 15) {
-                    stepText.textContent = 'Still waiting for the server. The selected AI model may be busy.';
+                if (elapsed >= 15 && stepText && stepText.textContent === 'Querying AI model...') {
+                    stepText.textContent = 'Still waiting for the AI model response...';
                 }
             }, 150);
+
+            if (progressId) {
+                let polling = false;
+                loadingProgressPollInterval = setInterval(async () => {
+                    if (polling) return;
+                    polling = true;
+                    try {
+                        const resp = await fetch(`/api/generate_progress/${encodeURIComponent(progressId)}`, { cache: 'no-store' });
+                        if (resp.ok) {
+                            const prog = await resp.json();
+                            if (prog && typeof prog.stage === 'number') {
+                                renderLoadingStages(prog.stage, prog.label);
+                            }
+                            if (prog && (prog.status === 'done' || prog.status === 'error')) {
+                                clearInterval(loadingProgressPollInterval);
+                            }
+                        }
+                    } catch {
+                        // Ignore transient polling errors while map is generating.
+                    } finally {
+                        polling = false;
+                    }
+                }, 250);
+            }
         }
 
         function stopLoadingStages() {
             clearInterval(loadingTimerInterval);
+            clearInterval(loadingProgressPollInterval);
         }
 
         // --- Handle Map Generation (Form Submit) ---
@@ -2317,12 +2417,16 @@ limitations under the License.
                 return;
             }
 
+            const progressId = (window.crypto && typeof crypto.randomUUID === 'function')
+                ? crypto.randomUUID()
+                : `map_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
             document.getElementById('generationError').classList.add('hidden');
             overlay.classList.remove('hidden');
             btn.disabled = true;
             btn.classList.add('opacity-70');
             metaBadge.textContent = "Synthesizing...";
-            startLoadingStages();
+            startLoadingStages(progressId);
 
             logToConsole(`$ ${cmd}`, 'cmd');
 
@@ -2330,7 +2434,7 @@ limitations under the License.
                 const response = await fetch('/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(state)
+                    body: JSON.stringify({ ...state, progress_id: progressId })
                 });
 
                 // The backend may return JSON on error; guard against non-JSON bodies.
@@ -3139,8 +3243,9 @@ limitations under the License.
             const mapRadio = document.querySelector(`input[name="map_type"][value="${s.map_type}"]`);
             if (mapRadio) mapRadio.checked = true;
             syncGsm(s.gsm);
-            const eopRadio = document.querySelector(`input[name="extra_option"][value="${s.extra_option}"]`);
-            if (eopRadio) eopRadio.checked = true;
+            setSelectedExtraOption(s.extra_option);
+            const legendToggle = document.getElementById('showLegendToggle');
+            if (legendToggle) legendToggle.checked = !!s.show_legend;
             document.getElementById('modelSelect').value = s.model;
             document.getElementById('fontSelect').value = s.font;
             document.getElementById('topicInput').value = s.topic || '';
@@ -3201,7 +3306,9 @@ limitations under the License.
             document.querySelector('input[name="mode"][value="text"]').checked = true;
             document.querySelector('input[name="map_type"][value="default"]').checked = true;
             syncGsm(15);
-            document.querySelector('input[name="extra_option"][value="none"]').checked = true;
+            setSelectedExtraOption('none');
+            const legendToggle = document.getElementById('showLegendToggle');
+            if (legendToggle) legendToggle.checked = false;
             changeAiProvider('gemini', fallbackModels.find(model => modelProvider(model) === 'gemini'));
             document.getElementById('fontSelect').selectedIndex = 0;
             document.getElementById('topicInput').value = '';
