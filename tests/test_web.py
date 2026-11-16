@@ -47,7 +47,7 @@ def test_generate_forwards_options_and_encodes_png(web, monkeypatch, generation_
     assert base64.b64decode(response.json['image_url'].split(',')[1]) == b'png-data'
     generate.assert_called_once_with(prompt='Population', mode='number', map_type='default',
         size_mod=22, optional_feature='show_most_least', model='mock-model',
-        font_name='DIN Condensed.ttf', show_result=False, io_res=True, api_key='form-key')
+        font_name='DIN Condensed.ttf', show_result=False, io_res=True, api_key='form-key', show_legend=False)
     assert 'form-key' not in response.json['command']
 
 
@@ -481,3 +481,34 @@ def test_model_discovery_excludes_non_text_models_and_keeps_new_versions(web, mo
     assert result.status_code == 200
     assert set(result.json['models']) == {'gemini-4-hydrogen', 'gemini-3.8-flash', 'gemma-4-31b-it'}
     assert client.call_args.kwargs['http_options'].timeout == 15000
+
+
+def test_map_progress_tracks_stages_and_expires_old_entries(web, monkeypatch, generation_request):
+    def generate(**kwargs):
+        kwargs['progress_callback'](2, 'Painting')
+        assert web._MAP_PROGRESS['render-id']['stage'] == 2
+        buf = io.BytesIO(b'png')
+        buf.map_meta = {'ai_answer': {'a': '1k'}, 'raw_ai_answer': {'a': 1049}}
+        return buf
+    monkeypatch.setattr(web, 'auto_map', generate)
+    web._MAP_PROGRESS['old'] = {'updated_at': 0}
+    web._set_map_progress('', 1, 'ignored')
+    client = web.app.test_client()
+    response = client.post('/api/generate', json={**generation_request, 'progress_id': 'render-id', 'show_legend': True})
+    assert response.status_code == 200
+    assert response.json['map_values'] == {'a': 1049}
+    assert '--legend' in response.json['command']
+    assert 'old' not in web._MAP_PROGRESS
+    progress = client.get('/api/generate_progress/render-id')
+    assert progress.json['status'] == 'done' and progress.json['stage'] == 4
+    assert progress.headers['Cache-Control'] == 'no-store'
+    assert client.get('/api/generate_progress/unknown').json['stage'] == 1
+
+
+@pytest.mark.parametrize('error,status', [(KeyError('x'), 400), (RuntimeError('failed'), 500), (None, 500)])
+def test_map_progress_records_generation_failure(web, monkeypatch, generation_request, error, status):
+    monkeypatch.setattr(web, 'auto_map', Mock(side_effect=error, return_value=None))
+    client = web.app.test_client()
+    response = client.post('/api/generate', json={**generation_request, 'progress_id': 'failed'})
+    assert response.status_code == status
+    assert client.get('/api/generate_progress/failed').json['status'] == 'error'

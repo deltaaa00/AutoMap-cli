@@ -804,7 +804,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
       mode             -- "text" or "number"
       map_type         -- "default", "flag", "world" or "world_countries"
       size_mod         -- global font size modifier (default 15)
-      optional_feature -- None, "show_most_least" or "short_form"
+      optional_feature -- None, "show_most_least", "short_form", or comma-separated flags
       model            -- Gemini model id
       font_name        -- font file name from resources/fonts
       show_result      -- open the result in the OS image viewer (GUI only)
@@ -988,7 +988,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
                 filling_txt_ci.setdefault(short_k, v)
 
     most_least = None
-    extrema = _numeric_extrema(ai_answer) if has_most_least else None
+    extrema = _numeric_extrema(raw_ai_answer) if has_most_least else None
     if has_most_least and extrema is None:
         log.warning("No numeric values available; skipping most / least overlay")
     if extrema is not None:
@@ -1209,6 +1209,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
     render_meta = {
         "ai_answer": dict(ai_answer),
+        "raw_ai_answer": raw_ai_answer,
         "mode": mode,
         "resolved_theme": resolved_theme,
         "filling_txt": {str(k): list(v) for k, v in effective_txt.items()},

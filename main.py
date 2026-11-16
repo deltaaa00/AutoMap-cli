@@ -297,17 +297,16 @@ def _auto_map_with_ai_cache(*, refresh: bool, provider: str, api_key, **kwargs):
     if cached is None and not refresh and short_form:
         raw_cached = ai_cache.get(ai_cache.make_key(scope, short_form=False, **base_fields))
         if raw_cached and any(_parse_short_number(v) is not None for v in raw_cached.values()):
-            cached = {k: _format_short_number(v) for k, v in raw_cached.items()}
+            cached = raw_cached
     if cached is not None:
         kwargs['ai_answer_override'] = cached
     buffer = auto_map(api_key=api_key, **kwargs)
     if buffer is not None:
         meta = getattr(buffer, 'map_meta', None)
-        answer = meta.get('ai_answer') if isinstance(meta, dict) else None
+        answer = meta.get('raw_ai_answer', meta.get('ai_answer')) if isinstance(meta, dict) else None
         if isinstance(answer, dict):
             if short_form:
-                answer = {k: _format_short_number(v) for k, v in answer.items()}
-                meta['ai_answer'] = answer
+                meta['ai_answer'] = {k: _format_short_number(v) for k, v in answer.items()}
             if not refresh:
                 ai_cache.put(cache_key, answer)
     return buffer, cached is not None
@@ -699,7 +698,7 @@ def generate():
     render_meta = getattr(buffer, "map_meta", None)
     ai_vals = render_meta.get("ai_answer") if isinstance(render_meta, dict) else None
     if isinstance(ai_vals, dict) and ai_vals:
-        resp_payload["map_values"] = ai_vals
+        resp_payload["map_values"] = render_meta.get("raw_ai_answer", ai_vals)
         resp_payload["analysis"] = _build_analysis_from_ai(
             ai_vals,
             mode=str(data.get("mode") or "auto"),
@@ -995,7 +994,7 @@ def generate_batch():
         render_meta = getattr(buffer, "map_meta", None)
         ai_vals = render_meta.get("ai_answer") if isinstance(render_meta, dict) else None
         if isinstance(ai_vals, dict) and ai_vals:
-            item_payload["map_values"] = ai_vals
+            item_payload["map_values"] = render_meta.get("raw_ai_answer", ai_vals)
             item_payload["analysis"] = _build_analysis_from_ai(
                 ai_vals,
                 mode=item_mode,

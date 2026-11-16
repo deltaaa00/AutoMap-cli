@@ -143,3 +143,11 @@ def test_deepseek_cli_key_does_not_replace_gemini_key(generate, monkeypatch):
     assert os.environ['GEMINI_API_KEY'] == 'keep-gemini'
     assert os.environ['DEEPSEEK_API_KEY'] == 'deepseek-cli-key'
     assert generate.call_args.kwargs['model'] == 'deepseek-flash'
+
+
+@pytest.mark.parametrize('feature', ['show_most_least,short_form', 'short_form,show_most_least'])
+def test_make_accepts_web_legend_and_combined_options(generate, feature):
+    result = CliRunner().invoke(cli.main, ['make', 'GDP', '-m', 'number', '-eop', feature, '--legend'])
+    assert result.exit_code == 0, result.output
+    assert generate.call_args.kwargs['optional_feature'] == feature
+    assert generate.call_args.kwargs['show_legend'] is True
