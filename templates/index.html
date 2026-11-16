@@ -179,6 +179,18 @@ limitations under the License.
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 0.5rem;
         }
+        /* Avoid large composited blur layers while scrolling or opening a touch keyboard. */
+        @media (max-width: 1023px), (pointer: coarse) {
+            #ambientBackdrop { display: none; }
+            .cyber-card, [class*="backdrop-blur"] {
+                backdrop-filter: none !important;
+                -webkit-backdrop-filter: none !important;
+            }
+            header { position: relative !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .aurora-blob-1, .aurora-blob-2, .aurora-blob-3 { animation: none; }
+        }
         /* Phone layouts keep controls reachable without shrinking form text. */
         @media (max-width: 639px) {
             header > div { height: auto !important; min-height: 64px; flex-wrap: wrap; gap: 10px !important; padding-block: 12px; }
@@ -226,7 +238,7 @@ limitations under the License.
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white overflow-x-hidden relative">
 
     <!-- Ambient Animated Aurora Glow Backdrop -->
-    <div class="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
+    <div id="ambientBackdrop" class="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
         <div class="aurora-blob-1 absolute -top-36 -left-36 w-[540px] h-[540px] rounded-full bg-indigo-600/15 blur-[130px]"></div>
         <div class="aurora-blob-2 absolute top-1/4 -right-40 w-[500px] h-[500px] rounded-full bg-purple-600/15 blur-[140px]"></div>
         <div class="aurora-blob-3 absolute -bottom-40 left-1/3 w-[600px] h-[420px] rounded-full bg-cyan-500/10 blur-[150px]"></div>
@@ -375,7 +387,7 @@ limitations under the License.
                         </div>
                         <div class="relative group">
                             <input type="text" id="topicInput" placeholder="e.g., Population of European countries" 
-                                oninput="updateCommandPreview()"
+                                oninput="scheduleTopicPreview(event)" oncompositionend="scheduleTopicPreview(event)" onchange="flushTopicPreview()"
                                 class="w-full pl-3.5 pr-9 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition shadow-inner">
                             <button type="button" onclick="clearTopicInput()" title="Clear prompt" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1 transition">
                                 <i class="fa-solid fa-xmark text-xs"></i>
@@ -2111,6 +2123,25 @@ limitations under the License.
             syncGsm(base + delta);
         }
 
+        // Keep synchronous storage and preview DOM work out of keyboard input events.
+        let topicPreviewTimer;
+        function scheduleTopicPreview(event) {
+            clearTimeout(topicPreviewTimer);
+            if (event.isComposing) return;
+            topicPreviewTimer = setTimeout(flushTopicPreview, 250);
+        }
+
+        function flushTopicPreview() {
+            clearTimeout(topicPreviewTimer);
+            updateCommandPreview();
+        }
+
+        // Flush a pending draft when switching away before the debounce expires.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') flushTopicPreview();
+        });
+        window.addEventListener('pagehide', flushTopicPreview);
+
         // --- Build & Update Live CLI Command ---
         function updateCommandPreview() {
             const state = getFormState();
@@ -2153,6 +2184,7 @@ limitations under the License.
         }
 
         // --- Update Watermark Badges on Map ---
+        let activeBadgesMarkup = null;
         function updateActiveBadges(state) {
             const container = document.getElementById('activeFlagsBadges');
             const badges = [
@@ -2164,9 +2196,13 @@ limitations under the License.
                 { label: state.font, color: 'bg-slate-900/90 text-slate-300 border-slate-700' }
             ];
 
-            container.innerHTML = badges.map(b => 
+            const markup = badges.map(b =>
                 `<span class="text-[11px] font-mono px-2.5 py-0.5 rounded-lg border backdrop-blur-md ${b.color}">${escapeHtml(b.label)}</span>`
             ).join('');
+            if (markup !== activeBadgesMarkup) {
+                container.innerHTML = markup;
+                activeBadgesMarkup = markup;
+            }
         }
 
         // --- Custom Model Addition ---
