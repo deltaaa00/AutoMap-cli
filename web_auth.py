@@ -69,6 +69,9 @@ def init_web_auth(app, env_values=None):
     app.secret_key = _session_secret(app, settings)
     app.config.update(
         PERMANENT_SESSION_LIFETIME=timedelta(days=365),
+        # Read-only requests must not overwrite a newer session cookie from
+        # a parallel OAuth/status request.
+        SESSION_REFRESH_EACH_REQUEST=False,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE='Lax',
     )

@@ -230,3 +230,27 @@ def test_failed_upload_never_exposes_secrets_and_releases_slot(web, tmp_path, mo
     assert web.youtube_uploads.slots.acquire(blocking=False)
     web.youtube_uploads.slots.release()
     web.youtube_uploads.slots.release()
+
+
+def test_studio_initializes_youtube_session_before_parallel_requests(web, tmp_path):
+    web.app.config['YOUTUBE_DATA_DIR'] = tmp_path / 'youtube'
+    client = web.app.test_client()
+    assert client.get('/studio').status_code == 200
+    with client.session_transaction() as cookie:
+        owner = cookie['youtube_owner']
+        token = cookie['youtube_csrf']
+    # A late response from a read-only API must not replace a newer cookie.
+    response = client.get('/api/youtube/status')
+    assert response.json['csrf_token'] == token
+    assert 'Set-Cookie' not in response.headers
+    with client.session_transaction() as cookie:
+        assert cookie['youtube_owner'] == owner
+    response = client.post('/api/youtube/disconnect', headers={'X-YouTube-CSRF': token})
+    assert response.status_code == 200
+
+
+def test_csrf_rejection_identifies_safe_to_retry_requests(web, tmp_path):
+    client, headers = setup_client(web, tmp_path)
+    response = client.post('/api/youtube/disconnect', headers={'X-YouTube-CSRF': 'stale'})
+    assert response.status_code == 403 and response.json['code'] == 'youtube_csrf_invalid'
+    assert client.post('/api/youtube/disconnect', headers=headers).status_code == 200

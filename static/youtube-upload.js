@@ -18,23 +18,50 @@ function youtubeSettings() {
     return settings;
 }
 
-async function youtubeRequest(url, options = {}) {
-    const response = await fetch(url, {...options, headers: {...options.headers, 'X-YouTube-CSRF': youtubeCsrf}, cache: 'no-store'});
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'YouTube request failed.');
-    return result;
-}
+let youtubeConnectionRequest = null;
 
 async function loadYouTubeConnection() {
-    try {
-        const result = await youtubeRequest('/api/youtube/status');
+    // Share one request so simultaneous actions cannot race session setup.
+    if (youtubeConnectionRequest) return youtubeConnectionRequest;
+    youtubeConnectionRequest = (async () => {
+        const response = await fetch('/api/youtube/status', {cache: 'no-store'});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Could not check YouTube connection.');
         youtubeCsrf = result.csrf_token;
         youtubeConnected = result.connected;
         ytElement('youtubeConnection').textContent = result.connected ? 'YouTube account connected.' : 'YouTube account not connected.';
         ytElement('youtubeRedirect').textContent = result.redirect_uri;
-    } catch (error) {
+        return result;
+    })();
+    try { return await youtubeConnectionRequest; }
+    catch (error) {
         ytElement('youtubeConnection').textContent = error.message;
+        throw error;
+    } finally { youtubeConnectionRequest = null; }
+}
+
+async function youtubeFetch(url, options = {}) {
+    const mutating = (options.method || 'GET').toUpperCase() === 'POST';
+    // Refresh before every mutation, including actions from older open tabs.
+    if (mutating) await loadYouTubeConnection();
+    const send = () => fetch(url, {...options, headers: {...options.headers, 'X-YouTube-CSRF': youtubeCsrf}, cache: 'no-store'});
+    let response = await send();
+    if (mutating && response.status === 403) {
+        const rejection = await response.clone().json().catch(() => ({}));
+        // This response is issued before any upload/render/OAuth side effect.
+        if (rejection.code === 'youtube_csrf_invalid') {
+            await loadYouTubeConnection();
+            response = await send();
+        }
     }
+    return response;
+}
+
+async function youtubeRequest(url, options = {}) {
+    const response = await youtubeFetch(url, options);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'YouTube request failed.');
+    return result;
 }
 
 async function connectYouTube() {
@@ -125,5 +152,5 @@ document.addEventListener('DOMContentLoaded', () => {
         if (outcome !== 'connected') showToast(outcome === 'denied' ? 'Google authorization cancelled.' : 'Google authorization failed. Check the redirect URI and try connecting again.', 'error');
         history.replaceState(null, '', location.pathname);
     }
-    loadYouTubeConnection();
+    loadYouTubeConnection().catch(() => {});
 });

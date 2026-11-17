@@ -4293,7 +4293,7 @@ limitations under the License.
                 formData.append('payload', JSON.stringify(payload));
 
                 stopProgress = startRenderProgress(renderId);
-                const response = await fetch('/api/render_video', {
+                const response = await (youtube ? youtubeFetch : fetch)('/api/render_video', {
                     method: 'POST',
                     headers: youtube ? {'X-YouTube-CSRF': youtubeCsrf} : {},
                     body: formData,

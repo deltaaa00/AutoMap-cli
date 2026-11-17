@@ -121,7 +121,7 @@ class YouTubeUploads:
 
     def valid_csrf(self):
         token = request.headers.get('X-YouTube-CSRF', '')
-        return bool(token) and hmac.compare_digest(token, session.get('youtube_csrf', ''))
+        return bool(token) and hmac.compare_digest(token.encode(), session.get('youtube_csrf', '').encode())
 
     def render_token(self, path):
         return self.signer.dumps({'owner': self.owner(), 'path': path})
@@ -221,7 +221,7 @@ class YouTubeUploads:
         def youtube_csrf():
             if request.path.startswith('/api/youtube/') and request.method == 'POST':
                 if not self.valid_csrf():
-                    return jsonify(error='Invalid YouTube request token. Reload the page.'), 403
+                    return jsonify(code='youtube_csrf_invalid', error='Invalid YouTube request token. Reload the page.'), 403
 
         @app.get('/api/youtube/status')
         def youtube_status():
