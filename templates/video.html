@@ -257,7 +257,8 @@ limitations under the License.
             display: flex;
             flex: 1;
             min-height: 0;
-            width: 100%;
+            width: 1080px;
+            margin-inline: -20px;
             align-items: center;
             justify-content: center;
         }
@@ -2456,7 +2457,7 @@ limitations under the License.
             const map = document.getElementById('stageMapPreview');
             const area = document.getElementById('stageMapArea');
             if (!map.naturalWidth || !map.naturalHeight) return;
-            const scale = Math.min(area.clientWidth / map.naturalWidth, area.clientHeight / map.naturalHeight) * 1.14;
+            const scale = Math.min(area.clientWidth / map.naturalWidth, area.clientHeight / map.naturalHeight);
             map.style.width = `${map.naturalWidth * scale}px`;
             map.style.height = `${map.naturalHeight * scale}px`;
         }

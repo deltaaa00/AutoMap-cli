@@ -1098,7 +1098,7 @@ def make_video() -> tuple[object, int]:
         map_bottom = 1450 if watermark_image is not None else (1664 if branded else 1760)
         map_area_height = max(240, map_bottom - map_top)
         # Fit inside the map area while ensuring non-portrait maps span the full Shorts width.
-        scale = min(1040 / map_clip.w, map_area_height / map_clip.h) * 1.14
+        scale = min(canvas_w / map_clip.w, map_area_height / map_clip.h)
         if map_clip.w >= map_clip.h:
             scale = max(canvas_w / map_clip.w, scale)
         map_clip = map_clip.resized(scale)
