@@ -392,6 +392,12 @@ IDEA_EXAMPLES = (
     "How many school years children must study in your country?",
     "What is the most popular drink in your country?",
     "What is the biggest city in your country?",
+    "How many McDonald's restaurants are there in your country?",
+    "What is the most popular car brand in your country?",
+    "How many UNESCO World Heritage sites are there in your country?",
+    "What is the minimum driving age in your country?",
+    "What is the most popular sport in your country?",
+    "How many hours do people work per week in your country?",
 )
 
 
@@ -509,7 +515,8 @@ def generate_map_idea(
             raise AIServiceError('The AI model returned an empty idea. Please try again.', 502)
         return {"idea": idea}
 
-    themes = [str(t) for t in (available_themes or list(constants._PALETTE_THEMES.keys()))]
+    raw_themes = [str(t) for t in (available_themes or list(constants._PALETTE_THEMES.keys()))]
+    themes = [t for t in raw_themes if t not in ("auto", "ocean", "emerald")] or raw_themes
     fonts = [str(f) for f in (available_fonts or ["Bips.ttf", "DIN Condensed.ttf", "kodchasan.ttf", "arialroundedmtbold.ttf"])]
     allowed_map_types = ("default", "flag", "world", "world_countries")
     allowed_modes = ("text", "number")

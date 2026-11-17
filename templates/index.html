@@ -416,7 +416,7 @@ limitations under the License.
                             </div>
                         </div>
                         <div class="relative group">
-                            <input type="text" id="topicInput" placeholder="e.g., Population of European countries" 
+                            <input type="text" id="topicInput" placeholder="e.g., What is the most popular drink in your country?" 
                                 oninput="scheduleTopicPreview(event)" oncompositionend="scheduleTopicPreview(event)" onchange="flushTopicPreview()"
                                 class="w-full pl-3.5 pr-9 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition shadow-inner">
                             <button type="button" onclick="clearTopicInput()" title="Clear prompt" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1 transition">
@@ -434,25 +434,25 @@ limitations under the License.
                                 <span class="text-[10px] text-slate-500">1-click auto-config</span>
                             </div>
                             <div class="flex flex-wrap gap-1.5" id="presetChipsContainer">
-                                <button type="button" onclick="applyPromptPreset('Population of European countries', 'number', 'default', 'show_most_least')"
+                                <button type="button" onclick="applyPromptPreset('How many people live in your country?', 'number', 'default', 'show_most_least')"
                                     class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-indigo-500/15 text-slate-300 hover:text-indigo-200 border border-slate-800 hover:border-indigo-500/40 transition flex items-center gap-1.5 group">
                                     <i class="fa-solid fa-users text-[10px] text-indigo-400 group-hover:scale-110 transition-transform"></i>
-                                    <span>Population of Europe</span>
+                                    <span>Population in your country?</span>
                                 </button>
-                                <button type="button" onclick="applyPromptPreset('Most popular hot drink in Europe', 'text', 'default', 'none')"
+                                <button type="button" onclick="applyPromptPreset('What is the most popular hot drink in your country?', 'text', 'default', 'none')"
                                     class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-emerald-500/15 text-slate-300 hover:text-emerald-200 border border-slate-800 hover:border-emerald-500/40 transition flex items-center gap-1.5 group">
                                     <i class="fa-solid fa-mug-hot text-[10px] text-emerald-400 group-hover:scale-110 transition-transform"></i>
-                                    <span>Hot drink in Europe</span>
+                                    <span>Most popular hot drink?</span>
                                 </button>
-                                <button type="button" onclick="applyPromptPreset('GDP per capita in Europe', 'number', 'flag', 'show_most_least')"
+                                <button type="button" onclick="applyPromptPreset('What is the GDP per capita in your country?', 'number', 'flag', 'show_most_least')"
                                     class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-amber-500/15 text-slate-300 hover:text-amber-200 border border-slate-800 hover:border-amber-500/40 transition flex items-center gap-1.5 group">
                                     <i class="fa-solid fa-coins text-[10px] text-amber-400 group-hover:scale-110 transition-transform"></i>
-                                    <span>GDP per capita (Flags)</span>
+                                    <span>GDP per capita? (Flags)</span>
                                 </button>
-                                <button type="button" onclick="applyPromptPreset('Forest coverage percentage by continent', 'number', 'world', 'none')"
+                                <button type="button" onclick="applyPromptPreset('What is the forest coverage percentage in your continent?', 'number', 'world', 'none')"
                                     class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-sky-500/15 text-slate-300 hover:text-sky-200 border border-slate-800 hover:border-sky-500/40 transition flex items-center gap-1.5 group">
                                     <i class="fa-solid fa-tree text-[10px] text-sky-400 group-hover:scale-110 transition-transform"></i>
-                                    <span>Forest coverage (World)</span>
+                                    <span>Forest coverage? (World)</span>
                                 </button>
                             </div>
                         </div>
@@ -1646,7 +1646,7 @@ limitations under the License.
             const icon = document.getElementById('generateIdeaIcon');
             const textEl = document.getElementById('generateIdeaText');
             const withParams = document.getElementById('ideaModeSelect')?.value === 'idea_and_params';
-            const state = collectCurrentState();
+            const state = getFormState();
 
             if (btn) btn.disabled = true;
             if (icon) icon.className = 'fa-solid fa-spinner fa-spin text-[10px]';
@@ -1690,6 +1690,9 @@ limitations under the License.
                     const paletteEl = document.getElementById('fillingPaletteTheme');
                     if (paletteEl && p.palette_theme && Array.from(paletteEl.options).some(o => o.value === p.palette_theme)) {
                         paletteEl.value = p.palette_theme;
+                        if (typeof onPaletteThemeChange === 'function') {
+                            onPaletteThemeChange();
+                        }
                     }
                     const fontEl = document.getElementById('fontSelect');
                     if (fontEl && p.font && Array.from(fontEl.options).some(o => o.value === p.font)) {
@@ -2281,7 +2284,7 @@ limitations under the License.
         let topicPreviewTimer;
         function scheduleTopicPreview(event) {
             clearTimeout(topicPreviewTimer);
-            if (event.isComposing) return;
+            if (event && event.isComposing) return;
             topicPreviewTimer = setTimeout(flushTopicPreview, 250);
         }
 
