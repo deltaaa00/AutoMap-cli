@@ -193,7 +193,7 @@ class YouTubeUploads:
                     video_id = result.get('id', '')
                     if not isinstance(video_id, str) or not video_id or not all(c.isalnum() or c in '_-' for c in video_id):
                         raise ValueError('YouTube did not return a video ID.')
-                    self._update(job_id, status='complete', progress=100, phase='Uploaded', url=f'https://www.youtube.com/watch?v={video_id}')
+                    self._update(job_id, status='complete', progress=100, phase='Uploaded', url=f'https://www.youtube.com/shorts/{video_id}')
                 finally:
                     media.stream().close()
         except Exception as error:

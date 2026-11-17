@@ -256,8 +256,8 @@ def test_map_fit_replacement_and_removal_release_blob_urls(studio, tmp_path):
     image = tmp_path / 'map.png'
     Image.new('RGB', (800, 400), 'green').save(image)
     page.locator('#mapFileInput').set_input_files(str(image))
-    page.wait_for_function("Math.abs(parseFloat(document.querySelector('#stageMapPreview').style.width) - 1040 * 1.14) < 1")
-    assert float(page.locator('#stageMapPreview').evaluate('el => parseFloat(el.style.height)')) == pytest.approx(520 * 1.14, abs=1)
+    page.wait_for_function("Math.abs(parseFloat(document.querySelector('#stageMapPreview').style.width) - document.querySelector('#stageMapArea').clientWidth) < 1")
+    assert page.locator('#stageMapPreview').evaluate('el => parseFloat(el.style.width) / parseFloat(el.style.height)') == pytest.approx(2)
     assert page.locator('#stageMapPreview').evaluate('''el => {
         const m = el.getBoundingClientRect();
         const s = el.closest('.video-preview-stage').getBoundingClientRect();

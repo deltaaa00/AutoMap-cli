@@ -48,7 +48,7 @@ def test_generate_forwards_options_and_encodes_png(web, monkeypatch, generation_
     assert base64.b64decode(response.json['image_url'].split(',')[1]) == b'png-data'
     generate.assert_called_once_with(prompt='Population', mode='number', map_type='default',
         size_mod=22, optional_feature='show_most_least', model='mock-model',
-        font_name='DIN Condensed.ttf', show_result=False, io_res=True, api_key='form-key', show_legend=False)
+        font_name='DIN Condensed.ttf', show_result=False, io_res=True, api_key='form-key', show_legend=False, highlight_extrema=False)
     assert 'form-key' not in response.json['command']
 
 

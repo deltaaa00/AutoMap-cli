@@ -320,13 +320,13 @@ def test_temperature_slider_updates_output_and_restores_from_history(map_page):
     assert page.locator('#aiTemperature').input_value() == '2'
 
 
-def test_batch_filename_is_literal_text_in_history_and_click_restores(map_page):
+def test_history_topic_is_literal_text_and_click_restores(map_page):
     page = map_page
     payload = '<img src=x onerror="window.historyXss=true">.png'
     page.evaluate('''filename => {
         window.historyXss = false;
         closeFillingStudio();
-        addToHistory({...getFormState(), topic: 'Restored topic'}, `[batch] ${filename}`);
+        addToHistory({...getFormState(), topic: filename}, `[batch] ${filename}`);
         addToHistory(getFormState(), 'Another run');
         document.getElementById('topicInput').value = 'Changed topic';
         switchBottomTab('history');
@@ -335,8 +335,8 @@ def test_batch_filename_is_literal_text_in_history_and_click_restores(map_page):
     assert history.locator('img').count() == 0
     assert history.locator('[onerror]').count() == 0
     assert history.inner_text().count(payload) == 1
-    page.get_by_text(f'[batch] {payload}', exact=True).click()
-    assert page.locator('#topicInput').input_value() == 'Restored topic'
+    page.get_by_text(payload, exact=True).click()
+    assert page.locator('#topicInput').input_value() == payload
     assert page.evaluate('window.historyXss') is False
 
 

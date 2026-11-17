@@ -50,8 +50,8 @@ def scene(monkeypatch, _scene_assets):
     monkeypatch.setenv('AUTOMAP_REGION_CACHE_DIR', str(_scene_assets / 'rcache'))
     monkeypatch.setattr(renderer, '__file__', str(_scene_assets / 'map' / 'auto_map.py'))
     coords = {'one': [(80, 80)], 'two': [(290, 80)], 'three': [(500, 80)]}
-    monkeypatch.setattr(renderer, 'europe_coords', coords)
-    monkeypatch.setattr(renderer, 'world_coords', coords)
+    monkeypatch.setattr(renderer.constants, 'europe_coords', coords)
+    monkeypatch.setattr(renderer.constants, 'world_coords', coords)
     answer = Mock(return_value={'one': 'Yes', 'two': 'no', 'three': 'yes'})
     monkeypatch.setattr(renderer, 'ai_request', answer)
     monkeypatch.setattr(renderer, 'load_filling', lambda: (
@@ -397,7 +397,7 @@ def test_new_palettes_render_selected_colors_for_categories_and_numbers(scene, t
     scene[0].return_value = values
     output = render(mode=mode, auto_style=True, palette_theme=theme)
     image = scene[2](output)
-    palette = renderer._PALETTE_THEMES[theme]
+    palette = renderer.constants._PALETTE_THEMES[theme]
     assert output.map_meta['resolved_theme'] == theme
     assert image.getpixel((80, 600)) == palette[0]
     assert image.getpixel((290, 600)) == palette[1]
@@ -490,7 +490,7 @@ def test_legend_formats_ranges(lo, hi, expected):
 @pytest.mark.parametrize('map_type', ['default', 'world', 'world_countries'])
 @pytest.mark.parametrize('has_ml', [False, True])
 def test_legend_draws_visible_swatches(map_type, has_ml):
-    font_path = renderer.FONTS_DIR / 'Bips.ttf'
+    font_path = renderer.constants.FONTS_DIR / 'Bips.ttf'
     font = lambda size: renderer.ImageFont.truetype(str(font_path), size)
     layer = renderer._draw_legend_overlay((2000, 3000), [((255, 0, 0, 255), 'Yes'), ((0, 0, 255, 255), 'No')], font, (255,255,255,255), (0,0,0,255), 5, map_type, has_ml)
     assert layer.getbbox() is not None
@@ -498,7 +498,7 @@ def test_legend_draws_visible_swatches(map_type, has_ml):
 
 
 def test_legend_empty_long_and_overflow_entries():
-    font = lambda size: renderer.ImageFont.truetype(str(renderer.FONTS_DIR / 'Bips.ttf'), size)
+    font = lambda size: renderer.ImageFont.truetype(str(renderer.constants.FONTS_DIR / 'Bips.ttf'), size)
     args = (font, (255,255,255,255), (0,0,0,255), 0, 'world', False)
     assert renderer._draw_legend_overlay((100,100), [], *args) is None
     layer = renderer._draw_legend_overlay((100,100), [((255,0,0,255), 'Long category ' * 20)] * 100, *args)
