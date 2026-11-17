@@ -14,6 +14,7 @@
 
 import ast
 import hashlib
+import logging
 import os
 import random
 import io
@@ -210,22 +211,80 @@ def _region_index(map_path: Path, base: Image.Image, coords: dict) -> tuple[np.n
     return result
 
 
+_RUST_WARNED = False
+
+
+def _get_automap_rs():
+    """Return the native ``automap_rs`` module when available, else ``None``."""
+    global _RUST_WARNED
+    try:
+        import automap_rs
+        if hasattr(automap_rs, "paint_regions_rs") and hasattr(automap_rs, "alpha_composite_rs"):
+            return automap_rs
+        raise ImportError("automap_rs map functions not built")
+    except Exception as exc:
+        if not _RUST_WARNED:
+            _RUST_WARNED = True
+            msg = f"Rust map acceleration unavailable ({type(exc).__name__}: {exc}); falling back to Python/PIL."
+            log.warning(msg)
+            logging.warning(msg)
+        return None
+
+
+def _alpha_composite(base: Image.Image, overlay: Image.Image) -> Image.Image:
+    """Alpha-composite ``overlay`` over ``base`` using Rust when available."""
+    global _RUST_WARNED
+    rs = _get_automap_rs()
+    if rs is not None and base.size == overlay.size:
+        try:
+            base_rgba = base if base.mode == "RGBA" else base.convert("RGBA")
+            overlay_rgba = overlay if overlay.mode == "RGBA" else overlay.convert("RGBA")
+            out_bytes = rs.alpha_composite_rs(base_rgba.tobytes(), overlay_rgba.tobytes())
+            return Image.frombytes("RGBA", base.size, out_bytes)
+        except Exception as exc:
+            if not _RUST_WARNED:
+                _RUST_WARNED = True
+                msg = f"Rust alpha_composite_rs failed ({type(exc).__name__}: {exc}); falling back to PIL."
+                log.warning(msg)
+                logging.warning(msg)
+    return Image.alpha_composite(base, overlay)
+
+
 def _paint_regions(img: Image.Image, flat: np.ndarray, ids: np.ndarray,
                    colors: dict[int, tuple[int, int, int, int]]) -> Image.Image:
     """Return a copy of ``img`` with region ``i`` painted ``colors[i]``."""
+    global _RUST_WARNED
     if not colors:
         return img.copy()
     n = int(max(colors)) + 1
     if ids.size:
         n = max(n, int(ids.max()) + 1)
     lut = np.zeros((n, 4), dtype=np.uint8)
-    use = np.zeros(n, dtype=bool)
+    use = np.zeros(n, dtype=np.uint8)
     for i, c in colors.items():
         lut[i] = c
-        use[i] = True
+        use[i] = 1
+    rs = _get_automap_rs()
+    if rs is not None:
+        try:
+            base_rgba = img if img.mode == "RGBA" else img.convert("RGBA")
+            out_bytes = rs.paint_regions_rs(
+                base_rgba.tobytes(),
+                np.ascontiguousarray(flat, dtype=np.uint32).tobytes(),
+                np.ascontiguousarray(ids, dtype=np.uint16).tobytes(),
+                lut.tobytes(),
+                use.tobytes(),
+            )
+            return Image.frombytes("RGBA", img.size, out_bytes)
+        except Exception as exc:
+            if not _RUST_WARNED:
+                _RUST_WARNED = True
+                msg = f"Rust paint_regions_rs failed ({type(exc).__name__}: {exc}); falling back to NumPy."
+                log.warning(msg)
+                logging.warning(msg)
     arr = np.array(img, dtype=np.uint8)
     pix = arr.reshape(-1, 4)
-    sel = use[ids]
+    sel = use.astype(bool, copy=False)[ids]
     pix[flat[sel]] = lut[ids[sel]]
     return Image.fromarray(arr)
 
@@ -1209,7 +1268,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         # Relief is resized and its opacity reduced once per process.
         maps_dir = Path(__file__).parent.parent / "resources" / "maps"
         relief = _prepared_relief(maps_dir / relief_name, img.size)
-        result = Image.alpha_composite(img, relief)
+        result = _alpha_composite(img, relief)
 
         # Restore borders above the relief, then put readable labels on top.
         borders = _load_rgba(maps_dir / borders_name)
@@ -1221,14 +1280,14 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
                 base_map=img, high_rgb=high_rgb, low_rgb=low_rgb,
             )
             if hl_layer is not None:
-                result = Image.alpha_composite(result, hl_layer)
-        result = Image.alpha_composite(result, borders)
-        result = Image.alpha_composite(result, text_layer)
+                result = _alpha_composite(result, hl_layer)
+        result = _alpha_composite(result, borders)
+        result = _alpha_composite(result, text_layer)
 
         if has_most_least and map_type != "world" and most_least is not None:
-            result = Image.alpha_composite(result, most_least)
+            result = _alpha_composite(result, most_least)
     else:
-        result = Image.alpha_composite(img, text_layer)
+        result = _alpha_composite(img, text_layer)
 
     if show_legend:
         if mode == "number":
@@ -1256,7 +1315,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             has_ml,
         )
         if legend_layer is not None:
-            result = Image.alpha_composite(result, legend_layer)
+            result = _alpha_composite(result, legend_layer)
 
 
     _report(4, "Encoding final PNG...")
@@ -1264,7 +1323,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         # Return an in-memory PNG for the web API instead of writing result.png.
 
         buffer = io.BytesIO()
-        result.save(buffer, format='PNG')
+        result.save(buffer, format='PNG', compress_level=1)
         # Consumers should be able to read the PNG from its first byte.
         buffer.seek(0)
         buffer.map_meta = render_meta
@@ -1274,7 +1333,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
     out_path = Path(__file__).parent.parent / "result.png"
     log.step(f"Saving result to {out_path}")
-    result.save(out_path)
+    result.save(out_path, compress_level=1)
 
     if show_result:
         result.show("Map")

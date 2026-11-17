@@ -13,11 +13,14 @@
 # limitations under the License.
 
 import base64
+import importlib
 import io
+import logging
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
@@ -451,6 +454,34 @@ from video_render import (
 )
 
 
+def _load_automap_rs():
+    """Import ``automap_rs``, bypassing any local source directory shadowing."""
+    if "automap_rs" in sys.modules and sys.modules["automap_rs"] is None:
+        raise ImportError("automap_rs is disabled")
+
+    mod = sys.modules.get("automap_rs")
+    if mod is None:
+        mod = importlib.import_module("automap_rs")
+    if hasattr(mod, "render_video_rs"):
+        return mod
+
+    # When CWD is the repo root, ./automap_rs/ can shadow site-packages/automap_rs.abi3.so.
+    repo_root = os.path.dirname(os.path.abspath(__file__))
+    orig_path = list(sys.path)
+    try:
+        sys.path = [p for p in orig_path if os.path.abspath(p or os.getcwd()) != repo_root]
+        if "automap_rs" in sys.modules and sys.modules["automap_rs"] is not None:
+            if not hasattr(sys.modules["automap_rs"], "render_video_rs"):
+                sys.modules.pop("automap_rs", None)
+        mod = importlib.import_module("automap_rs")
+    finally:
+        sys.path = orig_path
+
+    if not hasattr(mod, "render_video_rs"):
+        raise ImportError("automap_rs native extension not built")
+    return mod
+
+
 @app.route('/api/video_title_preview', methods=['POST'])
 def video_title_preview():
     from PIL import Image
@@ -648,6 +679,7 @@ def make_video() -> tuple[object, int]:
         media_resources.append(background_video)
         background_video = background_video.with_duration(bg_duration)
         dynamic_layers = {id(background_video)}
+        dynamic_fade_timing = {}
 
         # Darken the edges and the area behind the title for readable white text.
         import numpy as np
@@ -733,6 +765,7 @@ def make_video() -> tuple[object, int]:
             subscribe_clip = _apply_clip_fade_in(subscribe_clip, bg_duration, fade_start=fade_start, fade_duration=fade_dur)
             subscribe_clip = subscribe_clip.with_position(('center', accent_top))
             dynamic_layers.add(id(subscribe_clip))
+            dynamic_fade_timing[id(subscribe_clip)] = (float(fade_start), float(fade_dur))
             accent_height = max(accent_height, subscribe_clip.h)
         map_top = accent_top + accent_height + gap if accent_height else accent_top
 
@@ -785,13 +818,17 @@ def make_video() -> tuple[object, int]:
             else:
                 stars_arr = _stars_row_image(watermark_color or '#ffffff', effects)
             stars_clip = ImageClip(stars_arr).with_duration(bg_duration)
+            stars_start = 0.0
+            stars_fade_dur = 0.0
             if bg_duration > 1.8:
                 stars_start = min(1.8, bg_duration * 0.25)
-                stars_clip = _apply_clip_fade_in(stars_clip, bg_duration, fade_start=stars_start, fade_duration=0.5)
+                stars_fade_dur = 0.5
+                stars_clip = _apply_clip_fade_in(stars_clip, bg_duration, fade_start=stars_start, fade_duration=stars_fade_dur)
             stars_y = 1805 if watermark_text else 1785
             stars_clip = stars_clip.with_position(('center', stars_y))
             if bg_duration > 1.8:
                 dynamic_layers.add(id(stars_clip))
+                dynamic_fade_timing[id(stars_clip)] = (float(stars_start), float(stars_fade_dur))
             clips.append(stars_clip)
         if intro_fade:
             from moviepy import VideoClip
@@ -825,10 +862,7 @@ def make_video() -> tuple[object, int]:
         used_rust = False
         # ======== RUST ENGINE INJECTION =============
         try:  # pragma: no cover
-            import automap_rs
-
-            if not hasattr(automap_rs, "render_video_rs"):
-                raise ImportError("automap_rs native extension not built")
+            automap_rs = _load_automap_rs()
 
             def _clip_to_rgba_bytes(clip_obj, sample_t: float = 0.0) -> bytes:
                 # MoviePy splits RGBA inputs into 3-channel clip.img + float clip.mask.
@@ -857,7 +891,15 @@ def make_video() -> tuple[object, int]:
                 is_full_canvas = clip.img.shape[:2] == (canvas_h, canvas_w)
 
                 if not is_dynamic and is_full_canvas:
-                    static_rgba = _clip_to_rgba_bytes(clip, 0.0)
+                    layer_rgba = _clip_to_rgba_bytes(clip, 0.0)
+                    if static_rgba is None:
+                        static_rgba = layer_rgba
+                    elif hasattr(automap_rs, "alpha_composite_rs"):
+                        static_rgba = automap_rs.alpha_composite_rs(static_rgba, layer_rgba)
+                    else:
+                        base_img = Image.frombytes("RGBA", (canvas_w, canvas_h), static_rgba)
+                        over_img = Image.frombytes("RGBA", (canvas_w, canvas_h), layer_rgba)
+                        static_rgba = Image.alpha_composite(base_img, over_img).tobytes()
                 elif is_dynamic and is_full_canvas and clip.img.shape[2] == 3:
                     # Full-canvas 3-channel black clip represents the intro fade veil.
                     veil_duration = float(clip.duration or 0.0)
@@ -867,9 +909,16 @@ def make_video() -> tuple[object, int]:
                     h, w = clip.img.shape[:2]
                     x = (canvas_w - w) // 2 if pos[0] == "center" else int(pos[0])
                     y = (canvas_h - h) // 2 if pos[1] == "center" else int(pos[1])
-                    dynamic_overlays.append((_clip_to_rgba_bytes(clip, float(bg_duration)), x, y, int(w), int(h), 0.0, 0.0))
+                    start_sec, fade_in_sec = dynamic_fade_timing.get(id(clip), (0.0, 0.0))
+                    dynamic_overlays.append((_clip_to_rgba_bytes(clip, float(bg_duration)), x, y, int(w), int(h), start_sec, fade_in_sec))
 
             if static_rgba is not None and prepared_bg_path:
+                try:
+                    from moviepy.config import FFMPEG_BINARY
+                    if FFMPEG_BINARY:
+                        os.environ.setdefault("FFMPEG_BINARY", FFMPEG_BINARY)
+                except ImportError:
+                    pass
                 automap_rs.render_video_rs(
                     prepared_bg_path,
                     static_rgba,
@@ -886,8 +935,12 @@ def make_video() -> tuple[object, int]:
                     data.get('draft') is True,
                 )
                 used_rust = True
-        except ImportError:
-            pass
+        except Exception as exc:
+            logging.warning(
+                "Rust video render unavailable or failed (%s: %s); falling back to MoviePy.",
+                type(exc).__name__,
+                exc,
+            )
 
         if not used_rust:  # pragma: no branch
             final_clip = CompositeVideoClip(clips, size=(canvas_w, canvas_h))
