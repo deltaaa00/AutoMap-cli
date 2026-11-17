@@ -84,6 +84,7 @@ def test_oauth_connect_pkce_callback_and_replay(web, tmp_path, monkeypatch):
     assert response.status_code == 200
     query = parse_qs(urlsplit(response.json['authorization_url']).query)
     assert query['scope'] == ['https://www.googleapis.com/auth/youtube.upload']
+    assert set(query['prompt'][0].split()) == {'consent', 'select_account'}
     assert query['access_type'] == ['offline'] and query['code_challenge_method'] == ['S256']
     with client.session_transaction() as cookie:
         assert 'test-secret' not in str(dict(cookie))

@@ -424,6 +424,8 @@ limitations under the License.
                             </button>
                         </div>
 
+                        <p class="mt-1.5 text-[11px] text-slate-500">Your last topic is saved. New ideas are generated only when you click Generate idea.</p>
+
                         <!-- Quick Prompt Presets Chips -->
                         <div class="mt-2.5">
                             <div class="flex items-center justify-between mb-1.5">
@@ -2280,9 +2282,10 @@ limitations under the License.
             syncGsm(base + delta);
         }
 
-        // Keep synchronous storage and preview DOM work out of keyboard input events.
+        // Save the topic immediately; debounce the more expensive preview work.
         let topicPreviewTimer;
         function scheduleTopicPreview(event) {
+            saveBrowserValue(MAP_TOPIC_STORAGE_KEY, document.getElementById('topicInput').value);
             clearTimeout(topicPreviewTimer);
             if (event && event.isComposing) return;
             topicPreviewTimer = setTimeout(flushTopicPreview, 250);
