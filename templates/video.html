@@ -873,7 +873,7 @@ limitations under the License.
                                 Smooth intro fade-in from black (0.0s &rarr; 0.8s)
                             </label>
                             <label class="flex items-center gap-2 text-xs text-slate-300">
-                                <input id="mapZoomToggle" type="checkbox" onchange="updateMapZoomUI(); saveVideoSettings()" class="accent-emerald-400">
+                                <input id="mapZoomToggle" type="checkbox" onchange="updateMapZoomUI(true); saveVideoSettings()" class="accent-emerald-400">
                                 Camera zoom to point on map
                             </label>
                             <div id="mapZoomPanel" class="hidden rounded-xl border border-slate-800 bg-slate-950/70 p-3 space-y-2.5">
@@ -927,7 +927,7 @@ limitations under the License.
                                 </div>
                                 <div class="pt-1.5 border-t border-slate-800/80 space-y-2">
                                     <label class="flex items-center gap-2 text-xs text-slate-300">
-                                        <input id="revealCountryToggle" type="checkbox" checked onchange="updateRevealUI(); saveVideoSettings()" class="accent-emerald-400">
+                                        <input id="revealCountryToggle" type="checkbox" checked onchange="updateRevealUI(true); saveVideoSettings()" class="accent-emerald-400">
                                         <span>Country reveal animation (cover + &quot;...&quot; &rarr; reveal color &amp; value)</span>
                                     </label>
                                     <div id="revealControlsPanel" class="hidden pl-5 space-y-1.5">
@@ -2282,7 +2282,7 @@ limitations under the License.
                 zoom_duration: Number(document.getElementById('mapZoomDuration').value || 2.5),
                 zoom_out_enabled: !!document.getElementById('mapZoomOutToggle')?.checked,
                 zoom_out_duration: Number(document.getElementById('mapZoomOutDuration')?.value || 2.0),
-                reveal_enabled: !!document.getElementById('revealCountryToggle')?.checked,
+                reveal_enabled: !!document.getElementById('mapZoomToggle')?.checked && !!document.getElementById('revealCountryToggle')?.checked,
                 reveal_time: Number(document.getElementById('revealTimeInput')?.value || 5.5),
                 reveal_color: document.getElementById('revealColorInput')?.value || '#000000',
                 top_left_sticker: document.getElementById('topLeftStickerSelect').value,
@@ -2314,11 +2314,15 @@ limitations under the License.
             if (wrap) wrap.classList.toggle('opacity-50', !enabled);
         }
 
-        function updateRevealUI() {
+        function updateRevealUI(restart = false) {
             const zoomEnabled = !!document.getElementById('mapZoomToggle')?.checked;
             const enabled = zoomEnabled && !!document.getElementById('revealCountryToggle')?.checked;
             const panel = document.getElementById('revealControlsPanel');
             if (panel) panel.classList.toggle('hidden', !enabled);
+            if (restart && zoomEnabled) {
+                previewAnimTime = 0;
+                previewLastTs = null;
+            }
             if (typeof syncPreviewAnimationLoop === 'function') {
                 syncPreviewAnimationLoop();
             } else if (typeof renderPreviewFrame === 'function') {
@@ -2326,13 +2330,13 @@ limitations under the License.
             }
         }
 
-        function updateMapZoomUI() {
+        function updateMapZoomUI(restart = false) {
             const enabled = !!document.getElementById('mapZoomToggle')?.checked;
             const panel = document.getElementById('mapZoomPanel');
             if (panel) panel.classList.toggle('hidden', !enabled);
             if (enabled) loadZoomCountries();
             updateZoomOutUI();
-            updateRevealUI();
+            updateRevealUI(restart);
             const pin = document.getElementById('zoomPickerPin');
             const rawX = parseFloat(document.getElementById('mapZoomX')?.value);
             const rawY = parseFloat(document.getElementById('mapZoomY')?.value);
@@ -2360,7 +2364,7 @@ limitations under the License.
                 const normalizedName = (countryName || '').trim().toLowerCase();
                 keyEl.value = countryKey || (normalizedName === 'russia' ? 'russia' : '');
             }
-            updateMapZoomUI();
+            updateMapZoomUI(true);
             saveVideoSettings();
         }
 
@@ -2855,8 +2859,9 @@ limitations under the License.
                 }
                 previewLastTs = null;
                 if (!hasAnims) previewAnimTime = 0;
-                renderPreviewFrame(previewAnimTime);
             }
+            // Apply edits immediately, including while a RAF is already scheduled.
+            renderPreviewFrame(previewAnimTime);
         }
 
         function togglePreviewAnimation() {

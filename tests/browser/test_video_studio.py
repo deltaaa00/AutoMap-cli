@@ -114,6 +114,44 @@ def wait_for_title(page):
     page.wait_for_function("document.querySelector('#titlePreviewStatus').textContent === 'Preview matches rendered title'")
 
 
+def test_zoom_reveal_switches_and_country_selection_restart_preview(studio, tmp_path):
+    page, _ = studio
+    image = tmp_path / 'map.png'
+    Image.new('RGBA', (100, 100), (255, 0, 0, 255)).save(image)
+    page.locator('#mapFileInput').set_input_files(str(image))
+    page.wait_for_function('document.getElementById("stageMapPreview").naturalWidth === 100')
+    # Use a local mask so the test isolates playback from country extraction.
+    page.evaluate('''() => {
+        const mask = document.createElement('canvas');
+        mask.width = mask.height = 100;
+        const ctx = mask.getContext('2d');
+        ctx.fillRect(20, 20, 60, 60);
+        window.revealMaskDataUrl = mask.toDataURL();
+        previewAnimPlaying = false;
+        document.getElementById('mapZoomToggle').click();
+    }''')
+    page.wait_for_function('!document.getElementById("stageRevealCanvas").classList.contains("hidden")')
+    page.evaluate('''() => {
+        previewAnimTime = 8;
+        renderPreviewFrame(previewAnimTime);
+        document.getElementById('revealCountryToggle').click();
+        document.getElementById('revealCountryToggle').click();
+    }''')
+    assert page.evaluate('previewAnimTime') == 0
+    assert page.locator('#stageRevealCanvas').is_visible()
+    page.evaluate("document.getElementById('revealCountryToggle').click()")
+    assert page.locator('#stageRevealCanvas').is_hidden()
+    page.evaluate("document.getElementById('revealCountryToggle').click()")
+    page.evaluate("document.getElementById('mapZoomToggle').click()")
+    assert page.locator('#stageRevealCanvas').is_hidden()
+    assert page.evaluate('titleSettings().reveal_enabled') is False
+    page.evaluate("document.getElementById('mapZoomToggle').click()")
+    assert page.locator('#stageRevealCanvas').is_visible()
+    page.evaluate("previewAnimTime = 8; setZoomTarget(0.5, 0.5, 'Poland', 'poland')")
+    assert page.evaluate('previewAnimTime') == 0
+    assert page.locator('#stageRevealCanvas').is_visible()
+
+
 def test_custom_overlay_files_follow_enable_switches_in_render_payload(studio, tmp_path):
     page, _ = studio
     image = tmp_path / 'custom-overlay.png'

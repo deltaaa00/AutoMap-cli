@@ -187,6 +187,26 @@ def test_render_forwards_title_style_and_legacy_title(web, monkeypatch):
     assert post.call_args.kwargs['json']['visual_effects'] is False
 
 
+@pytest.mark.parametrize('zoom,reveal,expected', [
+    (False, True, False), ('false', True, False),
+    (True, False, False), (True, True, True), ('true', 'true', True),
+])
+def test_country_reveal_requires_zoom(web, monkeypatch, zoom, reveal, expected):
+    post = Mock(return_value=Mock(status_code=200, json=lambda: {}))
+    monkeypatch.setattr(requests, 'post', post)
+    extract = Mock(return_value='mask')
+    monkeypatch.setattr(web, '_decode_image_size', lambda _: (100, 100))
+    monkeypatch.setattr(web, '_extract_country_reveal_mask', extract)
+    response = web.app.test_client().post('/api/render_video', json={
+        'map_file': 'map', 'zoom_enabled': zoom, 'reveal_enabled': reveal,
+    })
+    assert response.status_code == 200
+    payload = post.call_args.kwargs['json']
+    assert payload['reveal_enabled'] is expected
+    assert payload['reveal_mask'] == ('mask' if expected else '')
+    assert extract.called is expected
+
+
 def test_title_preview_proxy_preserves_content(web, monkeypatch):
     client = web.app.test_client()
     for status in (200, 400):

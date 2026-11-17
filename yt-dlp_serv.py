@@ -1134,7 +1134,7 @@ def make_video() -> tuple[object, int]:
         zoom_out_enabled = bool(data.get('zoom_out_enabled', False))
         zoom_out_duration = max(0.0, _parse_finite_float(data.get('zoom_out_duration'), 2.0))
 
-        reveal_enabled = bool(data.get('reveal_enabled', False))
+        reveal_enabled = zoom_enabled and bool(data.get('reveal_enabled', False))
         reveal_mask_f = (
             _decode_reveal_mask(data.get('reveal_mask'), box_w, box_h)
             if reveal_enabled

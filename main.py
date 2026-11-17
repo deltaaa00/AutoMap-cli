@@ -1684,6 +1684,9 @@ def make_video() -> tuple[object, int]:
         if isinstance(raw_reveal, str)
         else bool(raw_reveal)
     )
+    raw_zoom = data.get('zoom_enabled', False)
+    zoom_enabled = raw_zoom.strip().lower() in _TRUTHY if isinstance(raw_zoom, str) else bool(raw_zoom)
+    reveal_enabled = zoom_enabled and reveal_enabled
     reveal_time = data.get('reveal_time', None)
     reveal_mask = ''
     if reveal_enabled and map_b64:
@@ -1732,7 +1735,7 @@ def make_video() -> tuple[object, int]:
                 "subscribe_text": data.get('subscribe_text', 'Subscribe!'),
                 "subscribe_delay": data.get('subscribe_delay', 2.5),
                 "intro_fade": data.get('intro_fade', False),
-                "zoom_enabled": data.get('zoom_enabled', False),
+                "zoom_enabled": zoom_enabled,
                 "zoom_x": data.get('zoom_x', 0.80),
                 "zoom_y": data.get('zoom_y', 0.35),
                 "zoom_scale": data.get('zoom_scale', 2.0),
