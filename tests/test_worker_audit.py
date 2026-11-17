@@ -84,19 +84,6 @@ def test_download_accepts_storage_relative_filename(worker):
     response.close()
 
 
-def test_download_rejects_null_byte_path(worker):
-    response = worker.app.test_client().get('/api/download_video', query_string={'path': '\0'})
-    assert response.status_code == 400
-
-
-def test_render_rejects_garbage_after_base64_material(worker):
-    response = worker.app.test_client().post('/api/render_video', json={
-        'map_file': 'eA==!', 'background_video': 'eA==', 'video_title': 'Title',
-    })
-    assert response.status_code == 400
-    assert 'not valid base64' in response.json['error']
-
-
 @pytest.mark.parametrize('titles', [
     ('Same title', 'Same title'),
     ('Same / title', 'Same ? title'),

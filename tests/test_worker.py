@@ -162,7 +162,7 @@ def test_audio_cut_read_failure(worker, monkeypatch):
     {'map_file': ''}, {'background_video': ''}, {'video_title': ''},
     {'video_title': 'a' * 1001}, {'codec': 'unsupported'},
     {'map_file': 'data:image/png;base64,'}, {'map_file': 'a'},
-    {'background_video': '!!!'},
+    {'map_file': 'eA==!'}, {'background_video': '!!!'},
 ])
 def test_render_validation(worker, changes):
     data = dict(map_file='eA==', background_video='eA==', video_title='test')
@@ -223,11 +223,11 @@ def test_download_video_stream(worker):
     response.close()
 
 
-@pytest.mark.parametrize('kind,status', [('empty', 400), ('missing', 404), ('outside', 400), ('sibling', 400), ('symlink', 400)])
+@pytest.mark.parametrize('kind,status', [('empty', 400), ('null', 400), ('missing', 404), ('outside', 400), ('sibling', 400), ('symlink', 400)])
 def test_download_path_validation(worker, tmp_path, kind, status):
     outside = tmp_path / 'secret.mp4'
     outside.write_bytes(b'private')
-    paths = {'empty': '', 'missing': str(Path(worker.RENDER_DIR) / 'missing.mp4'),
+    paths = {'empty': '', 'null': '\0', 'missing': str(Path(worker.RENDER_DIR) / 'missing.mp4'),
              'outside': str(outside), 'sibling': worker.RENDER_DIR + '-other/secret.mp4'}
     if kind == 'symlink':
         link = Path(worker.RENDER_DIR) / 'link.mp4'

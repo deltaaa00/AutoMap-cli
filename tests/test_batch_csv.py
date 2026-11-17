@@ -31,41 +31,33 @@ def authenticated_batch_client(monkeypatch):
     monkeypatch.setattr(app, 'test_client_class', AuthenticatedWebClient)
 
 
-def test_parse_ideas_rejects_non_csv_extensions(tmp_path: Path):
-    for ext in (".txt", ".md", ".json", ".yaml"):
-        with pytest.raises(ValueError, match="Only .csv files"):
-            parse_ideas_content("prompt\nEurope population\n", filename=f"ideas{ext}")
+@pytest.mark.parametrize("ext", [".txt", ".md", ".json", ".yaml"])
+def test_parse_ideas_rejects_non_csv_extensions(tmp_path: Path, ext: str):
+    with pytest.raises(ValueError, match="Only .csv files"):
+        parse_ideas_content("prompt\nEurope population\n", filename=f"ideas{ext}")
 
-        file_path = tmp_path / f"ideas{ext}"
-        file_path.write_text("prompt\nEurope population\n", encoding="utf-8")
-        with pytest.raises(ValueError, match="Only .csv files"):
-            load_ideas_from_file(file_path)
+    file_path = tmp_path / f"ideas{ext}"
+    file_path.write_text("prompt\nEurope population\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Only .csv files"):
+        load_ideas_from_file(file_path)
 
 
-def test_parse_ideas_validates_schema_and_values():
-    with pytest.raises(ValueError, match="Unknown CSV column"):
-        parse_ideas_content("prompt,unknown_col\nTest,1\n", filename="ideas.csv")
-
-    with pytest.raises(ValueError, match="Missing required CSV column"):
-        parse_ideas_content("mode,map_type\ntext,default\n", filename="ideas.csv")
-
-    with pytest.raises(ValueError, match="cannot be empty"):
-        parse_ideas_content("prompt,mode\n,text\n", filename="ideas.csv")
-
-    with pytest.raises(ValueError, match="invalid mode"):
-        parse_ideas_content("prompt,mode\nTest,invalid\n", filename="ideas.csv")
-
-    with pytest.raises(ValueError, match="invalid map_type"):
-        parse_ideas_content("prompt,map_type\nTest,mars\n", filename="ideas.csv")
-
-    with pytest.raises(ValueError, match="invalid extra_option"):
-        parse_ideas_content("prompt,extra_option\nTest,bad_opt\n", filename="ideas.csv")
-
-    with pytest.raises(ValueError, match="invalid gsm"):
-        parse_ideas_content("prompt,gsm\nTest,abc\n", filename="ideas.csv")
-
-    with pytest.raises(ValueError, match="invalid gsm"):
-        parse_ideas_content("prompt,gsm\nTest,101\n", filename="ideas.csv")
+@pytest.mark.parametrize(
+    "csv_text,match",
+    [
+        ("prompt,unknown_col\nTest,1\n", "Unknown CSV column"),
+        ("mode,map_type\ntext,default\n", "Missing required CSV column"),
+        ("prompt,mode\n,text\n", "cannot be empty"),
+        ("prompt,mode\nTest,invalid\n", "invalid mode"),
+        ("prompt,map_type\nTest,mars\n", "invalid map_type"),
+        ("prompt,extra_option\nTest,bad_opt\n", "invalid extra_option"),
+        ("prompt,gsm\nTest,abc\n", "invalid gsm"),
+        ("prompt,gsm\nTest,101\n", "invalid gsm"),
+    ],
+)
+def test_parse_ideas_validates_schema_and_values(csv_text: str, match: str):
+    with pytest.raises(ValueError, match=match):
+        parse_ideas_content(csv_text, filename="ideas.csv")
 
 
 def test_batch_template_endpoint_and_parsing():

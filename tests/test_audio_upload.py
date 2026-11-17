@@ -14,6 +14,7 @@
 
 """Real audio uploads and browser-restored sources without external downloads."""
 import base64
+from functools import lru_cache
 import io
 from pathlib import Path
 import re
@@ -24,7 +25,8 @@ import wave
 import pytest
 
 
-def wav_bytes(seconds=1.2):
+@lru_cache(maxsize=4)
+def wav_bytes(seconds=0.3):
     import math
     import struct
     output = io.BytesIO()
@@ -39,10 +41,11 @@ def payload(raw, filename='My music.wav'):
     return {'audio_file': 'data:audio/wav;base64,' + base64.b64encode(raw).decode(), 'filename': filename}
 
 
-def test_real_wav_upload_is_normalized_to_mp3_with_unique_safe_title(worker, tmp_path):
+def test_real_wav_upload_is_normalized_to_mp3_with_unique_safe_title(worker):
     from moviepy import AudioFileClip
     client = worker.app.test_client()
-    responses = [client.post('/api/music_upload', json=payload(wav_bytes(), '../../Моя музика.wav'))
+    raw_wav = wav_bytes(0.3)
+    responses = [client.post('/api/music_upload', json=payload(raw_wav, '../../Моя музика.wav'))
                  for _ in range(2)]
     titles = []
     for response in responses:
@@ -55,18 +58,18 @@ def test_real_wav_upload_is_normalized_to_mp3_with_unique_safe_title(worker, tmp
         assert path.read_bytes() == raw
         assert not raw.startswith(b'RIFF')
         with AudioFileClip(str(path)) as audio:
-            assert audio.duration == pytest.approx(1.2, abs=.15)
+            assert audio.duration == pytest.approx(0.3, abs=.15)
         titles.append(title)
     assert titles[0] != titles[1]
 
 
-@pytest.mark.parametrize('value', [None, '', 'data:audio/mp3;base64,', '!', 123,
-                                  'data:audio/wav,not-base64', 'eA==!'])
-def test_upload_rejects_empty_or_invalid_base64(worker, monkeypatch, value):
+def test_upload_rejects_empty_or_invalid_base64(worker, monkeypatch):
     convert = Mock()
     monkeypatch.setattr(worker, '_convert_uploaded_audio', convert)
-    response = worker.app.test_client().post('/api/music_upload', json={'audio_file': value})
-    assert response.status_code == 400
+    client = worker.app.test_client()
+    for value in (None, '', 'data:audio/mp3;base64,', '!', 123, 'data:audio/wav,not-base64', 'eA==!'):
+        response = client.post('/api/music_upload', json={'audio_file': value})
+        assert response.status_code == 400, value
     convert.assert_not_called()
     assert not list(Path(worker.DOWNLOADS).iterdir())
 
@@ -88,13 +91,14 @@ def test_upload_rejects_file_without_actual_audio(worker):
     assert not list(Path(worker.DOWNLOADS).iterdir())
 
 
-@pytest.mark.parametrize('error,status', [(subprocess.TimeoutExpired('ffmpeg', 30), 504),
-                                       (FileNotFoundError('ffmpeg unavailable'), 503)])
-def test_upload_conversion_failures_are_bounded_and_do_not_save_file(worker, monkeypatch, error, status):
-    monkeypatch.setattr(worker.subprocess, 'run', Mock(side_effect=error))
-    response = worker.app.test_client().post('/api/music_upload', json=payload(wav_bytes()))
-    assert response.status_code == status
-    assert not list(Path(worker.DOWNLOADS).iterdir())
+def test_upload_conversion_failures_are_bounded_and_do_not_save_file(worker, monkeypatch):
+    client = worker.app.test_client()
+    for error, status in ((subprocess.TimeoutExpired('ffmpeg', 30), 504),
+                          (FileNotFoundError('ffmpeg unavailable'), 503)):
+        monkeypatch.setattr(worker.subprocess, 'run', Mock(side_effect=error))
+        response = client.post('/api/music_upload', json=payload(wav_bytes()))
+        assert response.status_code == status
+        assert not list(Path(worker.DOWNLOADS).iterdir())
 
 
 def test_converted_audio_limit_and_subprocess_timeout(worker, monkeypatch):
@@ -134,12 +138,13 @@ def test_inline_cut_rejects_start_beyond_audio(worker):
     assert not list(Path(worker.CUT_DIR).iterdir())
 
 
-@pytest.mark.parametrize('raw', ['', 'bad!'])
-def test_inline_cut_requires_valid_source(worker, raw):
-    response = worker.app.test_client().post('/api/music_cut', json={
-        'title': 'restored', 'audio_file': raw, 'start_time': '00:00',
-    })
-    assert response.status_code == 400
+def test_inline_cut_requires_valid_source(worker):
+    client = worker.app.test_client()
+    for raw in ('', 'bad!'):
+        response = client.post('/api/music_cut', json={
+            'title': 'restored', 'audio_file': raw, 'start_time': '00:00',
+        })
+        assert response.status_code == 400, raw
 
 
 def test_inline_cut_rejects_oversize_source(worker, monkeypatch):

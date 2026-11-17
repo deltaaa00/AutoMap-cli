@@ -28,6 +28,7 @@ services:
       WEB_SECRET_KEY: "${WEB_SECRET_KEY:-}"
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
       DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      YOUTUBE_REDIRECT_URI: "${YOUTUBE_REDIRECT_URI:-}"
       YTDLP_URL: http://yt-dlp-worker:8080
     volumes:
       - automap-session:/app/instance

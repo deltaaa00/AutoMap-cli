@@ -397,14 +397,26 @@ limitations under the License.
 
                     <!-- Topic / Prompt Input + Interactive Quick Prompt Presets -->
                     <div>
-                        <div class="flex justify-between items-center mb-1.5">
+                        <div class="flex flex-wrap justify-between items-center gap-2 mb-1.5">
                             <label for="topicInput" class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
                                 <i class="fa-solid fa-wand-magic-sparkles text-indigo-400"></i>
                                 Map Topic or AI Query
                             </label>
+                            <div class="flex items-center gap-1.5">
+                                <select id="ideaModeSelect" title="Idea generation mode"
+                                    class="px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-300 focus:outline-none focus:border-amber-500/60">
+                                    <option value="idea_only">Idea only</option>
+                                    <option value="idea_and_params">Idea + Params</option>
+                                </select>
+                                <button type="button" id="generateIdeaBtn" onclick="generateIdea()"
+                                    class="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border border-amber-500/35 text-[11px] font-medium transition flex items-center gap-1.5">
+                                    <i id="generateIdeaIcon" class="fa-solid fa-lightbulb text-[10px]"></i>
+                                    <span id="generateIdeaText">Generate idea</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="relative group">
-                            <input type="text" id="topicInput" placeholder="e.g., Population of European countries" 
+                            <input type="text" id="topicInput" placeholder="e.g., What is the most popular drink in your country?" 
                                 oninput="scheduleTopicPreview(event)" oncompositionend="scheduleTopicPreview(event)" onchange="flushTopicPreview()"
                                 class="w-full pl-3.5 pr-9 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition shadow-inner">
                             <button type="button" onclick="clearTopicInput()" title="Clear prompt" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1 transition">
@@ -422,25 +434,25 @@ limitations under the License.
                                 <span class="text-[10px] text-slate-500">1-click auto-config</span>
                             </div>
                             <div class="flex flex-wrap gap-1.5" id="presetChipsContainer">
-                                <button type="button" onclick="applyPromptPreset('Population of European countries', 'number', 'default', 'show_most_least')"
+                                <button type="button" onclick="applyPromptPreset('How many people live in your country?', 'number', 'default', 'show_most_least')"
                                     class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-indigo-500/15 text-slate-300 hover:text-indigo-200 border border-slate-800 hover:border-indigo-500/40 transition flex items-center gap-1.5 group">
                                     <i class="fa-solid fa-users text-[10px] text-indigo-400 group-hover:scale-110 transition-transform"></i>
-                                    <span>Population of Europe</span>
+                                    <span>Population in your country?</span>
                                 </button>
-                                <button type="button" onclick="applyPromptPreset('Most popular hot drink in Europe', 'text', 'default', 'none')"
+                                <button type="button" onclick="applyPromptPreset('What is the most popular hot drink in your country?', 'text', 'default', 'none')"
                                     class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-emerald-500/15 text-slate-300 hover:text-emerald-200 border border-slate-800 hover:border-emerald-500/40 transition flex items-center gap-1.5 group">
                                     <i class="fa-solid fa-mug-hot text-[10px] text-emerald-400 group-hover:scale-110 transition-transform"></i>
-                                    <span>Hot drink in Europe</span>
+                                    <span>Most popular hot drink?</span>
                                 </button>
-                                <button type="button" onclick="applyPromptPreset('GDP per capita in Europe', 'number', 'flag', 'show_most_least')"
+                                <button type="button" onclick="applyPromptPreset('What is the GDP per capita in your country?', 'number', 'flag', 'show_most_least')"
                                     class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-amber-500/15 text-slate-300 hover:text-amber-200 border border-slate-800 hover:border-amber-500/40 transition flex items-center gap-1.5 group">
                                     <i class="fa-solid fa-coins text-[10px] text-amber-400 group-hover:scale-110 transition-transform"></i>
-                                    <span>GDP per capita (Flags)</span>
+                                    <span>GDP per capita? (Flags)</span>
                                 </button>
-                                <button type="button" onclick="applyPromptPreset('Forest coverage percentage by continent', 'number', 'world', 'none')"
+                                <button type="button" onclick="applyPromptPreset('What is the forest coverage percentage in your continent?', 'number', 'world', 'none')"
                                     class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-sky-500/15 text-slate-300 hover:text-sky-200 border border-slate-800 hover:border-sky-500/40 transition flex items-center gap-1.5 group">
                                     <i class="fa-solid fa-tree text-[10px] text-sky-400 group-hover:scale-110 transition-transform"></i>
-                                    <span>Forest coverage (World)</span>
+                                    <span>Forest coverage? (World)</span>
                                 </button>
                             </div>
                         </div>
@@ -653,6 +665,29 @@ limitations under the License.
                             <input type="checkbox" id="showLegendToggle" onchange="updateCommandPreview()"
                                 class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500">
                         </label>
+                        <label class="mt-2 flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-slate-700 transition cursor-pointer">
+                            <div>
+                                <div class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-highlighter text-amber-400 text-[11px]"></i>
+                                    Highlight Min / Max Countries
+                                </div>
+                                <div class="text-[10px] text-slate-400 mt-0.5">Soft glow on highest &amp; lowest values (number mode)</div>
+                            </div>
+                            <input type="checkbox" id="highlightExtremaToggle" onchange="updateCommandPreview()"
+                                class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500">
+                        </label>
+                        <div id="highlightColorsRow" class="hidden mt-2 grid grid-cols-2 gap-2 px-3 py-2 rounded-xl border border-slate-800/80 bg-slate-950/50">
+                            <label class="flex items-center justify-between gap-2 text-[11px] text-slate-300 cursor-pointer">
+                                <span>Highest color</span>
+                                <input type="color" id="highlightHighColor" value="#00e5ff" onchange="updateCommandPreview()"
+                                    class="h-6 w-9 rounded border border-slate-700 bg-slate-900 cursor-pointer">
+                            </label>
+                            <label class="flex items-center justify-between gap-2 text-[11px] text-slate-300 cursor-pointer">
+                                <span>Lowest color</span>
+                                <input type="color" id="highlightLowColor" value="#ff2daa" onchange="updateCommandPreview()"
+                                    class="h-6 w-9 rounded border border-slate-700 bg-slate-900 cursor-pointer">
+                            </label>
+                        </div>
                     </div>
 
                     <!-- 5. Flag: --model & 6. Flag: --font in a responsive 2-col or stacked layout -->
@@ -1606,6 +1641,87 @@ limitations under the License.
             updateCommandPreview();
         }
 
+        async function generateIdea() {
+            const btn = document.getElementById('generateIdeaBtn');
+            const icon = document.getElementById('generateIdeaIcon');
+            const textEl = document.getElementById('generateIdeaText');
+            const withParams = document.getElementById('ideaModeSelect')?.value === 'idea_and_params';
+            const state = getFormState();
+
+            if (btn) btn.disabled = true;
+            if (icon) icon.className = 'fa-solid fa-spinner fa-spin text-[10px]';
+            if (textEl) textEl.textContent = 'Thinking...';
+
+            try {
+                const response = await fetch('/api/generate_idea', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        provider: state.provider,
+                        model: state.model,
+                        api_key: state.api_key,
+                        with_params: withParams,
+                        temperature: state.temperature,
+                    }),
+                });
+                let result;
+                try {
+                    result = await response.json();
+                } catch {
+                    throw new Error(`Server returned ${response.status} ${response.statusText}`);
+                }
+                if (!response.ok || result.status !== 'success' || !result.idea) {
+                    throw new Error(result.error || 'Failed to generate idea');
+                }
+
+                const topicInput = document.getElementById('topicInput');
+                if (topicInput) {
+                    topicInput.value = result.idea;
+                    scheduleTopicPreview();
+                    flushTopicPreview();
+                }
+
+                if (withParams && result.params) {
+                    const p = result.params;
+                    const modeRadio = document.querySelector(`input[name="mode"][value="${p.mode}"]`);
+                    if (modeRadio) modeRadio.checked = true;
+                    const mapRadio = document.querySelector(`input[name="map_type"][value="${p.map_type}"]`);
+                    if (mapRadio) mapRadio.checked = true;
+                    const paletteEl = document.getElementById('fillingPaletteTheme');
+                    if (paletteEl && p.palette_theme && Array.from(paletteEl.options).some(o => o.value === p.palette_theme)) {
+                        paletteEl.value = p.palette_theme;
+                        if (typeof onPaletteThemeChange === 'function') {
+                            onPaletteThemeChange();
+                        }
+                    }
+                    const fontEl = document.getElementById('fontSelect');
+                    if (fontEl && p.font && Array.from(fontEl.options).some(o => o.value === p.font)) {
+                        fontEl.value = p.font;
+                    }
+                    if (typeof setSelectedExtraOption === 'function') {
+                        setSelectedExtraOption(p.extra_option || 'none');
+                    }
+                    const legendEl = document.getElementById('showLegendToggle');
+                    if (legendEl) legendEl.checked = !!p.show_legend;
+
+                    updateCommandPreview();
+                    logToConsole(`[Idea] "${result.idea}" (${p.mode}, ${p.map_type}, theme=${p.palette_theme}, font=${p.font})`, 'info');
+                    showToast(`Generated idea + params (${p.palette_theme}, ${p.map_type})`, 'success');
+                } else {
+                    updateCommandPreview();
+                    logToConsole(`[Idea] "${result.idea}"`, 'info');
+                    showToast('Generated new map idea!', 'success');
+                }
+            } catch (error) {
+                logToConsole(`[Idea Error] ${error.message}`, 'error');
+                showToast(error.message || 'Failed to generate idea', 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+                if (icon) icon.className = 'fa-solid fa-lightbulb text-[10px]';
+                if (textEl) textEl.textContent = 'Generate idea';
+            }
+        }
+
         let loadedIdeasFile = { filename: '', text: '' };
         let lastBatchResults = [];
 
@@ -2119,6 +2235,9 @@ limitations under the License.
                 gsm,
                 extra_option: extraOption,
                 show_legend: !!document.getElementById('showLegendToggle')?.checked,
+                highlight_extrema: !!document.getElementById('highlightExtremaToggle')?.checked,
+                highlight_high_color: document.getElementById('highlightHighColor')?.value || '#00e5ff',
+                highlight_low_color: document.getElementById('highlightLowColor')?.value || '#ff2daa',
                 model,
                 font,
                 topic,
@@ -2165,7 +2284,7 @@ limitations under the License.
         let topicPreviewTimer;
         function scheduleTopicPreview(event) {
             clearTimeout(topicPreviewTimer);
-            if (event.isComposing) return;
+            if (event && event.isComposing) return;
             topicPreviewTimer = setTimeout(flushTopicPreview, 250);
         }
 
@@ -2189,8 +2308,11 @@ limitations under the License.
             const escapedTopic = (state.topic || '').replace(/"/g, '\\"');
             let cmd = `python cli.py make "${escapedTopic}" -m ${state.mode} -mp ${state.map_type} -gsm ${state.gsm} -eop ${state.extra_option} --model ${state.model} --font "${state.font}" --temperature ${state.temperature}`;
             if (state.show_legend) cmd += ' --legend';
+            if (state.highlight_extrema) cmd += ' --highlight-extrema';
 
             document.getElementById('cliCommandDisplay').textContent = cmd;
+            const hlColorsRow = document.getElementById('highlightColorsRow');
+            if (hlColorsRow) hlColorsRow.classList.toggle('hidden', !state.highlight_extrema);
             updateActiveBadges(state);
             updateCompatibilityHint(state);
             updateHudCoords(state);
@@ -2200,8 +2322,8 @@ limitations under the License.
             const hint = document.getElementById('extraOptionHint');
             if (!hint) return;
             const hasMostLeast = String(state.extra_option || '').includes('show_most_least');
-            if (hasMostLeast && state.mode === 'text') {
-                hint.textContent = 'Note: show_most_least is designed for numeric mode (-m number).';
+            if ((hasMostLeast || state.highlight_extrema) && state.mode === 'text') {
+                hint.textContent = 'Note: Most/Least and Min/Max highlighting only apply in numeric mode.';
                 hint.className = 'text-[11px] text-amber-400/90 mt-1.5 block';
             } else if (hasMostLeast && state.map_type === 'world') {
                 hint.textContent = 'Note: show_most_least overlay is supported on default, flag, and world_countries maps.';
@@ -2233,6 +2355,7 @@ limitations under the License.
                 { label: `gsm: ${state.gsm}`, color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
                 { label: `eop: ${state.extra_option}`, color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
                 ...(state.show_legend ? [{ label: 'legend', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' }] : []),
+                ...(state.highlight_extrema ? [{ label: 'highlight min/max', color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' }] : []),
                 { label: state.model, color: 'bg-sky-500/20 text-sky-300 border-sky-500/30' },
                 { label: state.font, color: 'bg-slate-900/90 text-slate-300 border-slate-700' }
             ];
@@ -2447,6 +2570,10 @@ limitations under the License.
 
                 if (response.ok && result.status === 'success') {
                     if (result.command) logToConsole(`[Server] ${result.command}`, 'info');
+                    if (result.warning) {
+                        logToConsole(`[Warning] ${result.warning}`, 'warn');
+                        showToast(result.warning, 'warn');
+                    }
                     logToConsole(`[Success] Map generated and loaded (${describeDataUrl(result.image_url)})`, 'success');
 
                     if (result.map_values) {
@@ -3164,6 +3291,33 @@ limitations under the License.
             showToast("Run history cleared", "info");
         }
 
+        function createHistoryThumbnail(dataUrl, size = 96) {
+            return new Promise(resolve => {
+                if (!dataUrl || !dataUrl.startsWith('data:image/')) {
+                    resolve(null);
+                    return;
+                }
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = size;
+                        canvas.height = size;
+                        const ctx = canvas.getContext('2d');
+                        const scale = Math.max(size / img.naturalWidth, size / img.naturalHeight);
+                        const drawW = img.naturalWidth * scale;
+                        const drawH = img.naturalHeight * scale;
+                        ctx.drawImage(img, (size - drawW) / 2, (size - drawH) / 2, drawW, drawH);
+                        resolve(canvas.toDataURL('image/jpeg', 0.82));
+                    } catch {
+                        resolve(null);
+                    }
+                };
+                img.onerror = () => resolve(null);
+                img.src = dataUrl;
+            });
+        }
+
         function addToHistory(state, cmd, extra = {}) {
             const {api_key, ...savedState} = state;
             const createdAt = Date.now();
@@ -3174,12 +3328,44 @@ limitations under the License.
                 state: savedState,
                 cmd,
                 image_url: extra.image_url || null,
+                thumb_url: null,
                 analysis: extra.analysis || null,
                 map_values: extra.map_values || null
             };
             runHistory = [entry, ...runHistory.filter(item => createdAt - item.createdAt <= HISTORY_RETENTION_MS)];
             renderRunHistory();
-            queueHistoryWrite(() => StudioStorage.addHistory(entry));
+            if (entry.image_url) {
+                createHistoryThumbnail(entry.image_url).then(thumb => {
+                    if (!thumb) return;
+                    entry.thumb_url = thumb;
+                    const imgEl = document.querySelector(`[data-history-id="${entry.id}"] img`);
+                    if (imgEl) imgEl.src = thumb;
+                    queueHistoryWrite(() => StudioStorage.addHistory(entry));
+                });
+            } else {
+                queueHistoryWrite(() => StudioStorage.addHistory(entry));
+            }
+        }
+
+        let thumbBackfillRunning = false;
+        function backfillMissingThumbnails() {
+            if (thumbBackfillRunning) return;
+            const missing = runHistory.filter(item => item.image_url && !item.thumb_url);
+            if (!missing.length) return;
+            thumbBackfillRunning = true;
+            (async () => {
+                for (const item of missing) {
+                    const thumb = await createHistoryThumbnail(item.image_url);
+                    if (thumb) {
+                        item.thumb_url = thumb;
+                        const imgEl = document.querySelector(`[data-history-id="${item.id}"] img`);
+                        if (imgEl) imgEl.src = thumb;
+                        queueHistoryWrite(() => StudioStorage.addHistory(item));
+                    }
+                    await new Promise(r => setTimeout(r, 20));
+                }
+                thumbBackfillRunning = false;
+            })();
         }
 
         function renderRunHistory() {
@@ -3194,12 +3380,18 @@ limitations under the License.
             }
             runHistory.forEach((item, idx) => {
                 const row = document.createElement('div');
+                row.dataset.historyId = item.id || '';
+                row.style.contain = 'layout style paint';
                 row.className = 'p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/60 cursor-pointer transition flex items-center gap-2.5';
                 row.addEventListener('click', () => restoreHistoryItem(idx));
 
-                if (item.image_url) {
+                if (item.image_url || item.thumb_url) {
                     const preview = document.createElement('img');
-                    preview.src = item.image_url;
+                    preview.decoding = 'async';
+                    preview.loading = 'lazy';
+                    preview.width = 44;
+                    preview.height = 44;
+                    preview.src = item.thumb_url || item.image_url;
                     preview.alt = 'Map preview';
                     preview.className = 'w-11 h-11 rounded-lg object-cover border border-slate-700/80 shrink-0 bg-slate-950';
                     row.appendChild(preview);
@@ -3208,22 +3400,24 @@ limitations under the License.
                 const details = document.createElement('div');
                 details.className = 'min-w-0 flex-1 flex flex-col justify-between gap-1';
                 const metadata = document.createElement('div');
-                metadata.className = 'flex items-center justify-between text-[11px]';
-                const mode = document.createElement('span');
-                mode.className = 'font-mono text-indigo-400 font-semibold';
-                mode.textContent = `${item.state.map_type} / ${item.state.mode}`;
+                metadata.className = 'flex items-center justify-between gap-2 text-[11px]';
+                const topicEl = document.createElement('span');
+                topicEl.className = 'text-indigo-300 font-semibold truncate';
+                topicEl.textContent = (item.state?.topic || '').trim() || 'Untitled map';
                 const time = document.createElement('span');
-                time.className = 'text-slate-500';
+                time.className = 'text-slate-500 shrink-0';
                 time.textContent = item.time;
-                metadata.append(mode, time);
+                metadata.append(topicEl, time);
 
-                const command = document.createElement('div');
-                command.className = 'text-[11px] font-mono text-slate-400 truncate';
-                command.textContent = item.cmd;
-                details.append(metadata, command);
+                const modeLine = document.createElement('div');
+                modeLine.className = 'text-[11px] font-mono text-slate-400 truncate';
+                const mapLabel = String(item.state?.map_type || 'default').replace(/_/g, ' ');
+                modeLine.textContent = `${mapLabel} / ${item.state?.mode || 'text'}`;
+                details.append(metadata, modeLine);
                 row.appendChild(details);
                 list.appendChild(row);
             });
+            backfillMissingThumbnails();
         }
 
         function restoreHistoryItem(index) {
@@ -3246,6 +3440,12 @@ limitations under the License.
             setSelectedExtraOption(s.extra_option);
             const legendToggle = document.getElementById('showLegendToggle');
             if (legendToggle) legendToggle.checked = !!s.show_legend;
+            const hlToggle = document.getElementById('highlightExtremaToggle');
+            if (hlToggle) hlToggle.checked = !!s.highlight_extrema;
+            const hlHigh = document.getElementById('highlightHighColor');
+            if (hlHigh && s.highlight_high_color) hlHigh.value = s.highlight_high_color;
+            const hlLow = document.getElementById('highlightLowColor');
+            if (hlLow && s.highlight_low_color) hlLow.value = s.highlight_low_color;
             document.getElementById('modelSelect').value = s.model;
             document.getElementById('fontSelect').value = s.font;
             document.getElementById('topicInput').value = s.topic || '';
@@ -3309,6 +3509,12 @@ limitations under the License.
             setSelectedExtraOption('none');
             const legendToggle = document.getElementById('showLegendToggle');
             if (legendToggle) legendToggle.checked = false;
+            const hlToggle = document.getElementById('highlightExtremaToggle');
+            if (hlToggle) hlToggle.checked = false;
+            const hlHigh = document.getElementById('highlightHighColor');
+            if (hlHigh) hlHigh.value = '#00e5ff';
+            const hlLow = document.getElementById('highlightLowColor');
+            if (hlLow) hlLow.value = '#ff2daa';
             changeAiProvider('gemini', fallbackModels.find(model => modelProvider(model) === 'gemini'));
             document.getElementById('fontSelect').selectedIndex = 0;
             document.getElementById('topicInput').value = '';

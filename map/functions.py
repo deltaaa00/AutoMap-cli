@@ -387,6 +387,202 @@ def ai_request(prompt: str, mode: str, ai_model: str, api_key: str | None = None
     return country_dict
 
 
+IDEA_EXAMPLES = (
+    "How many bears are there in your country?",
+    "How many school years children must study in your country?",
+    "What is the most popular drink in your country?",
+    "What is the biggest city in your country?",
+    "How many McDonald's restaurants are there in your country?",
+    "What is the most popular car brand in your country?",
+    "How many UNESCO World Heritage sites are there in your country?",
+    "What is the minimum driving age in your country?",
+    "What is the most popular sport in your country?",
+    "How many hours do people work per week in your country?",
+)
+
+
+def _call_model_text(
+    system_msg: str,
+    user_prompt: str,
+    ai_model: str,
+    api_key: str | None = None,
+    *,
+    temperature: float | None = None,
+    json_mode: bool = False,
+) -> str:
+    """Send a lightweight prompt to the selected Gemini or DeepSeek model and return raw text."""
+    if provider_for_model(ai_model) == 'deepseek':
+        payload: dict[str, object] = {
+            'model': ai_model,
+            'messages': [
+                {'role': 'system', 'content': system_msg},
+                {'role': 'user', 'content': user_prompt},
+            ],
+            'thinking': {'type': 'disabled'},
+            'max_tokens': 512,
+            'stream': False,
+        }
+        if json_mode:
+            payload['response_format'] = {'type': 'json_object'}
+        if temperature is not None:
+            payload['temperature'] = validate_temperature(temperature)
+        key = api_key or configured_api_key('deepseek')
+        result = _deepseek_json('chat/completions', key, payload=payload)
+        try:
+            content = result['choices'][0]['message']['content']
+        except (KeyError, IndexError, TypeError) as error:
+            raise AIServiceError('DeepSeek returned no idea. Please try again.', 502) from error
+        if not isinstance(content, str) or not content.strip():
+            raise AIServiceError('DeepSeek returned an empty idea. Please try again.', 502)
+        return content.strip()
+
+    try:
+        options: dict[str, object] = {
+            'http_options': types.HttpOptions(
+                timeout=AI_TIMEOUT_MS,
+                retry_options=types.HttpRetryOptions(attempts=1),
+            ),
+        }
+        if api_key:
+            options['api_key'] = api_key
+        client = genai.Client(**options)
+        cfg_kwargs: dict[str, object] = {}
+        if temperature is not None:
+            cfg_kwargs['temperature'] = validate_temperature(temperature)
+        if json_mode:
+            cfg_kwargs['response_mime_type'] = 'application/json'
+        config = {'config': types.GenerateContentConfig(**cfg_kwargs)} if cfg_kwargs else {}
+        response = client.models.generate_content(
+            model=ai_model,
+            contents=f"{system_msg}\n\n{user_prompt}",
+            **config,
+        )
+    except genai_errors.APIError as error:
+        if error.code in (500, 502, 503, 504):
+            raise AIServiceError(
+                f'The selected model ({ai_model}) is overloaded or temporarily unavailable. '
+                'Please try again shortly or select another model.', 503,
+            ) from error
+        if error.code == 429:
+            raise AIServiceError(
+                'The AI request limit or quota has been reached. Please try again later '
+                'or check the quota for your API key.', 429,
+            ) from error
+        if error.code in (400, 401, 403, 404):
+            raise AIServiceError(
+                f'The selected model ({ai_model}) could not be used. '
+                'Refresh the model list and check your API key and model access.', 400,
+            ) from error
+        raise AIServiceError('The AI service could not complete this request. Please try again.') from error
+    except (httpx.TimeoutException, TimeoutError) as error:
+        raise AIServiceError(
+            'The AI model did not respond within 45 seconds. '
+            'Please try again or select a faster model.', 504,
+        ) from error
+
+    text = getattr(response, 'text', None)
+    if not isinstance(text, str) or not text.strip():
+        raise AIServiceError('The AI model returned an empty idea. Please try again.', 502)
+    return text.strip()
+
+
+def generate_map_idea(
+    ai_model: str,
+    api_key: str | None = None,
+    *,
+    with_params: bool = False,
+    available_themes: list[str] | tuple[str, ...] | None = None,
+    available_fonts: list[str] | tuple[str, ...] | None = None,
+    temperature: float | None = None,
+) -> dict[str, object]:
+    """Generate a single map idea (and optionally matching map parameters) via the selected AI model."""
+    examples_block = "\n".join(f'- "{ex}"' for ex in IDEA_EXAMPLES)
+
+    if not with_params:
+        system_msg = (
+            "You generate short, engaging, curiosity-sparking map topic questions in English. "
+            "Return ONLY the idea itself as a single plain-text sentence/question, with no quotes, "
+            "no numbering, no markdown, and no explanation."
+        )
+        user_prompt = (
+            "Generate 1 new creative map topic idea in the exact same style and format as these examples:\n"
+            f"{examples_block}\n\n"
+            "Return only the idea text."
+        )
+        raw = _call_model_text(system_msg, user_prompt, ai_model, api_key, temperature=temperature, json_mode=False)
+        idea = raw.strip().splitlines()[0].strip().strip('"\'` ')
+        if not idea:
+            raise AIServiceError('The AI model returned an empty idea. Please try again.', 502)
+        return {"idea": idea}
+
+    raw_themes = [str(t) for t in (available_themes or list(constants._PALETTE_THEMES.keys()))]
+    themes = [t for t in raw_themes if t not in ("auto", "ocean", "emerald")] or raw_themes
+    fonts = [str(f) for f in (available_fonts or ["Bips.ttf", "DIN Condensed.ttf", "kodchasan.ttf", "arialroundedmtbold.ttf"])]
+    allowed_map_types = ("default", "flag", "world", "world_countries")
+    allowed_modes = ("text", "number")
+    allowed_extras = ("none", "show_most_least", "show_short_form")
+
+    system_msg = (
+        "You generate short, engaging map topic questions in English along with the best map rendering parameters. "
+        "Return ONLY a valid JSON object (no markdown fences, no commentary)."
+    )
+    user_prompt = (
+        "Generate 1 new creative map topic idea in the same style as these examples:\n"
+        f"{examples_block}\n\n"
+        "Return a JSON object with these exact keys:\n"
+        '- "idea": string (the single map question/topic, no surrounding quotes)\n'
+        f'- "mode": one of {list(allowed_modes)} ("number" for numeric counts/amounts/years, "text" for names/words/categories)\n'
+        f'- "map_type": one of {list(allowed_map_types)} ("default" = Europe painted, "flag" = Europe flags, "world" = continents, "world_countries" = all world countries)\n'
+        f'- "palette_theme": one of {themes}\n'
+        f'- "font": one of {fonts}\n'
+        f'- "extra_option": one of {list(allowed_extras)} ("show_most_least" or "show_short_form" only when mode is "number" and map_type is not "world", otherwise "none")\n'
+        '- "show_legend": boolean (true if a legend helps explain the map, false otherwise)'
+    )
+    raw = _call_model_text(system_msg, user_prompt, ai_model, api_key, temperature=temperature, json_mode=True)
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE | re.DOTALL).strip()
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError as error:
+        raise AIServiceError('AI returned invalid JSON for the map idea. Please try again.', 502) from error
+    if not isinstance(parsed, dict):
+        raise AIServiceError('AI returned an unexpected format for the map idea.', 502)
+
+    idea = str(parsed.get("idea") or "").strip().strip('"\'` ')
+    if not idea:
+        raise AIServiceError('The AI model returned an empty idea. Please try again.', 502)
+
+    mode = str(parsed.get("mode") or "text").strip().lower()
+    if mode not in allowed_modes:
+        mode = "text"
+    map_type = str(parsed.get("map_type") or "default").strip().lower()
+    if map_type not in allowed_map_types:
+        map_type = "default"
+    palette_theme = str(parsed.get("palette_theme") or "auto").strip()
+    if palette_theme not in themes:
+        palette_theme = "auto" if "auto" in themes else themes[0]
+    font = str(parsed.get("font") or fonts[0]).strip()
+    if font not in fonts:
+        font = fonts[0]
+    extra_option = str(parsed.get("extra_option") or "none").strip().lower()
+    if extra_option not in allowed_extras or mode != "number" or map_type == "world":
+        extra_option = "none"
+    show_legend = bool(parsed.get("show_legend", False))
+
+    return {
+        "idea": idea,
+        "params": {
+            "mode": mode,
+            "map_type": map_type,
+            "palette_theme": palette_theme,
+            "font": font,
+            "extra_option": extra_option,
+            "show_legend": show_legend,
+        },
+    }
+
+
 
 
 

@@ -13,11 +13,15 @@
 # limitations under the License.
 
 import base64
+import importlib
 import io
+import logging
+import math
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
@@ -451,6 +455,34 @@ from video_render import (
 )
 
 
+def _load_automap_rs():
+    """Import ``automap_rs``, bypassing any local source directory shadowing."""
+    if "automap_rs" in sys.modules and sys.modules["automap_rs"] is None:
+        raise ImportError("automap_rs is disabled")
+
+    mod = sys.modules.get("automap_rs")
+    if mod is None:
+        mod = importlib.import_module("automap_rs")
+    if hasattr(mod, "render_video_rs"):
+        return mod
+
+    # When CWD is the repo root, ./automap_rs/ can shadow site-packages/automap_rs.abi3.so.
+    repo_root = os.path.dirname(os.path.abspath(__file__))
+    orig_path = list(sys.path)
+    try:
+        sys.path = [p for p in orig_path if os.path.abspath(p or os.getcwd()) != repo_root]
+        if "automap_rs" in sys.modules and sys.modules["automap_rs"] is not None:
+            if not hasattr(sys.modules["automap_rs"], "render_video_rs"):
+                sys.modules.pop("automap_rs", None)
+        mod = importlib.import_module("automap_rs")
+    finally:
+        sys.path = orig_path
+
+    if not hasattr(mod, "render_video_rs"):
+        raise ImportError("automap_rs native extension not built")
+    return mod
+
+
 @app.route('/api/video_title_preview', methods=['POST'])
 def video_title_preview():
     from PIL import Image
@@ -497,6 +529,349 @@ def video_title_preview():
     Image.fromarray(image).save(output, format='PNG')
     output.seek(0)
     return send_file(output, mimetype='image/png')
+
+
+def _parse_finite_float(value: object, default: float) -> float:
+    """Parse a finite float from JSON input, returning ``default`` on missing or invalid values."""
+    if value is None or value == '' or isinstance(value, bool):
+        return default
+    try:
+        parsed = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+    return parsed if math.isfinite(parsed) else default
+
+
+def _decode_reveal_mask(raw_mask: object, box_w: int, box_h: int):
+    """Decode a base64 or data-URL L-mode PNG mask resized to ``(box_w, box_h)``, or return None."""
+    if not isinstance(raw_mask, str) or not raw_mask.strip():
+        return None
+    import numpy as np
+    from PIL import Image, UnidentifiedImageError
+
+    value = raw_mask.strip()
+    if value.startswith('data:'):
+        header, sep, value = value.partition(',')
+        if not sep or ';base64' not in header.lower():
+            return None
+    b64_part = ''.join(value.split())
+    if not b64_part or len(b64_part) > 4 * ((MAX_MATERIAL_BYTES + 2) // 3):
+        return None
+    try:
+        raw_bytes = base64.b64decode(b64_part, validate=True)
+    except (ValueError, TypeError):
+        return None
+    if not raw_bytes or len(raw_bytes) > MAX_MATERIAL_BYTES:
+        return None
+    try:
+        with Image.open(io.BytesIO(raw_bytes)) as mask_img:
+            if mask_img.width * mask_img.height > 20_000_000:
+                return None
+            mask_resized = mask_img.convert('L').resize(
+                (box_w, box_h),
+                Image.Resampling.BILINEAR,
+            )
+            mask_arr = np.array(mask_resized, dtype=np.float32) / 255.0
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError, ValueError):
+        return None
+    if not np.any(mask_arr > 0.0):
+        return None
+    return mask_arr[..., None]
+
+
+def _parse_reveal_color(raw_color: object) -> tuple[int, int, int]:
+    """Parse a hex color string (e.g. ``#000000``) into an RGB tuple, defaulting to black."""
+    if not isinstance(raw_color, str):
+        return (0, 0, 0)
+    s = raw_color.strip().lstrip('#')
+    if len(s) == 3 and all(c in '0123456789abcdefABCDEF' for c in s):
+        s = ''.join(c * 2 for c in s)
+    if len(s) == 6 and all(c in '0123456789abcdefABCDEF' for c in s):
+        return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16))
+    return (0, 0, 0)
+
+
+def _render_reveal_dot_overlays(
+    box_w: int,
+    box_h: int,
+    cx: float,
+    cy: float,
+    cover_rgb: tuple[int, int, int] = (0, 0, 0),
+) -> dict[int, tuple[int, int, int, int, object]]:
+    """Pre-render 1-, 2-, and 3-dot RGBA overlays centered at ``(cx, cy)`` using 4x supersampling."""
+    import numpy as np
+    from PIL import Image, ImageDraw
+
+    base_dim = min(box_w, box_h)
+    dot_r = max(6.0, min(10.5, base_dim * 0.011))
+    outline_w = max(2.0, dot_r * 0.34)
+    outer_r = dot_r + outline_w
+    spacing = dot_r * 3.0
+
+    pad = int(math.ceil(outer_r)) + 4
+    x0 = max(0, int(math.floor(cx - spacing - pad)))
+    x1 = min(box_w, int(math.ceil(cx + spacing + pad)))
+    y0 = max(0, int(math.floor(cy - pad)))
+    y1 = min(box_h, int(math.ceil(cy + pad)))
+    patch_w = max(1, x1 - x0)
+    patch_h = max(1, y1 - y0)
+
+    lum = 0.299 * cover_rgb[0] + 0.587 * cover_rgb[1] + 0.114 * cover_rgb[2]
+    dot_fill = (15, 23, 42, 255) if lum > 175 else (255, 255, 255, 255)
+    ring_fill = (255, 255, 255, 255) if lum > 175 else (10, 12, 20, 255)
+
+    ss = 4
+    overlays: dict[int, tuple[int, int, int, int, object]] = {}
+    for count in (1, 2, 3):
+        hi_img = Image.new('RGBA', (patch_w * ss, patch_h * ss), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(hi_img)
+        for idx in range(count):
+            dot_x = (cx + (idx - 1) * spacing - x0) * ss
+            dot_y = (cy - y0) * ss
+            ro = outer_r * ss
+            ri = dot_r * ss
+            draw.ellipse(
+                (dot_x - ro, dot_y - ro, dot_x + ro, dot_y + ro),
+                fill=ring_fill,
+            )
+            draw.ellipse(
+                (dot_x - ri, dot_y - ri, dot_x + ri, dot_y + ri),
+                fill=dot_fill,
+            )
+        patch = hi_img.resize((patch_w, patch_h), Image.Resampling.LANCZOS)
+        overlays[count] = (y0, y1, x0, x1, np.array(patch, dtype=np.uint8))
+    return overlays
+
+
+def _alpha_composite_patch(base_rgba, y0: int, y1: int, x0: int, x1: int, patch_rgba):
+    """Return a copy of ``base_rgba`` with ``patch_rgba`` alpha-composited into ``[y0:y1, x0:x1]``."""
+    import numpy as np
+
+    out = base_rgba.copy()
+    bg = out[y0:y1, x0:x1].astype(np.float32)
+    fg = patch_rgba.astype(np.float32)
+    fg_a = fg[:, :, 3:4] / 255.0
+    bg_a = bg[:, :, 3:4] / 255.0
+    out_a = fg_a + bg_a * (1.0 - fg_a)
+    safe_a = np.maximum(out_a, 1e-6)
+    out_rgb = (fg[:, :, :3] * fg_a + bg[:, :, :3] * bg_a * (1.0 - fg_a)) / safe_a
+    out[y0:y1, x0:x1, :3] = np.clip(np.rint(out_rgb), 0, 255).astype(np.uint8)
+    out[y0:y1, x0:x1, 3:4] = np.clip(np.rint(out_a * 255.0), 0, 255).astype(np.uint8)
+    return out
+
+
+def _compute_reveal_time(
+    zoom_enabled: bool,
+    zoom_start: float,
+    zoom_duration: float,
+    reveal_time_raw: object,
+) -> float:
+    """Resolve the effective reveal trigger timestamp (after zoom ends when zoom is enabled)."""
+    z_start = zoom_start if zoom_enabled else 1.5
+    zoom_end = (z_start + zoom_duration) if zoom_enabled else 0.0
+    default_reveal = (zoom_end + 0.8) if zoom_enabled else 2.5
+    raw_r_time = _parse_finite_float(reveal_time_raw, default_reveal)
+    if zoom_enabled:
+        return max(zoom_end + 0.5, raw_r_time)
+    return max(0.2, raw_r_time)
+
+
+def _apply_reveal_impact_fx(clip, reveal_time: float, canvas_w: int, canvas_h: int):
+    """Apply a brief camera-shake + RGB chromatic glitch + impact punch when dots vanish."""
+    import numpy as np
+    from PIL import Image
+
+    impact_dur = 0.60
+
+    def _impact_frame(get_frame, t: float) -> np.ndarray:
+        frame = get_frame(t)
+        dt = float(t) - reveal_time
+        if dt < 0.0 or dt >= impact_dur:
+            return frame
+
+        env = math.exp(-dt * 5.8) * max(0.0, 1.0 - dt / impact_dur)
+        punch = 1.0 + 0.042 * env
+        inv_p = 1.0 / punch
+        cw = canvas_w * inv_p
+        ch = canvas_h * inv_p
+        margin_x = (canvas_w - cw) * 0.5
+        margin_y = (canvas_h - ch) * 0.5
+        shake_x = env * 22.0 * math.sin(dt * 85.0) + env * 8.0 * math.cos(dt * 145.0)
+        shake_y = env * 18.0 * math.cos(dt * 78.0) - env * 6.0 * math.sin(dt * 130.0)
+        x0 = max(0.0, min(canvas_w - cw, margin_x + shake_x))
+        y0 = max(0.0, min(canvas_h - ch, margin_y + shake_y))
+
+        punched = Image.fromarray(frame).transform(
+            (canvas_w, canvas_h),
+            Image.Transform.AFFINE,
+            (inv_p, 0.0, x0, 0.0, inv_p, y0),
+            resample=Image.Resampling.BILINEAR,
+        )
+        out = np.array(punched, dtype=np.uint8, copy=True)
+
+        if dt < 0.38:
+            glitch_env = math.exp(-dt * 7.5)
+            ca_shift = int(round(10.0 * glitch_env * (1.0 if math.sin(dt * 105.0) >= 0 else -1.0)))
+            if ca_shift > 0 and ca_shift < canvas_w:
+                src = out.copy()
+                out[:, ca_shift:, 0] = src[:, :-ca_shift, 0]
+                out[:, :-ca_shift, 2] = src[:, ca_shift:, 2]
+            elif ca_shift < 0 and (-ca_shift) < canvas_w:
+                s = -ca_shift
+                src = out.copy()
+                out[:, :-s, 0] = src[:, s:, 0]
+                out[:, s:, 2] = src[:, :-s, 2]
+
+            if glitch_env > 0.20:
+                step = int(dt * 50.0)
+                band_h = max(8, canvas_h // 65)
+                dx = max(4, int(round(18.0 * glitch_env)))
+                for b_idx, frac in enumerate((0.38, 0.56)):
+                    by0 = min(
+                        canvas_h - band_h,
+                        max(0, int(canvas_h * frac) + ((step * 53 + b_idx * 97) % 140) - 70),
+                    )
+                    by1 = min(canvas_h, by0 + band_h)
+                    shift_px = dx if ((step + b_idx) % 2 == 0) else -dx
+                    out[by0:by1] = np.roll(out[by0:by1], shift_px, axis=1)
+
+        if dt < 0.14:
+            boost = int(round(18.0 * (1.0 - dt / 0.14)))
+            if boost > 0:
+                out = np.clip(out.astype(np.int16) + boost, 0, 255).astype(np.uint8)
+        return out
+
+    return clip.transform(_impact_frame)
+
+
+def _build_reveal_map_clip(
+    map_path: str,
+    mask_f,
+    box_w: int,
+    box_h: int,
+    bg_duration: float,
+    effects: bool,
+    zoom_enabled: bool,
+    zoom_x: float,
+    zoom_y: float,
+    zoom_start: float,
+    zoom_duration: float,
+    reveal_time_raw: object,
+    reveal_color: object = "#000000",
+):
+    """Build a dynamic RGB + mask ``VideoClip`` for the country reveal animation."""
+    import numpy as np
+    from moviepy import VideoClip
+    from PIL import Image, ImageFilter
+
+    with Image.open(map_path) as raw_map:
+        base_pil = raw_map.convert('RGBA').resize((box_w, box_h), Image.Resampling.LANCZOS)
+    base_rgba = np.array(base_pil, dtype=np.uint8)
+
+    cover_r, cover_g, cover_b = _parse_reveal_color(reveal_color)
+    map_visible = (base_rgba[:, :, 3:4] > 0).astype(np.float32)
+    eff_mask = mask_f * map_visible
+    black_pixel = np.array([float(cover_r), float(cover_g), float(cover_b), 255.0], dtype=np.float32).reshape(1, 1, 4)
+    base_f = base_rgba.astype(np.float32)
+    black_f = base_f * (1.0 - eff_mask) + black_pixel * eff_mask
+    delta_f = black_f - base_f
+    black_rgba = np.clip(np.rint(black_f), 0, 255).astype(np.uint8)
+
+    shadow_only = None
+    if effects:
+        alpha_chan = Image.new('L', (box_w + 48, box_h + 48))
+        alpha_chan.paste(base_pil.getchannel('A'), (24, 32))
+        shadow_only = Image.new('RGBA', (box_w + 48, box_h + 48), (0, 0, 0, 0))
+        shadow_only.putalpha(
+            alpha_chan.filter(ImageFilter.GaussianBlur(10)).point(lambda p: round(p * 0.8))
+        )
+
+    def _compose_rgba(frame_rgba) -> np.ndarray:
+        if shadow_only is not None:
+            canvas = shadow_only.copy()
+            canvas.alpha_composite(Image.fromarray(frame_rgba), (24, 24))
+            return np.asarray(canvas, dtype=np.uint8)
+        return np.ascontiguousarray(frame_rgba, dtype=np.uint8)
+
+    def _to_rgb_and_mask(composed: np.ndarray) -> tuple[object, object]:
+        rgb = np.ascontiguousarray(composed[:, :, :3])
+        mask = np.ascontiguousarray(composed[:, :, 3], dtype=np.float32) / 255.0
+        return rgb, mask
+
+    z_start = zoom_start if zoom_enabled else 1.5
+    r_time = _compute_reveal_time(zoom_enabled, zoom_start, zoom_duration, reveal_time_raw)
+    fade_dur = 0.25
+    phase_end = z_start if (zoom_enabled and z_start > 0.2) else min(1.5, r_time * 0.6)
+
+    dot_cx = zoom_x * box_w
+    dot_cy = zoom_y * box_h
+    mask_2d = eff_mask[:, :, 0] > 0.5
+    ys, xs = np.nonzero(mask_2d)
+    if ys.size > 0:
+        dot_cx = float(xs.mean())
+        dot_cy = float(ys.mean())
+        ix = max(0, min(box_w - 1, int(round(dot_cx))))
+        iy = max(0, min(box_h - 1, int(round(dot_cy))))
+        if not mask_2d[iy, ix]:
+            d2 = (xs.astype(np.float32) - dot_cx) ** 2 + (ys.astype(np.float32) - dot_cy) ** 2
+            best = int(np.argmin(d2))
+            dot_cx = float(xs[best])
+            dot_cy = float(ys[best])
+
+    dot_overlays = _render_reveal_dot_overlays(box_w, box_h, dot_cx, dot_cy, (cover_r, cover_g, cover_b))
+    dot_rgba_frames = {
+        count: _compose_rgba(_alpha_composite_patch(black_rgba, *dot_overlays[count]))
+        for count in (1, 2, 3)
+    }
+    dot_frames = {
+        count: _to_rgb_and_mask(dot_rgba_frames[count])
+        for count in (1, 2, 3)
+    }
+    black_composed_rgba = _compose_rgba(black_rgba)
+    base_composed_rgba = _compose_rgba(base_rgba)
+    final_frame = _to_rgb_and_mask(base_composed_rgba)
+
+    frame_cache: list[tuple[float, object, object] | None] = [None]
+
+    def _get_cached_frame(t: float) -> tuple[object, object]:
+        t_key = float(t)
+        cached = frame_cache[0]
+        if cached is not None and cached[0] == t_key:
+            return cached[1], cached[2]
+        if t_key < r_time:
+            if t_key < phase_end * 0.33:
+                count = 1
+            elif t_key < phase_end * 0.66:
+                count = 2
+            else:
+                count = 3
+            rgb, mask = dot_frames[count]
+        elif t_key >= r_time + fade_dur:
+            rgb, mask = final_frame
+        else:
+            fade_alpha = max(0.0, min(1.0, 1.0 - (t_key - r_time) / fade_dur))
+            blended_rgba = np.clip(np.rint(base_f + fade_alpha * delta_f), 0, 255).astype(np.uint8)
+            rgb, mask = _to_rgb_and_mask(_compose_rgba(blended_rgba))
+        frame_cache[0] = (t_key, rgb, mask)
+        return rgb, mask
+
+    rgb_clip = VideoClip(lambda t: _get_cached_frame(t)[0], duration=bg_duration)
+    mask_clip = VideoClip(lambda t: _get_cached_frame(t)[1], is_mask=True, duration=bg_duration)
+    reveal_clip = rgb_clip.with_mask(mask_clip)
+    spec_h, spec_w = base_composed_rgba.shape[:2]
+    reveal_clip.rust_reveal_spec = (
+        int(spec_w),
+        int(spec_h),
+        dot_rgba_frames[1].tobytes(),
+        dot_rgba_frames[2].tobytes(),
+        dot_rgba_frames[3].tobytes(),
+        black_composed_rgba.tobytes(),
+        base_composed_rgba.tobytes(),
+        float(r_time),
+        float(phase_end),
+        float(fade_dur),
+    )
+    return reveal_clip
 
 
 @app.route('/api/render_video', methods=['POST'])
@@ -648,6 +1023,7 @@ def make_video() -> tuple[object, int]:
         media_resources.append(background_video)
         background_video = background_video.with_duration(bg_duration)
         dynamic_layers = {id(background_video)}
+        dynamic_fade_timing = {}
 
         # Darken the edges and the area behind the title for readable white text.
         import numpy as np
@@ -733,6 +1109,7 @@ def make_video() -> tuple[object, int]:
             subscribe_clip = _apply_clip_fade_in(subscribe_clip, bg_duration, fade_start=fade_start, fade_duration=fade_dur)
             subscribe_clip = subscribe_clip.with_position(('center', accent_top))
             dynamic_layers.add(id(subscribe_clip))
+            dynamic_fade_timing[id(subscribe_clip)] = (float(fade_start), float(fade_dur))
             accent_height = max(accent_height, subscribe_clip.h)
         map_top = accent_top + accent_height + gap if accent_height else accent_top
 
@@ -740,17 +1117,92 @@ def make_video() -> tuple[object, int]:
         map_bottom = 1450 if watermark_image is not None else (1664 if branded else 1760)
         map_area_height = max(240, map_bottom - map_top)
         # Fit inside the map area while ensuring non-portrait maps span the full Shorts width.
-        scale = min(1040 / map_clip.w, map_area_height / map_clip.h) * 1.14
+        scale = min(canvas_w / map_clip.w, map_area_height / map_clip.h)
         if map_clip.w >= map_clip.h:
             scale = max(canvas_w / map_clip.w, scale)
         map_clip = map_clip.resized(scale)
-        map_y = map_top + (map_area_height - map_clip.h) / 2
-        if effects:
-            map_image = Image.open(map_path).convert('RGBA').resize((map_clip.w, map_clip.h))
+        box_w, box_h = int(map_clip.w), int(map_clip.h)
+        map_y = map_top + (map_area_height - box_h) / 2
+        map_x = (canvas_w - box_w) / 2.0
+
+        zoom_enabled = bool(data.get('zoom_enabled', False))
+        zoom_x = max(0.0, min(1.0, _parse_finite_float(data.get('zoom_x'), 0.80)))
+        zoom_y = max(0.0, min(1.0, _parse_finite_float(data.get('zoom_y'), 0.35)))
+        zoom_scale = max(1.1, min(4.0, _parse_finite_float(data.get('zoom_scale'), 2.0)))
+        zoom_start = max(0.0, _parse_finite_float(data.get('zoom_start'), 1.5))
+        zoom_duration = max(0.2, _parse_finite_float(data.get('zoom_duration'), 2.5))
+        zoom_out_enabled = bool(data.get('zoom_out_enabled', False))
+        zoom_out_duration = max(0.0, _parse_finite_float(data.get('zoom_out_duration'), 2.0))
+
+        reveal_enabled = zoom_enabled and bool(data.get('reveal_enabled', False))
+        reveal_mask_f = (
+            _decode_reveal_mask(data.get('reveal_mask'), box_w, box_h)
+            if reveal_enabled
+            else None
+        )
+        reveal_active = reveal_enabled and reveal_mask_f is not None
+
+        rust_reveal_spec = None
+        if reveal_active:
+            map_clip = _build_reveal_map_clip(
+                map_path,
+                reveal_mask_f,
+                box_w,
+                box_h,
+                bg_duration,
+                effects,
+                zoom_enabled,
+                zoom_x,
+                zoom_y,
+                zoom_start,
+                zoom_duration,
+                data.get('reveal_time'),
+                data.get('reveal_color', '#000000'),
+            )
+            if effects:
+                map_y -= 24
+            raw_reveal = getattr(map_clip, "rust_reveal_spec", None)
+            if raw_reveal is not None:
+                spec_w, spec_h, f1, f2, f3, blk, base, rt, pe, fd = raw_reveal
+                rust_reveal_spec = (
+                    (canvas_w - spec_w) // 2,
+                    int(map_y),
+                    spec_w,
+                    spec_h,
+                    f1,
+                    f2,
+                    f3,
+                    blk,
+                    base,
+                    rt,
+                    pe,
+                    fd,
+                    True,
+                )
+        elif effects:
+            with Image.open(map_path) as raw_map:
+                map_image = raw_map.convert('RGBA').resize((box_w, box_h))
             map_clip = ImageClip(np.array(_with_shadow(map_image))).with_duration(bg_duration)
             map_y -= 24
+
         title_clip = title_clip.with_position(("center", title_top))
         map_clip = map_clip.with_position(("center", map_y))
+        if reveal_active:
+            dynamic_layers.add(id(map_clip))
+
+        zoom_params = None
+        if zoom_enabled:
+            target_cx = map_x + zoom_x * box_w
+            target_cy = (map_y + (24 if effects else 0)) + zoom_y * box_h
+            zoom_params = (
+                target_cx,
+                target_cy,
+                zoom_scale,
+                zoom_start,
+                zoom_duration,
+                zoom_out_enabled,
+                zoom_out_duration,
+            )
         clips = [background_video, scrim, map_clip, title_clip]
 
         if left_sticker_arr is not None:
@@ -785,13 +1237,17 @@ def make_video() -> tuple[object, int]:
             else:
                 stars_arr = _stars_row_image(watermark_color or '#ffffff', effects)
             stars_clip = ImageClip(stars_arr).with_duration(bg_duration)
+            stars_start = 0.0
+            stars_fade_dur = 0.0
             if bg_duration > 1.8:
                 stars_start = min(1.8, bg_duration * 0.25)
-                stars_clip = _apply_clip_fade_in(stars_clip, bg_duration, fade_start=stars_start, fade_duration=0.5)
+                stars_fade_dur = 0.5
+                stars_clip = _apply_clip_fade_in(stars_clip, bg_duration, fade_start=stars_start, fade_duration=stars_fade_dur)
             stars_y = 1805 if watermark_text else 1785
             stars_clip = stars_clip.with_position(('center', stars_y))
             if bg_duration > 1.8:
                 dynamic_layers.add(id(stars_clip))
+                dynamic_fade_timing[id(stars_clip)] = (float(stars_start), float(stars_fade_dur))
             clips.append(stars_clip)
         if intro_fade:
             from moviepy import VideoClip
@@ -821,14 +1277,12 @@ def make_video() -> tuple[object, int]:
             media_resources.append(audio_clip)
             render_duration = min(bg_duration, audio_clip.duration or bg_duration)
 
-        # Prefer the native Rust compositor when available; fall back to MoviePy locally.
+        # Prefer the native Rust compositor when available; fall back to MoviePy on failure.
         used_rust = False
+        rust_warning: str | None = None
         # ======== RUST ENGINE INJECTION =============
         try:  # pragma: no cover
-            import automap_rs
-
-            if not hasattr(automap_rs, "render_video_rs"):
-                raise ImportError("automap_rs native extension not built")
+            automap_rs = _load_automap_rs()
 
             def _clip_to_rgba_bytes(clip_obj, sample_t: float = 0.0) -> bytes:
                 # MoviePy splits RGBA inputs into 3-channel clip.img + float clip.mask.
@@ -850,6 +1304,8 @@ def make_video() -> tuple[object, int]:
 
             # Skip clips[0] (background_video); Rust decodes it directly from prepared_bg_path.
             for clip in clips[1:]:
+                if rust_reveal_spec is not None and clip is map_clip:
+                    continue
                 if not hasattr(clip, "img"):
                     continue
 
@@ -857,7 +1313,15 @@ def make_video() -> tuple[object, int]:
                 is_full_canvas = clip.img.shape[:2] == (canvas_h, canvas_w)
 
                 if not is_dynamic and is_full_canvas:
-                    static_rgba = _clip_to_rgba_bytes(clip, 0.0)
+                    layer_rgba = _clip_to_rgba_bytes(clip, 0.0)
+                    if static_rgba is None:
+                        static_rgba = layer_rgba
+                    elif hasattr(automap_rs, "alpha_composite_rs"):
+                        static_rgba = automap_rs.alpha_composite_rs(static_rgba, layer_rgba)
+                    else:
+                        base_img = Image.frombytes("RGBA", (canvas_w, canvas_h), static_rgba)
+                        over_img = Image.frombytes("RGBA", (canvas_w, canvas_h), layer_rgba)
+                        static_rgba = Image.alpha_composite(base_img, over_img).tobytes()
                 elif is_dynamic and is_full_canvas and clip.img.shape[2] == 3:
                     # Full-canvas 3-channel black clip represents the intro fade veil.
                     veil_duration = float(clip.duration or 0.0)
@@ -867,9 +1331,16 @@ def make_video() -> tuple[object, int]:
                     h, w = clip.img.shape[:2]
                     x = (canvas_w - w) // 2 if pos[0] == "center" else int(pos[0])
                     y = (canvas_h - h) // 2 if pos[1] == "center" else int(pos[1])
-                    dynamic_overlays.append((_clip_to_rgba_bytes(clip, float(bg_duration)), x, y, int(w), int(h), 0.0, 0.0))
+                    start_sec, fade_in_sec = dynamic_fade_timing.get(id(clip), (0.0, 0.0))
+                    dynamic_overlays.append((_clip_to_rgba_bytes(clip, float(bg_duration)), x, y, int(w), int(h), start_sec, fade_in_sec))
 
             if static_rgba is not None and prepared_bg_path:
+                try:
+                    from moviepy.config import FFMPEG_BINARY
+                    if FFMPEG_BINARY:
+                        os.environ.setdefault("FFMPEG_BINARY", FFMPEG_BINARY)
+                except ImportError:
+                    pass
                 automap_rs.render_video_rs(
                     prepared_bg_path,
                     static_rgba,
@@ -884,14 +1355,71 @@ def make_video() -> tuple[object, int]:
                     codec,
                     _x264_preset() if codec == 'libx264' else None,
                     data.get('draft') is True,
+                    zoom_params=zoom_params,
+                    reveal_spec=rust_reveal_spec,
                 )
                 used_rust = True
-        except ImportError:
-            pass
+        except Exception as exc:
+            rust_warning = (
+                f"Rust video render unavailable or failed ({type(exc).__name__}: {exc}); "
+                "falling back to MoviePy."
+            )
+            logging.warning(rust_warning)
 
         if not used_rust:  # pragma: no branch
             final_clip = CompositeVideoClip(clips, size=(canvas_w, canvas_h))
             media_resources.append(final_clip)
+            if zoom_params is not None:
+                target_cx, target_cy, z_scale, z_start, z_dur, z_out_enabled, z_out_dur = zoom_params
+                final_cw = canvas_w / z_scale
+                final_ch = canvas_h / z_scale
+                final_x0 = max(0.0, min(canvas_w - final_cw, target_cx - final_cw / 2.0))
+                final_y0 = max(0.0, min(canvas_h - final_ch, target_cy - final_ch / 2.0))
+                zoom_total_dur = render_duration if has_audio else bg_duration
+
+                def _zoom_full_frame(get_frame, t: float) -> np.ndarray:
+                    frame = get_frame(t)
+                    if t <= z_start:
+                        return frame
+                    if t < z_start + z_dur:
+                        u = (t - z_start) / z_dur
+                        # Quintic smootherstep for silky-smooth camera acceleration/deceleration.
+                        ease = u * u * u * (u * (u * 6.0 - 15.0) + 10.0)
+                    elif z_out_enabled and z_out_dur > 0.0 and zoom_total_dur > (z_start + z_dur + 0.05):
+                        out_start = max(z_start + z_dur, zoom_total_dur - z_out_dur)
+                        out_dur = max(0.05, zoom_total_dur - out_start)
+                        if t >= zoom_total_dur:
+                            ease = 0.0
+                        elif t > out_start:
+                            u = (t - out_start) / out_dur
+                            ease = 1.0 - (u * u * u * (u * (u * 6.0 - 15.0) + 10.0))
+                        else:
+                            ease = 1.0
+                    else:
+                        ease = 1.0
+                    if ease <= 0.0:
+                        return frame
+                    cw = canvas_w + (final_cw - canvas_w) * ease
+                    ch = canvas_h + (final_ch - canvas_h) * ease
+                    x0 = final_x0 * ease
+                    y0 = final_y0 * ease
+                    inv_z = cw / canvas_w
+                    zoomed = Image.fromarray(frame).transform(
+                        (canvas_w, canvas_h),
+                        Image.Transform.AFFINE,
+                        (inv_z, 0.0, x0, 0.0, inv_z, y0),
+                        resample=Image.Resampling.BILINEAR,
+                    )
+                    return np.asarray(zoomed, dtype=np.uint8)
+
+                final_clip = final_clip.transform(_zoom_full_frame)
+                media_resources.append(final_clip)
+            if reveal_active:
+                r_trigger = _compute_reveal_time(
+                    zoom_enabled, zoom_start, zoom_duration, data.get('reveal_time')
+                )
+                final_clip = _apply_reveal_impact_fx(final_clip, r_trigger, canvas_w, canvas_h)
+                media_resources.append(final_clip)
             if has_audio:
                 final_clip = final_clip.with_audio(audio_clip.subclipped(0, render_duration))
                 final_clip = final_clip.with_duration(render_duration)
@@ -914,12 +1442,16 @@ def make_video() -> tuple[object, int]:
                 **encode_options,
             )
 
-        return jsonify({
+        payload = {
             "status": "success",
             "file_path": output_path,
             "download_url": "/api/download_video?" + urlencode({'path': output_path}),
             "has_audio": has_audio,
-        }), 200
+            "render_engine": "rust" if used_rust else "moviepy",
+        }
+        if rust_warning:
+            payload["warning"] = rust_warning
+        return jsonify(payload), 200
     
     except Exception as e:
         return jsonify({"status": "error", "error": f"Error processing video: {str(e)}"}), 500

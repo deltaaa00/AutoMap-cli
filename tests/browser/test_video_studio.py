@@ -19,15 +19,15 @@ checks, not visual regression tests of external Tailwind/font assets.
 """
 import base64
 import json
-from pathlib import Path
 from urllib.parse import urlsplit
 from unittest.mock import Mock
 
 import pytest
 import requests
 from PIL import Image
-from playwright.sync_api import sync_playwright
 from werkzeug.wrappers import Request
+
+from test_map_palettes import get_browser
 
 pytestmark = pytest.mark.browser
 
@@ -76,43 +76,80 @@ def studio(web, worker, monkeypatch):
         response.status_code, response._content = result.status_code, result.data
         return response
     monkeypatch.setattr(requests, 'get', Mock(side_effect=get_upstream))
-    with sync_playwright() as playwright:
-        chrome = Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
-        kwargs = {'executable_path': str(chrome)} if chrome.exists() else {}
-        browser = playwright.chromium.launch(headless=True, **kwargs)
-        page = browser.new_page(viewport={'width': 1200, 'height': 900})
-        errors = []
-        previews = []
-        page.on('pageerror', lambda error: errors.append(str(error)))
+    context = get_browser().new_context(viewport={'width': 1200, 'height': 900})
+    page = context.new_page()
+    errors = []
+    previews = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
 
-        def route_request(route):
-            request = route.request
-            url = urlsplit(request.url)
-            if url.hostname == 'automap.test':
-                if url.path == '/api/video_title_preview':
-                    previews.append(request.post_data_json)
-                result = web.app.test_client().open(
-                    url.path + ('?' + url.query if url.query else ''),
-                    method=request.method, data=request.post_data_buffer,
-                    content_type=request.headers.get('content-type'),
-                )
-                route.fulfill(status=result.status_code, body=result.data,
-                              content_type=result.content_type)
-            elif url.hostname == 'cdn.tailwindcss.com':
-                route.fulfill(content_type='application/javascript', body='window.tailwind = {};')
-            else:
-                route.fulfill(content_type='text/css', body='')
+    def route_request(route):
+        request = route.request
+        url = urlsplit(request.url)
+        if url.hostname == 'automap.test':
+            if url.path == '/api/video_title_preview':
+                previews.append(request.post_data_json)
+            result = web.app.test_client().open(
+                url.path + ('?' + url.query if url.query else ''),
+                method=request.method, data=request.post_data_buffer,
+                content_type=request.headers.get('content-type'),
+            )
+            route.fulfill(status=result.status_code, body=result.data,
+                          content_type=result.content_type)
+        elif url.hostname == 'cdn.tailwindcss.com':
+            route.fulfill(content_type='application/javascript', body='window.tailwind = {};')
+        else:
+            route.fulfill(content_type='text/css', body='')
 
-        page.route('**/*', route_request)
+    page.route('**/*', route_request)
+    try:
         page.goto('http://automap.test/studio')
         page.add_style_tag(content=OFFLINE_CSS)
         yield page, previews
         assert not errors, errors
-        browser.close()
+    finally:
+        context.close()
 
 
 def wait_for_title(page):
     page.wait_for_function("document.querySelector('#titlePreviewStatus').textContent === 'Preview matches rendered title'")
+
+
+def test_zoom_reveal_switches_and_country_selection_restart_preview(studio, tmp_path):
+    page, _ = studio
+    image = tmp_path / 'map.png'
+    Image.new('RGBA', (100, 100), (255, 0, 0, 255)).save(image)
+    page.locator('#mapFileInput').set_input_files(str(image))
+    page.wait_for_function('document.getElementById("stageMapPreview").naturalWidth === 100')
+    # Use a local mask so the test isolates playback from country extraction.
+    page.evaluate('''() => {
+        const mask = document.createElement('canvas');
+        mask.width = mask.height = 100;
+        const ctx = mask.getContext('2d');
+        ctx.fillRect(20, 20, 60, 60);
+        window.revealMaskDataUrl = mask.toDataURL();
+        previewAnimPlaying = false;
+        document.getElementById('mapZoomToggle').click();
+    }''')
+    page.wait_for_function('!document.getElementById("stageRevealCanvas").classList.contains("hidden")')
+    page.evaluate('''() => {
+        previewAnimTime = 8;
+        renderPreviewFrame(previewAnimTime);
+        document.getElementById('revealCountryToggle').click();
+        document.getElementById('revealCountryToggle').click();
+    }''')
+    assert page.evaluate('previewAnimTime') == 0
+    assert page.locator('#stageRevealCanvas').is_visible()
+    page.evaluate("document.getElementById('revealCountryToggle').click()")
+    assert page.locator('#stageRevealCanvas').is_hidden()
+    page.evaluate("document.getElementById('revealCountryToggle').click()")
+    page.evaluate("document.getElementById('mapZoomToggle').click()")
+    assert page.locator('#stageRevealCanvas').is_hidden()
+    assert page.evaluate('titleSettings().reveal_enabled') is False
+    page.evaluate("document.getElementById('mapZoomToggle').click()")
+    assert page.locator('#stageRevealCanvas').is_visible()
+    page.evaluate("previewAnimTime = 8; setZoomTarget(0.5, 0.5, 'Poland', 'poland')")
+    assert page.evaluate('previewAnimTime') == 0
+    assert page.locator('#stageRevealCanvas').is_visible()
 
 
 def test_custom_overlay_files_follow_enable_switches_in_render_payload(studio, tmp_path):
@@ -671,10 +708,12 @@ def test_slow_map_restore_does_not_replace_a_title_edited_in_the_meantime(studio
 
 def test_new_stickers_exist_on_both_sides_and_preview_offline(studio):
     page, previews = studio
+    expected = {'mountain', 'volcano', 'island', 'rainbow', 'moon', 'rain', 'robot', 'satellite',
+                'laptop', 'graduation', 'medal', 'cat', 'dog', 'fish', 'burger', 'train'}
     for side in ('Left', 'Right'):
-        for kind in ('mountain', 'volcano', 'island', 'rainbow', 'moon', 'rain', 'robot', 'satellite',
-                     'laptop', 'graduation', 'medal', 'cat', 'dog', 'fish', 'burger', 'train'):
-            assert page.locator(f'#top{side}StickerSelect option[value="{kind}"]').count() == 1
+        values = page.locator(f'#top{side}StickerSelect option').evaluate_all(
+            'opts => opts.map(o => o.value)')
+        assert expected.issubset(values)
     page.locator('#topLeftStickerSelect').select_option('robot')
     page.locator('#topRightStickerSelect').select_option('mountain')
     page.wait_for_function("document.querySelector('#stageTopLeftSticker img')?.naturalWidth > 0")
@@ -708,3 +747,42 @@ def test_clear_all_data_requires_confirmation_and_clears_both_studios(studio):
     page.goto('http://automap.test/')
     assert page.locator('#clearAllDataBtn').is_visible()
     assert page.locator('#topicInput').input_value() == ''
+
+
+def test_youtube_auto_upload_uses_metadata_and_shows_video_link(studio):
+    page, _ = studio
+    page.route('**/api/youtube/status', lambda route: route.fulfill(json={
+        'connected': True, 'csrf_token': 'csrf-test', 'redirect_uri': 'https://automap.test/api/youtube/callback'}))
+    page.evaluate('loadYouTubeConnection()')
+    page.locator('#youtubePanel summary').click()
+    page.locator('#youtubeTitle').fill('Заголовок YouTube')
+    page.locator('#youtubeDescription').fill('Опис відео\n🌍')
+    page.locator('#youtubeTags').fill('географія, maps')
+    page.locator('#youtubePrivacy').select_option('unlisted')
+    page.locator('#youtubeAuto').check()
+    page.locator('#videoTitleInput').fill('Title in video')
+    page.evaluate('''() => {
+        renderFiles.mapFileInput = new File(['map'], 'map.png', {type:'image/png'});
+        renderFiles.bgFileInput = new File(['video'], 'background.mp4', {type:'video/mp4'});
+    }''')
+    payloads = []
+    def render(route):
+        payloads.append(render_payload(route.request))
+        assert route.request.headers['x-youtube-csrf'] == 'csrf-test'
+        route.fulfill(json={'status': 'success', 'file_path': '/render/test.mp4',
+                            'upload_token': 'signed-test', 'youtube_job_id': 'job-test'})
+    page.route('**/api/render_video', render)
+    page.route('**/api/youtube/jobs/job-test', lambda route: route.fulfill(json={
+        'status': 'complete', 'progress': 100, 'phase': 'Uploaded', 'url': 'https://www.youtube.com/watch?v=test'}))
+    page.evaluate('handleRenderVideo({preventDefault(){}})')
+    page.wait_for_function("!document.getElementById('youtubeVideoLink').classList.contains('hidden')")
+    assert payloads[0]['youtube'] == {'title': 'Заголовок YouTube', 'description': 'Опис відео\n🌍',
+                                    'tags': 'географія, maps', 'privacy': 'unlisted', 'made_for_kids': False}
+    assert page.locator('#youtubeVideoLink').get_attribute('href') == 'https://www.youtube.com/watch?v=test'
+    assert page.locator('#downloadVideoBtn').is_visible()
+    reopen_studio(page)
+    page.locator('#youtubePanel summary').click()
+    assert page.locator('#youtubeTitle').input_value() == 'Заголовок YouTube'
+    assert page.locator('#youtubeDescription').input_value() == 'Опис відео\n🌍'
+    assert not page.locator('#youtubeAuto').is_checked()
+    assert page.locator('#youtubeSecret').input_value() == ''

@@ -22,6 +22,7 @@ reports it and the UI uses that provider's browser-saved key for the request.
 
 import base64
 import io
+import math
 import os
 import re
 import threading
@@ -54,12 +55,12 @@ from map.auto_map import (
     _resolve_theme_name,
     _to_rgba_tuple,
 )
-from map.constants import europe_coords, world_coords
+from map.constants import europe_coords, world_coords, _PALETTE_THEMES
 from cli import AVAILABLE_MODELS
 from map.functions import (
-    _ALLOWED_MAP_TYPES, AIServiceError, configured_api_key, list_deepseek_models,
-    parse_ideas_content, provider_for_model, provider_key_name, slugify_prompt,
-    validate_temperature,
+    _ALLOWED_MAP_TYPES, AIServiceError, configured_api_key, generate_map_idea,
+    list_deepseek_models, parse_ideas_content, provider_for_model,
+    provider_key_name, slugify_prompt, validate_temperature,
 )
 
 from flask import Flask, request, jsonify, send_file, render_template, Response, session
@@ -127,6 +128,10 @@ app.config["MAX_CONTENT_LENGTH"] = 48 * 1024 * 1024
 from web_auth import init_web_auth
 
 init_web_auth(app, dotenv_values(env) if env.is_file() else {})
+
+from youtube_upload import YouTubeUploads
+
+youtube_uploads = YouTubeUploads(app, WORKER_URL, requests)
 
 
 @app.before_request
@@ -623,14 +628,25 @@ def generate():
         command += f" --temperature {temperature_options['temperature']:g}"
 
     show_legend = bool(data.get("show_legend", False))
+    highlight_extrema = bool(data.get("highlight_extrema", False))
     if show_legend:
         command += " --legend"
+    if highlight_extrema:
+        command += " --highlight-extrema"
 
     progress_id = str(data.get("progress_id") or "").strip()[:64]
     if progress_id:
         _set_map_progress(progress_id, 1, "Querying AI model...")
 
-    style_kwargs: dict[str, object] = {"show_legend": show_legend}
+    style_kwargs: dict[str, object] = {
+        "show_legend": show_legend,
+        "highlight_extrema": highlight_extrema,
+    }
+    if highlight_extrema:
+        if "highlight_high_color" in data:
+            style_kwargs["highlight_high_color"] = str(data.get("highlight_high_color") or "#00e5ff")
+        if "highlight_low_color" in data:
+            style_kwargs["highlight_low_color"] = str(data.get("highlight_low_color") or "#ff2daa")
     if progress_id:
         style_kwargs["progress_callback"] = lambda stage, label: _set_map_progress(progress_id, stage, label)
     for style_key, kw_name in (
@@ -696,6 +712,8 @@ def generate():
         "ai_cached": ai_cache_hit,
     }
     render_meta = getattr(buffer, "map_meta", None)
+    if isinstance(render_meta, dict) and render_meta.get("rust_warning"):
+        resp_payload["warning"] = render_meta["rust_warning"]
     ai_vals = render_meta.get("ai_answer") if isinstance(render_meta, dict) else None
     if isinstance(ai_vals, dict) and ai_vals:
         resp_payload["map_values"] = render_meta.get("raw_ai_answer", ai_vals)
@@ -708,6 +726,46 @@ def generate():
         )
 
     return jsonify(resp_payload)
+
+
+@app.route('/api/generate_idea', methods=['POST'])
+def api_generate_idea():
+    """Generate a map topic idea (and optionally matching parameters) using the selected AI model."""
+    data = request.get_json(silent=True) or {}
+    try:
+        provider = _request_provider(data)
+        api_key = _request_api_key(data, provider)
+    except ValueError as error:
+        return jsonify(status='error', error=str(error)), 400
+
+    model = str(data.get("model") or ('deepseek-flash' if provider == 'deepseek' else AVAILABLE_MODELS[0])).strip()
+    if provider_for_model(model) != provider:
+        return jsonify(status='error', error=f"Model '{model}' does not match provider '{provider}'."), 400
+
+    with_params = str(data.get("with_params") or "").strip().lower() in ("1", "true", "yes", "on") or data.get("with_params") is True
+
+    temperature = None
+    if "temperature" in data and str(data["temperature"]).strip() != "":
+        try:
+            temperature = validate_temperature(data["temperature"])
+        except ValueError as err:
+            return jsonify(status='error', error=str(err)), 400
+
+    try:
+        result = generate_map_idea(
+            model,
+            api_key=api_key,
+            with_params=with_params,
+            available_themes=list(_PALETTE_THEMES.keys()),
+            available_fonts=_available_fonts(),
+            temperature=temperature,
+        )
+    except AIServiceError as error:
+        return jsonify(status='error', error=str(error)), error.status_code
+    except Exception as exc:  # noqa: BLE001
+        return jsonify(status='error', error=str(exc)), 500
+
+    return jsonify({"status": "success", **result}), 200
 
 
 @app.route('/api/models', methods=['POST'])
@@ -1056,6 +1114,9 @@ def api_restyle_map():
             palette_theme=palette_theme,
             ai_answer_override=map_values,
             show_legend=bool(data.get("show_legend", False)),
+            highlight_extrema=bool(data.get("highlight_extrema", False)),
+            highlight_high_color=str(data.get("highlight_high_color") or "#00e5ff"),
+            highlight_low_color=str(data.get("highlight_low_color") or "#ff2daa"),
         )
     except Exception as e:  # noqa: BLE001
         return jsonify({"status": "error", "error": str(e)}), 500
@@ -1295,6 +1356,299 @@ def _render_video_request_data():
     return data
 
 
+_ZOOM_REF_DIMENSIONS: dict[str, tuple[float, float]] = {
+    "europe": (3900.0, 4104.0),
+    "world": (3424.0, 2027.0),
+}
+_ZOOM_OUTLINE_CACHE: dict[tuple[str, str], bytes] = {}
+_REVEAL_MASK_CACHE: dict[tuple[str, str, int, int], str] = {}
+_ZOOM_CACHE_LOCK = threading.Lock()
+
+
+def _zoom_country_entries(
+    coords: dict[str, list[tuple[int, int]]],
+    ref_w: float,
+    ref_h: float,
+) -> list[dict[str, object]]:
+    """Build normalized (0..1) center coordinate entries for a country map."""
+    return [
+        {
+            "key": k,
+            "name": k.replace("_", " ").title(),
+            "x": round(pts[0][0] / ref_w, 4),
+            "y": round(pts[0][1] / ref_h, 4),
+        }
+        for k, pts in coords.items()
+        if pts
+    ]
+
+
+def _region_mask_from_index(
+    map_path: Path,
+    coords: dict[str, list[tuple[int, int]]],
+    key: str,
+) -> Image.Image | None:
+    """Extract a full-resolution L-mode binary mask using ``_region_index``."""
+    import numpy as np
+    from map.auto_map import _load_rgba, _region_index
+
+    if key not in coords:
+        return None
+    region_idx = list(coords.keys()).index(key) + 1
+    base = _load_rgba(map_path)
+    w, h = base.size
+    flat, ids = _region_index(map_path, base, coords)
+    pix_mask = np.zeros(w * h, dtype=np.uint8)
+    pix_mask[flat[ids == region_idx]] = 255
+    if not pix_mask.any():
+        return None
+    return Image.fromarray(pix_mask.reshape((h, w)), mode="L")
+
+
+def _world_country_floodfill_mask(seeds: list[tuple[int, int]]) -> Image.Image | None:
+    """Extract a full-resolution L-mode binary mask on ``world_countries_map.png``."""
+    import numpy as np
+    from map.auto_map import _floodfill_bool_mask, _load_rgba
+
+    if not seeds:
+        return None
+    maps_dir = BASE_DIR / "resources" / "maps"
+    map_path = maps_dir / "world_countries_map.png"
+    base = _load_rgba(map_path)
+    w, h = base.size
+    base_arr = np.asarray(base)
+    wc_base_alpha = base_arr[..., 3]
+    wc_dark = (wc_base_alpha >= 128) & (base_arr[..., :3].max(axis=2) <= 12)
+    wc_interior_crisp = (wc_base_alpha >= 128) & ~wc_dark
+    wc_interior = wc_interior_crisp
+
+    wc_border_alpha = None
+    borders_path = maps_dir / "world_countries_map_blured.png"
+    if borders_path.is_file():
+        borders = _load_rgba(borders_path)
+        if borders.size == (w, h):
+            wc_border_alpha = np.asarray(borders)[..., 3]
+            # Only trust blurred border alpha to bridge inland black flag bands
+            # when the border asset actually covers the crisp borders.
+            if not wc_dark.any() or float(np.mean(wc_border_alpha[wc_dark] >= 20)) >= 0.8:
+                wc_interior = wc_interior_crisp | ((wc_base_alpha >= 128) & (wc_border_alpha < 44))
+
+    max_px = int(0.08 * w * h)
+    filled = _floodfill_bool_mask(wc_interior, seeds, max_px)
+    if (filled is None or not filled.any()) and wc_border_alpha is not None:
+        for thr in (45, 65):
+            interior = (wc_base_alpha >= 128) & (wc_border_alpha < thr)
+            filled = _floodfill_bool_mask(interior, seeds, max_px)
+            if filled is not None and filled.any():
+                break
+    if filled is None or not filled.any():
+        return None
+    return Image.fromarray((filled.astype(np.uint8) * 255), mode="L")
+
+
+def _extract_country_mask_image(
+    map_kind: str,
+    key: str,
+    *,
+    allow_world_continent_fallback: bool = False,
+) -> Image.Image | None:
+    """Return a full-resolution L-mode binary mask for ``key`` on ``europe`` or ``world``."""
+    from map.constants import europe_coords, world_coords
+    from map.world_countries_coords import world_countries_coords
+
+    maps_dir = BASE_DIR / "resources" / "maps"
+    if map_kind == "europe":
+        return _region_mask_from_index(maps_dir / "default_map.png", europe_coords, key)
+    if map_kind == "world":
+        if key in world_countries_coords:
+            return _world_country_floodfill_mask(world_countries_coords[key])
+        if allow_world_continent_fallback and key in world_coords:
+            return _region_mask_from_index(maps_dir / "world_map.png", world_coords, key)
+    return None
+
+
+def _resolve_reveal_country_key(
+    coords: dict[str, list[tuple[int, int]]],
+    ref_w: float,
+    ref_h: float,
+    zoom_country_key: str,
+    zoom_x: float,
+    zoom_y: float,
+) -> str:
+    """Resolve target country key by exact match or nearest seed within 0.18 distance."""
+    candidate = str(zoom_country_key or "").strip().lower()
+    if candidate and candidate in coords and coords[candidate]:
+        return candidate
+    if isinstance(zoom_x, bool) or isinstance(zoom_y, bool):
+        return ""
+    try:
+        zx = float(zoom_x)
+        zy = float(zoom_y)
+    except (TypeError, ValueError):
+        return ""
+    if not (math.isfinite(zx) and math.isfinite(zy)):
+        return ""
+    best_key = ""
+    best_dist_sq = 0.18 * 0.18
+    for k, pts in coords.items():
+        if not pts:
+            continue
+        dx = (pts[0][0] / ref_w) - zx
+        dy = (pts[0][1] / ref_h) - zy
+        dist_sq = dx * dx + dy * dy
+        if dist_sq <= best_dist_sq:
+            best_dist_sq = dist_sq
+            best_key = k
+    return best_key
+
+
+def _extract_country_reveal_mask(
+    map_w: int,
+    map_h: int,
+    zoom_country_key: str,
+    zoom_x: float,
+    zoom_y: float,
+) -> str:
+    """Extract a country reveal mask as a base64 L-mode PNG resized to ``(map_w, map_h)``."""
+    map_w = int(map_w)
+    map_h = int(map_h)
+    if map_w <= 0 or map_h <= 0:
+        return ""
+
+    from map.constants import europe_coords
+    from map.world_countries_coords import world_countries_coords
+
+    map_kind = "europe" if (map_w / max(1, map_h)) < 1.25 else "world"
+    coords = europe_coords if map_kind == "europe" else world_countries_coords
+    ref_w, ref_h = _ZOOM_REF_DIMENSIONS[map_kind]
+
+    key = _resolve_reveal_country_key(
+        coords, ref_w, ref_h, zoom_country_key, zoom_x, zoom_y
+    )
+    if not key:
+        return ""
+
+    cache_key = (map_kind, key, map_w, map_h)
+    with _ZOOM_CACHE_LOCK:
+        cached = _REVEAL_MASK_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    mask = _extract_country_mask_image(map_kind, key, allow_world_continent_fallback=False)
+    if mask is None:
+        return ""
+    if mask.size != (map_w, map_h):
+        mask = mask.resize((map_w, map_h), Image.Resampling.BILINEAR)
+    if mask.mode != "L":
+        mask = mask.convert("L")
+    from PIL import ImageFilter
+    mask = mask.filter(ImageFilter.MaxFilter(5)).point(lambda p: 255 if p > 64 else 0)
+    if mask.getbbox() is None:
+        return ""
+
+    buf = io.BytesIO()
+    mask.save(buf, format="PNG")
+    b64_mask = base64.b64encode(buf.getvalue()).decode("ascii")
+    with _ZOOM_CACHE_LOCK:
+        _REVEAL_MASK_CACHE[cache_key] = b64_mask
+    return b64_mask
+
+
+def _parse_finite_coord(value: object, default: float) -> float:
+    """Parse a finite float coordinate, falling back to ``default`` when invalid."""
+    if value is None or isinstance(value, bool) or value == "":
+        return default
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if math.isfinite(parsed) else default
+
+
+def _decode_image_size(image_data: object) -> tuple[int, int] | None:
+    """Decode a base64 or data-URL image payload and return its ``(width, height)``."""
+    if not isinstance(image_data, str) or not image_data.strip():
+        return None
+    raw_b64 = image_data.strip()
+    if "," in raw_b64 and raw_b64.lower().startswith("data:"):
+        _, raw_b64 = raw_b64.split(",", 1)
+    b64_part = "".join(raw_b64.split())
+    if not b64_part:
+        return None
+    try:
+        decoded = base64.b64decode(b64_part, validate=True)
+    except (ValueError, TypeError):
+        return None
+    if not decoded:
+        return None
+    try:
+        with Image.open(io.BytesIO(decoded)) as opened:
+            return opened.size
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError, ValueError):
+        return None
+
+
+@app.get('/api/zoom_countries')
+def api_zoom_countries():
+    """Return normalized (0..1) country center coordinates for Europe and World maps."""
+    from map.constants import europe_coords, world_coords
+    from map.world_countries_coords import world_countries_coords
+
+    europe = _zoom_country_entries(europe_coords, *_ZOOM_REF_DIMENSIONS["europe"])
+    world_source = world_countries_coords if world_countries_coords else world_coords
+    world = _zoom_country_entries(world_source, *_ZOOM_REF_DIMENSIONS["world"])
+    return jsonify({"europe": europe, "world": world})
+
+
+@app.get('/api/zoom_country_outline')
+def api_zoom_country_outline():
+    """Return a small transparent PNG highlighting the hovered country's outline."""
+    from PIL import ImageChops, ImageFilter
+
+    map_kind = str(request.args.get('map') or 'europe').strip().lower()
+    key = str(request.args.get('key') or '').strip().lower()
+    solid = str(request.args.get('solid') or '').strip() in ('1', 'true', 'yes')
+    if not key or map_kind not in ('europe', 'world'):
+        return ('', 404)
+
+    cache_key = (map_kind, key, solid)
+    with _ZOOM_CACHE_LOCK:
+        cached = _ZOOM_OUTLINE_CACHE.get(cache_key)
+    if cached is not None:
+        resp = Response(cached, mimetype='image/png')
+        resp.headers['Cache-Control'] = 'public, max-age=86400'
+        return resp
+
+    mask = _extract_country_mask_image(
+        map_kind, key, allow_world_continent_fallback=True
+    )
+    if mask is None:
+        return ('', 404)
+
+    w, h = mask.size
+    pw = 720 if solid else 360
+    ph = max(1, int(round(h * (pw / w))))
+    small_mask = mask.resize((pw, ph), Image.Resampling.BILINEAR)
+    if solid:
+        alpha = small_mask.filter(ImageFilter.MaxFilter(5)).point(lambda p: 255 if p > 64 else 0)
+        out = Image.new('RGBA', (pw, ph), (0, 0, 0, 255))
+    else:
+        edge = ImageChops.subtract(small_mask.filter(ImageFilter.MaxFilter(5)), small_mask.filter(ImageFilter.MinFilter(3)))
+        fill_alpha = small_mask.point(lambda p: 45 if p > 128 else 0)
+        alpha = ImageChops.lighter(fill_alpha, edge.point(lambda p: min(255, int(p * 1.2))))
+        out = Image.new('RGBA', (pw, ph), (252, 211, 77, 255))
+    out.putalpha(alpha)
+    buf = io.BytesIO()
+    out.save(buf, format='PNG')
+    png_bytes = buf.getvalue()
+    with _ZOOM_CACHE_LOCK:
+        _ZOOM_OUTLINE_CACHE[cache_key] = png_bytes
+
+    resp = Response(png_bytes, mimetype='image/png')
+    resp.headers['Cache-Control'] = 'public, max-age=86400'
+    return resp
+
+
 @app.route('/api/render_video', methods=['POST'])
 @app.route('/api/render_video/', methods=['POST'])
 def make_video() -> tuple[object, int]:
@@ -1318,6 +1672,15 @@ def make_video() -> tuple[object, int]:
     if data is None:
         return jsonify(status='error', error='Invalid multipart payload field.'), 400
 
+    youtube_body = None
+    if data.get('youtube') is not None:
+        if not youtube_uploads.valid_csrf():
+            return jsonify(error='Invalid YouTube request token. Reload the page.'), 403
+        try:
+            youtube_body = youtube_uploads.check_ready(data['youtube'])
+        except ValueError as error:
+            return jsonify(status='error', error=str(error)), 400
+
     # The frontend sends base64 strings; keep them as-is (default to empty string).
     map_b64 = data.get('map_file') or ''
     background_b64 = data.get('background_video') or ''
@@ -1325,6 +1688,32 @@ def make_video() -> tuple[object, int]:
     title = str(data.get('video_title') or data.get('title') or '').strip()
     codec = str(data.get('codec') or 'libx264').strip()
     duration = data.get('duration')
+
+    raw_country_key = data.get('zoom_country_key')
+    zoom_country_key = raw_country_key.strip() if isinstance(raw_country_key, str) else ''
+    raw_reveal = data.get('reveal_enabled', False)
+    reveal_enabled = (
+        raw_reveal.strip().lower() in _TRUTHY
+        if isinstance(raw_reveal, str)
+        else bool(raw_reveal)
+    )
+    raw_zoom = data.get('zoom_enabled', False)
+    zoom_enabled = raw_zoom.strip().lower() in _TRUTHY if isinstance(raw_zoom, str) else bool(raw_zoom)
+    reveal_enabled = zoom_enabled and reveal_enabled
+    reveal_time = data.get('reveal_time', None)
+    reveal_mask = ''
+    if reveal_enabled and map_b64:
+        map_size = _decode_image_size(map_b64)
+        if map_size is not None:
+            zoom_x = _parse_finite_coord(data.get('zoom_x'), 0.80)
+            zoom_y = _parse_finite_coord(data.get('zoom_y'), 0.35)
+            reveal_mask = _extract_country_reveal_mask(
+                map_size[0],
+                map_size[1],
+                zoom_country_key,
+                zoom_x,
+                zoom_y,
+            )
 
     try:
         response = requests.post(
@@ -1359,6 +1748,19 @@ def make_video() -> tuple[object, int]:
                 "subscribe_text": data.get('subscribe_text', 'Subscribe!'),
                 "subscribe_delay": data.get('subscribe_delay', 2.5),
                 "intro_fade": data.get('intro_fade', False),
+                "zoom_enabled": zoom_enabled,
+                "zoom_x": data.get('zoom_x', 0.80),
+                "zoom_y": data.get('zoom_y', 0.35),
+                "zoom_scale": data.get('zoom_scale', 2.0),
+                "zoom_start": data.get('zoom_start', 1.5),
+                "zoom_duration": data.get('zoom_duration', 2.5),
+                "zoom_out_enabled": data.get('zoom_out_enabled', False),
+                "zoom_out_duration": data.get('zoom_out_duration', 2.0),
+                "zoom_country_key": zoom_country_key,
+                "reveal_enabled": reveal_enabled,
+                "reveal_time": reveal_time,
+                "reveal_color": str(data.get('reveal_color') or '#000000').strip(),
+                "reveal_mask": reveal_mask,
                 **({'render_id': data['render_id']} if data.get('render_id') is not None else {}),
             },
             # Video rendering (moviepy/ffmpeg) can take a while - allow more time.
@@ -1375,7 +1777,15 @@ def make_video() -> tuple[object, int]:
         return jsonify({"status": "error",
                         "error": "Video service returned a non-JSON response."}), 502
 
-    # Pass the downstream payload/status straight through.
+    if response.ok and isinstance(payload, dict) and payload.get('status') == 'success':
+        path = payload.get('file_path') or payload.get('path') or payload.get('file')
+        if isinstance(path, str) and path:
+            payload['upload_token'] = youtube_uploads.render_token(path)
+            if youtube_body is not None:
+                try:
+                    payload['youtube_job_id'] = youtube_uploads.start(payload['upload_token'], youtube_body)
+                except (ValueError, ImportError):
+                    payload['youtube_error'] = 'Video rendered, but YouTube upload could not start. Check your connection and try Upload to YouTube.'
     return jsonify(payload), response.status_code
 
 

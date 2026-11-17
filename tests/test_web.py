@@ -20,17 +20,18 @@ import pytest
 import requests
 
 
-@pytest.mark.parametrize('path', ['/', '/studio', '/api/status', '/api/fonts', '/api/fonts/'])
-def test_pages_and_discovery(web, path):
-    response = web.app.test_client().get(path)
-    assert response.status_code == 200
-    if path.startswith('/api/fonts'):
-        assert 'DIN Condensed.ttf' in response.json['fonts']
-        assert response.json['count'] == len(response.json['fonts'])
-    elif path == '/api/status':
-        assert response.json == {'needs_api_key': True}
-    elif path == '/studio':
-        assert b'titleFontSelect' in response.data and b'titleFontSize' in response.data
+def test_pages_and_discovery(web):
+    client = web.app.test_client()
+    for path in ('/', '/studio', '/api/status', '/api/fonts', '/api/fonts/'):
+        response = client.get(path)
+        assert response.status_code == 200, path
+        if path.startswith('/api/fonts'):
+            assert 'DIN Condensed.ttf' in response.json['fonts']
+            assert response.json['count'] == len(response.json['fonts'])
+        elif path == '/api/status':
+            assert response.json == {'needs_api_key': True}
+        elif path == '/studio':
+            assert b'titleFontSelect' in response.data and b'titleFontSize' in response.data
 
 
 @pytest.fixture
@@ -51,39 +52,41 @@ def test_generate_forwards_options_and_encodes_png(web, monkeypatch, generation_
     assert 'form-key' not in response.json['command']
 
 
-@pytest.mark.parametrize('temperature', [0, 0.4, 2])
-def test_generate_forwards_temperature_including_zero(web, monkeypatch, generation_request, temperature):
+def test_generate_forwards_temperature_including_zero(web, monkeypatch, generation_request):
     generate = Mock(return_value=io.BytesIO(b'png'))
     monkeypatch.setattr(web, 'auto_map', generate)
-    response = web.app.test_client().post('/api/generate', json={
-        **generation_request, 'temperature': temperature})
-    assert response.status_code == 200
-    assert generate.call_args.kwargs['temperature'] == temperature
-    assert f'--temperature {temperature:g}' in response.json['command']
+    client = web.app.test_client()
+    for temperature in (0, 0.4, 2):
+        response = client.post('/api/generate', json={**generation_request, 'temperature': temperature})
+        assert response.status_code == 200
+        assert generate.call_args.kwargs['temperature'] == temperature
+        assert f'--temperature {temperature:g}' in response.json['command']
 
 
-@pytest.mark.parametrize('temperature', [-1, 3, 'NaN', 'Infinity', True, None, 'invalid', {}])
-def test_generate_rejects_invalid_temperature_before_rendering(web, monkeypatch, generation_request, temperature):
+def test_generate_rejects_invalid_temperature_before_rendering(web, monkeypatch, generation_request):
     generate = Mock()
     monkeypatch.setattr(web, 'auto_map', generate)
-    response = web.app.test_client().post('/api/generate', json={
-        **generation_request, 'temperature': temperature})
-    assert response.status_code == 400
-    assert 'Temperature' in response.json['error']
+    client = web.app.test_client()
+    for temperature in (-1, 3, 'NaN', 'Infinity', True, None, 'invalid', {}):
+        response = client.post('/api/generate', json={**generation_request, 'temperature': temperature})
+        assert response.status_code == 400, temperature
+        assert 'Temperature' in response.json['error'], temperature
     generate.assert_not_called()
 
 
-@pytest.mark.parametrize('gsm', [None, 'bad', 15])
-@pytest.mark.parametrize('extra', ['none', '', None])
-def test_generate_defaults_and_invalid_font_fallback(web, monkeypatch, generation_request, gsm, extra):
+def test_generate_defaults_and_invalid_font_fallback(web, monkeypatch, generation_request):
     generate = Mock(return_value=io.BytesIO(b'png'))
     monkeypatch.setattr(web, 'auto_map', generate)
-    response = web.app.test_client().post('/api/generate/', json={**generation_request,
-        'font': '../bad.ttf', 'gsm': gsm, 'extra_option': extra})
-    assert response.status_code == 200
-    assert generate.call_args.kwargs['font_name'] == 'Bips.ttf'
-    assert generate.call_args.kwargs['size_mod'] == 15
-    assert generate.call_args.kwargs['optional_feature'] is None
+    client = web.app.test_client()
+    for gsm in (None, 'bad', 15):
+        for extra in ('none', '', None):
+            response = client.post('/api/generate/', json={
+                **generation_request, 'font': '../bad.ttf', 'gsm': gsm, 'extra_option': extra,
+            })
+            assert response.status_code == 200
+            assert generate.call_args.kwargs['font_name'] == 'Bips.ttf'
+            assert generate.call_args.kwargs['size_mod'] == 15
+            assert generate.call_args.kwargs['optional_feature'] is None
 
 
 def test_generate_requires_key_without_server_key(web, monkeypatch, generation_request):
@@ -103,15 +106,6 @@ def test_generate_server_key_does_not_require_form_key(web, monkeypatch, generat
     assert generate.call_args.kwargs['api_key'] is None
 
 
-@pytest.mark.parametrize('failure,status', [(KeyError('topic'), 400), (RuntimeError('broken'), 500), (None, 500)])
-def test_generation_errors(web, monkeypatch, generation_request, failure, status):
-    generate = Mock(side_effect=failure) if failure else Mock(return_value=None)
-    monkeypatch.setattr(web, 'auto_map', generate)
-    response = web.app.test_client().post('/api/generate', json=generation_request)
-    assert response.status_code == status
-    assert response.json['status'] == 'error'
-
-
 PROXIES = [
     ('/api/music_download', {'url': 'https://example.test/song'}, 150),
     ('/api/music_cut', {'title': 'song', 'start_time': '00:01'}, 40),
@@ -119,45 +113,52 @@ PROXIES = [
 ]
 
 
-@pytest.mark.parametrize('path,payload,timeout', PROXIES)
-@pytest.mark.parametrize('status', [200, 400, 500])
-def test_json_proxy_passes_response(web, monkeypatch, path, payload, timeout, status):
-    upstream = Mock(status_code=status)
-    upstream.json.return_value = {'status': 'success' if status == 200 else 'error', 'file': 'data'}
-    post = Mock(return_value=upstream)
-    monkeypatch.setattr(requests, 'post', post)
-    response = web.app.test_client().post(path, json=payload)
-    assert response.status_code == status and response.json == upstream.json.return_value
-    assert post.call_args.kwargs['timeout'] == timeout
-    if path.endswith('render_video'):
-        assert post.call_args.kwargs['json']['title_font'] == 'DIN Condensed.ttf'
-        assert post.call_args.kwargs['json']['title_font_size'] == 100
-        assert post.call_args.kwargs['json']['include_audio'] is False
-
-
-@pytest.mark.parametrize('path,payload,timeout', PROXIES)
-@pytest.mark.parametrize('failure', ['network', 'json'])
-def test_proxy_failure_returns_bad_gateway(web, monkeypatch, path, payload, timeout, failure):
-    upstream = Mock()
-    upstream.json.side_effect = ValueError('not json')
-    post = Mock(side_effect=requests.ConnectionError('offline')) if failure == 'network' else Mock(return_value=upstream)
-    monkeypatch.setattr(requests, 'post', post)
-    assert web.app.test_client().post(path, json=payload).status_code == 502
-
-
-@pytest.mark.parametrize('path', ['/api/music_download', '/api/music_cut', '/api/download_video'])
-def test_missing_proxy_fields(web, path):
+def test_json_proxy_passes_response(web, monkeypatch):
     client = web.app.test_client()
-    response = client.get(path) if 'download_video' in path else client.post(path, json={})
-    assert response.status_code == 400
+    for path, payload, timeout in PROXIES:
+        for status in (200, 400, 500):
+            upstream = Mock(status_code=status)
+            upstream.json.return_value = {'status': 'success' if status == 200 else 'error', 'file': 'data'}
+            post = Mock(return_value=upstream)
+            monkeypatch.setattr(requests, 'post', post)
+            response = client.post(path, json=payload)
+            assert response.status_code == status and response.json == upstream.json.return_value
+            assert post.call_args.kwargs['timeout'] == timeout
+            if path.endswith('render_video'):
+                assert post.call_args.kwargs['json']['title_font'] == 'DIN Condensed.ttf'
+                assert post.call_args.kwargs['json']['title_font_size'] == 100
+                assert post.call_args.kwargs['json']['include_audio'] is False
 
 
-@pytest.mark.parametrize('raw,expected', [(0, 1), (100, 30), ('bad', 8), (None, 8), ('12', 12)])
-def test_cut_duration_normalization(web, monkeypatch, raw, expected):
-    post = Mock(return_value=Mock(status_code=200, json=lambda: {}))
-    monkeypatch.setattr(requests, 'post', post)
-    web.app.test_client().post('/api/music_cut', json={'title': 'song', 'duration': raw})
-    assert post.call_args.kwargs['json']['duration'] == expected
+def test_proxy_failure_returns_bad_gateway(web, monkeypatch):
+    client = web.app.test_client()
+    for path, payload, _ in PROXIES:
+        for failure in ('network', 'json'):
+            upstream = Mock()
+            upstream.json.side_effect = ValueError('not json')
+            post = (
+                Mock(side_effect=requests.ConnectionError('offline'))
+                if failure == 'network'
+                else Mock(return_value=upstream)
+            )
+            monkeypatch.setattr(requests, 'post', post)
+            assert client.post(path, json=payload).status_code == 502, (path, failure)
+
+
+def test_missing_proxy_fields(web):
+    client = web.app.test_client()
+    for path in ('/api/music_download', '/api/music_cut', '/api/download_video'):
+        response = client.get(path) if 'download_video' in path else client.post(path, json={})
+        assert response.status_code == 400, path
+
+
+def test_cut_duration_normalization(web, monkeypatch):
+    client = web.app.test_client()
+    for raw, expected in ((0, 1), (100, 30), ('bad', 8), (None, 8), ('12', 12)):
+        post = Mock(return_value=Mock(status_code=200, json=lambda: {}))
+        monkeypatch.setattr(requests, 'post', post)
+        client.post('/api/music_cut', json={'title': 'song', 'duration': raw})
+        assert post.call_args.kwargs['json']['duration'] == expected, raw
 
 
 def test_render_forwards_title_style_and_legacy_title(web, monkeypatch):
@@ -186,19 +187,40 @@ def test_render_forwards_title_style_and_legacy_title(web, monkeypatch):
     assert post.call_args.kwargs['json']['visual_effects'] is False
 
 
-@pytest.mark.parametrize('status', [200, 400])
-def test_title_preview_proxy_preserves_content(web, monkeypatch, status):
-    upstream = Mock(status_code=status, content=b'png-or-error', headers={'Content-Type': 'image/png'})
-    post = Mock(return_value=upstream)
+@pytest.mark.parametrize('zoom,reveal,expected', [
+    (False, True, False), ('false', True, False),
+    (True, False, False), (True, True, True), ('true', 'true', True),
+])
+def test_country_reveal_requires_zoom(web, monkeypatch, zoom, reveal, expected):
+    post = Mock(return_value=Mock(status_code=200, json=lambda: {}))
     monkeypatch.setattr(requests, 'post', post)
-    response = web.app.test_client().post('/api/video_title_preview', json={
-        'video_title': 'Title', 'title_font': 'Bips.ttf', 'title_font_size': 72, 'ignore': True,
-        'title_first_line_color': '#ff6600', 'title_other_lines_color': '#3366ff'})
-    assert response.status_code == status and response.data == b'png-or-error'
-    assert response.mimetype == 'image/png'
-    assert 'ignore' not in post.call_args.kwargs['json']
-    assert post.call_args.kwargs['json']['title_first_line_color'] == '#ff6600'
-    assert post.call_args.kwargs['json']['title_other_lines_color'] == '#3366ff'
+    extract = Mock(return_value='mask')
+    monkeypatch.setattr(web, '_decode_image_size', lambda _: (100, 100))
+    monkeypatch.setattr(web, '_extract_country_reveal_mask', extract)
+    response = web.app.test_client().post('/api/render_video', json={
+        'map_file': 'map', 'zoom_enabled': zoom, 'reveal_enabled': reveal,
+    })
+    assert response.status_code == 200
+    payload = post.call_args.kwargs['json']
+    assert payload['reveal_enabled'] is expected
+    assert payload['reveal_mask'] == ('mask' if expected else '')
+    assert extract.called is expected
+
+
+def test_title_preview_proxy_preserves_content(web, monkeypatch):
+    client = web.app.test_client()
+    for status in (200, 400):
+        upstream = Mock(status_code=status, content=b'png-or-error', headers={'Content-Type': 'image/png'})
+        post = Mock(return_value=upstream)
+        monkeypatch.setattr(requests, 'post', post)
+        response = client.post('/api/video_title_preview', json={
+            'video_title': 'Title', 'title_font': 'Bips.ttf', 'title_font_size': 72, 'ignore': True,
+            'title_first_line_color': '#ff6600', 'title_other_lines_color': '#3366ff'})
+        assert response.status_code == status and response.data == b'png-or-error'
+        assert response.mimetype == 'image/png'
+        assert 'ignore' not in post.call_args.kwargs['json']
+        assert post.call_args.kwargs['json']['title_first_line_color'] == '#ff6600'
+        assert post.call_args.kwargs['json']['title_other_lines_color'] == '#3366ff'
 
 
 def test_title_preview_unavailable(web, monkeypatch):
@@ -218,16 +240,23 @@ def test_video_download_streaming(web, monkeypatch):
     assert get.call_args.kwargs['stream'] is True
 
 
-@pytest.mark.parametrize('kind', ['network', 'json', 'text', 'invalid-json'])
-def test_video_download_errors(web, monkeypatch, kind):
-    upstream = Mock(status_code=404, headers={'Content-Type': 'application/json' if 'json' in kind else 'text/plain'}, text='missing')
-    upstream.json.return_value = {'error': 'missing'}
-    if kind == 'invalid-json':
-        upstream.json.side_effect = ValueError()
-    get = Mock(side_effect=requests.ConnectionError()) if kind == 'network' else Mock(return_value=upstream)
-    monkeypatch.setattr(requests, 'get', get)
-    response = web.app.test_client().get('/api/download_video?path=clip.mp4')
-    assert response.status_code == (502 if kind == 'network' else 404)
+def test_video_download_errors(web, monkeypatch):
+    client = web.app.test_client()
+    for kind in ('network', 'json', 'text', 'invalid-json'):
+        upstream = Mock(
+            status_code=404,
+            headers={'Content-Type': 'application/json' if 'json' in kind else 'text/plain'},
+            text='missing',
+        )
+        upstream.json.return_value = {'error': 'missing'}
+        if kind == 'invalid-json':
+            upstream.json.side_effect = ValueError()
+        get = Mock(side_effect=requests.ConnectionError()) if kind == 'network' else Mock(return_value=upstream)
+        monkeypatch.setattr(requests, 'get', get)
+        response = client.get('/api/download_video?path=clip.mp4')
+        assert response.status_code == (502 if kind == 'network' else 404), kind
+
+
 def test_codec_proxy_returns_worker_capabilities(web, monkeypatch):
     monkeypatch.setattr(requests, 'get', Mock(return_value=Mock(
         status_code=200, json=lambda: {'codecs': ['libx264']})))
@@ -243,12 +272,13 @@ def test_worker_url_environment_override(monkeypatch, request):
     get.assert_called_once_with('http://127.0.0.1:9090/api/codecs', timeout=20)
 
 
-@pytest.mark.parametrize('failure', [requests.Timeout(), ValueError('bad JSON')])
-def test_codec_proxy_failure(web, monkeypatch, failure):
-    response = Mock()
-    response.json.side_effect = failure
-    monkeypatch.setattr(requests, 'get', Mock(return_value=response))
-    assert web.app.test_client().get('/api/codecs').status_code == 502
+def test_codec_proxy_failure(web, monkeypatch):
+    client = web.app.test_client()
+    for failure in (requests.Timeout(), ValueError('bad JSON')):
+        response = Mock()
+        response.json.side_effect = failure
+        monkeypatch.setattr(requests, 'get', Mock(return_value=response))
+        assert client.get('/api/codecs').status_code == 502
 
 
 def test_analyze_map_endpoint_returns_rules_and_style(web):
@@ -317,17 +347,8 @@ def test_analyze_map_validates_and_inspects_uploaded_image(web):
     from PIL import Image
     client = web.app.test_client()
 
-    # Invalid base64/image must return 400 error instead of sample data
-    bad_res = client.post('/api/analyze_map', json={
-        'image_data': 'data:image/png;base64,invalid',
-        'topic': 'Any',
-        'prefer_cached': False,
-    })
-    assert bad_res.status_code == 400
-    assert bad_res.json['status'] == 'error'
-
     # Valid PNG image is inspected for its actual pixel colors
-    img = Image.new('RGBA', (220, 180), (20, 180, 90, 255))
+    img = Image.new('RGBA', (32, 32), (20, 180, 90, 255))
     buf = io.BytesIO()
     img.save(buf, format='PNG')
     b64 = base64.b64encode(buf.getvalue()).decode('ascii')
@@ -346,22 +367,23 @@ def test_analyze_map_validates_and_inspects_uploaded_image(web):
     assert '#14b45a' in ok_res.json['analysis']['filling_txt']
 
 
-@pytest.mark.parametrize('theme', [
-    'auto', 'viridis', 'heatmap', 'emerald_gold', 'festive', 'oceanic', 'categorical',
-    'greens', 'blues', 'reds', 'oranges', 'yellows', 'purples', 'teals', 'pinks', 'earth_tones',
-    'pastel', 'neon', 'monochrome', 'sunset',
-])
-def test_analyze_map_supports_every_ui_palette_theme(web, theme):
+def test_analyze_map_supports_every_ui_palette_theme(web):
     client = web.app.test_client()
-    res = client.post('/api/analyze_map', json={
-        'topic': 'Population',
-        'mode': 'number',
-        'palette_theme': theme,
-        'map_values': {'germany': 84, 'france': 68, 'estonia': 1},
-    })
-    assert res.status_code == 200
-    expected = 'viridis' if theme == 'auto' else theme
-    assert res.json['analysis']['resolved_theme'] == expected
+    themes = (
+        'auto', 'viridis', 'heatmap', 'emerald_gold', 'festive', 'oceanic', 'categorical',
+        'greens', 'blues', 'reds', 'oranges', 'yellows', 'purples', 'teals', 'pinks', 'earth_tones',
+        'pastel', 'neon', 'monochrome', 'sunset',
+    )
+    for theme in themes:
+        res = client.post('/api/analyze_map', json={
+            'topic': 'Population',
+            'mode': 'number',
+            'palette_theme': theme,
+            'map_values': {'germany': 84, 'france': 68, 'estonia': 1},
+        })
+        assert res.status_code == 200, theme
+        expected = 'viridis' if theme == 'auto' else theme
+        assert res.json['analysis']['resolved_theme'] == expected, theme
 
 
 def test_analyze_map_prefer_cached_false_does_not_leak_previous_state(web):
@@ -401,27 +423,31 @@ def test_generate_returns_request_values_and_effective_style(web, monkeypatch, g
         assert kwargs[key] == style[key]
 
 
-@pytest.mark.parametrize('failure', [None, RuntimeError('repaint failed')])
-def test_restyle_reports_renderer_failure(web, monkeypatch, failure):
-    generate = Mock(side_effect=failure) if failure else Mock(return_value=None)
-    monkeypatch.setattr(web, 'auto_map', generate)
-    response = web.app.test_client().post('/api/restyle_map', json={'map_values': {'ukraine': 'Yes'}})
-    assert response.status_code == 500
-    assert response.json['status'] == 'error'
-    assert 'image_url' not in response.json
+def test_restyle_reports_renderer_failure(web, monkeypatch):
+    client = web.app.test_client()
+    for failure in (None, RuntimeError('repaint failed')):
+        generate = Mock(side_effect=failure) if failure else Mock(return_value=None)
+        monkeypatch.setattr(web, 'auto_map', generate)
+        response = client.post('/api/restyle_map', json={'map_values': {'ukraine': 'Yes'}})
+        assert response.status_code == 500
+        assert response.json['status'] == 'error'
+        assert 'image_url' not in response.json
 
 
-@pytest.mark.parametrize('image_data,error', [
-    ('', 'Empty image data'),
-    ('data:text/plain;base64,YQ==', 'Unsupported data URL media type'),
-    ('data:image/png;base64,', 'Decoded image payload is empty'),
-    ('data:image/png;base64,YQ==', 'not a valid image'),
-])
-def test_palette_inspection_rejects_invalid_uploads(web, image_data, error):
-    response = web.app.test_client().post('/api/analyze_map', json={'image_data': image_data})
-    assert response.status_code == 400
-    assert error in response.json['error']
-    assert 'map_values' not in response.json
+def test_palette_inspection_rejects_invalid_uploads(web):
+    client = web.app.test_client()
+    cases = (
+        ('', 'Empty image data'),
+        ('data:text/plain;base64,YQ==', 'Unsupported data URL media type'),
+        ('data:image/png;base64,', 'Decoded image payload is empty'),
+        ('data:image/png;base64,YQ==', 'not a valid image'),
+        ('data:image/png;base64,invalid', 'Invalid base64 image payload'),
+    )
+    for image_data, error in cases:
+        response = client.post('/api/analyze_map', json={'image_data': image_data})
+        assert response.status_code == 400, image_data
+        assert error in response.json['error'], image_data
+        assert 'map_values' not in response.json
 
 
 def test_palette_inspection_rejects_images_too_small_for_sampling(web):
@@ -434,24 +460,24 @@ def test_palette_inspection_rejects_images_too_small_for_sampling(web):
     assert 'too small' in response.json['error']
 
 
-@pytest.mark.parametrize('mode', ['text', 'number'])
-def test_topic_preview_is_explicitly_identified_as_sample_data(web, mode):
-    response = web.app.test_client().post('/api/analyze_map', json={'topic': 'Example', 'mode': mode})
-    assert response.status_code == 200
-    assert response.json['source'] == 'topic_preview'
-    assert response.json['analysis']['detected_type'] == mode
-    assert response.json['map_values']
+def test_topic_preview_is_explicitly_identified_as_sample_data(web):
+    client = web.app.test_client()
+    for mode in ('text', 'number'):
+        response = client.post('/api/analyze_map', json={'topic': 'Example', 'mode': mode})
+        assert response.status_code == 200
+        assert response.json['source'] == 'topic_preview'
+        assert response.json['analysis']['detected_type'] == mode
+        assert response.json['map_values']
 
 
-
-
-@pytest.mark.parametrize('code,phrase', [(503, 'overloaded'), (429, 'quota'), (504, '45 seconds')])
-def test_generate_displays_upstream_service_reason(web, monkeypatch, generation_request, code, phrase):
+def test_generate_displays_upstream_service_reason(web, monkeypatch, generation_request):
     from map.functions import AIServiceError
-    monkeypatch.setattr(web, 'auto_map', Mock(side_effect=AIServiceError(phrase, code)))
-    response = web.app.test_client().post('/api/generate', json=generation_request)
-    assert response.status_code == code
-    assert response.json['error'] == phrase
+    client = web.app.test_client()
+    for code, phrase in ((503, 'overloaded'), (429, 'quota'), (504, '45 seconds')):
+        monkeypatch.setattr(web, 'auto_map', Mock(side_effect=AIServiceError(phrase, code)))
+        response = client.post('/api/generate', json=generation_request)
+        assert response.status_code == code
+        assert response.json['error'] == phrase
 
 
 def test_analysis_preserves_fractional_values_and_rendered_bounds(web):
@@ -505,10 +531,14 @@ def test_map_progress_tracks_stages_and_expires_old_entries(web, monkeypatch, ge
     assert client.get('/api/generate_progress/unknown').json['stage'] == 1
 
 
-@pytest.mark.parametrize('error,status', [(KeyError('x'), 400), (RuntimeError('failed'), 500), (None, 500)])
-def test_map_progress_records_generation_failure(web, monkeypatch, generation_request, error, status):
-    monkeypatch.setattr(web, 'auto_map', Mock(side_effect=error, return_value=None))
+def test_map_progress_records_generation_failure(web, monkeypatch, generation_request):
     client = web.app.test_client()
-    response = client.post('/api/generate', json={**generation_request, 'progress_id': 'failed'})
-    assert response.status_code == status
-    assert client.get('/api/generate_progress/failed').json['status'] == 'error'
+    for error, status in ((KeyError('x'), 400), (RuntimeError('failed'), 500), (None, 500)):
+        monkeypatch.setattr(web, 'auto_map', Mock(side_effect=error, return_value=None))
+        no_progress = client.post('/api/generate', json=generation_request)
+        assert no_progress.status_code == status
+        assert no_progress.json['status'] == 'error'
+        response = client.post('/api/generate', json={**generation_request, 'progress_id': 'failed'})
+        assert response.status_code == status
+        assert response.json['status'] == 'error'
+        assert client.get('/api/generate_progress/failed').json['status'] == 'error'

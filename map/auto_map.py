@@ -14,6 +14,7 @@
 
 import ast
 import hashlib
+import logging
 import os
 import random
 import io
@@ -28,209 +29,10 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-from .constants import europe_coords, world_coords
+from . import constants
+
 from .functions import ai_request, load_filling, _warning as showwarning, _error as showerror
 from . import log
-
-FONTS_DIR = Path(__file__).resolve().parent.parent / "resources" / "fonts"
-
-_AUTO_PALETTE: tuple[tuple[int, int, int, int], ...] = (
-    (56, 189, 248, 255),   # #38bdf8 Sky
-    (99, 102, 241, 255),   # #6366f1 Indigo
-    (16, 185, 129, 255),   # #10b981 Emerald
-    (245, 158, 11, 255),   # #f59e0b Amber
-    (244, 63, 94, 255),    # #f43f5e Rose
-    (168, 85, 247, 255),   # #a855f7 Purple
-    (20, 184, 166, 255),   # #14b8a6 Teal
-    (236, 72, 153, 255),   # #ec4899 Pink
-    (234, 179, 8, 255),    # #eab308 Gold
-    (249, 115, 22, 255),   # #f97316 Orange
-)
-
-_PALETTE_THEMES: dict[str, tuple[tuple[int, int, int, int], ...]] = {
-    "auto": _AUTO_PALETTE,
-    "viridis": (
-        (68, 1, 84, 255), (59, 82, 139, 255), (33, 145, 140, 255),
-        (94, 201, 98, 255), (253, 231, 37, 255),
-    ),
-    "sunset": (
-        (124, 45, 18, 255), (194, 65, 12, 255), (234, 88, 12, 255),
-        (245, 158, 11, 255), (253, 224, 71, 255),
-    ),
-    "ocean": (
-        (12, 74, 110, 255), (3, 105, 161, 255), (2, 132, 199, 255),
-        (56, 189, 248, 255), (125, 211, 252, 255),
-    ),
-    "festive": (
-        (220, 38, 38, 255), (22, 163, 74, 255), (234, 179, 8, 255),
-        (37, 99, 235, 255), (147, 51, 234, 255),
-    ),
-    "emerald": (
-        (6, 78, 59, 255), (4, 120, 87, 255), (16, 185, 129, 255),
-        (52, 211, 153, 255), (167, 243, 208, 255),
-    ),
-    "neon": (
-        (236, 72, 153, 255), (139, 92, 246, 255), (6, 182, 212, 255),
-        (16, 185, 129, 255), (250, 204, 21, 255),
-    ),
-    "pastel": (
-        (147, 197, 253, 255), (196, 181, 253, 255), (167, 243, 208, 255),
-        (253, 230, 138, 255), (253, 164, 175, 255),
-    ),
-    "monochrome": (
-        (51, 65, 85, 255), (71, 85, 105, 255), (100, 116, 139, 255),
-        (148, 163, 184, 255), (203, 213, 225, 255),
-    ),
-    "heatmap": (
-        (37, 99, 235, 255), (16, 185, 129, 255), (245, 158, 11, 255),
-        (239, 68, 68, 255), (185, 28, 28, 255),
-    ),
-    "emerald_gold": (
-        (244, 63, 94, 255), (245, 158, 11, 255), (234, 179, 8, 255),
-        (16, 185, 129, 255), (5, 150, 105, 255),
-    ),
-    "oceanic": (
-        (56, 189, 248, 255), (14, 165, 233, 255), (37, 99, 235, 255),
-        (99, 102, 241, 255), (139, 92, 246, 255),
-    ),
-    "categorical": _AUTO_PALETTE + (
-        (14, 165, 233, 255), (132, 204, 22, 255),
-    ),
-    "greens": (
-        (187, 247, 208, 255), (134, 239, 172, 255), (74, 222, 128, 255),
-        (22, 163, 74, 255), (20, 83, 45, 255),
-    ),
-    "blues": (
-        (191, 219, 254, 255), (147, 197, 253, 255), (96, 165, 250, 255),
-        (37, 99, 235, 255), (30, 58, 138, 255),
-    ),
-    "reds": (
-        (254, 202, 202, 255), (252, 165, 165, 255), (248, 113, 113, 255),
-        (220, 38, 38, 255), (127, 29, 29, 255),
-    ),
-    "oranges": (
-        (254, 215, 170, 255), (253, 186, 116, 255), (251, 146, 60, 255),
-        (234, 88, 12, 255), (124, 45, 18, 255),
-    ),
-    "yellows": (
-        (254, 240, 138, 255), (253, 224, 71, 255), (250, 204, 21, 255),
-        (202, 138, 4, 255), (133, 77, 14, 255),
-    ),
-    "purples": (
-        (233, 213, 255, 255), (216, 180, 254, 255), (192, 132, 252, 255),
-        (147, 51, 234, 255), (88, 28, 135, 255),
-    ),
-    "teals": (
-        (153, 246, 228, 255), (94, 234, 212, 255), (45, 212, 191, 255),
-        (13, 148, 136, 255), (19, 78, 74, 255),
-    ),
-    "pinks": (
-        (251, 207, 232, 255), (249, 168, 212, 255), (244, 114, 182, 255),
-        (219, 39, 119, 255), (131, 24, 67, 255),
-    ),
-    "earth_tones": (
-        (231, 229, 176, 255), (194, 178, 128, 255), (163, 137, 87, 255),
-        (120, 113, 62, 255), (75, 85, 45, 255),
-    ),
-}
-
-_SEMANTIC_COLORS: dict[str, tuple[int, int, int, int]] = {
-    "yes": (46, 204, 113, 255), "так": (46, 204, 113, 255), "true": (46, 204, 113, 255),
-    "no": (231, 76, 60, 255), "ні": (231, 76, 60, 255), "false": (231, 76, 60, 255),
-    "tea": (16, 185, 129, 255), "coffee": (245, 158, 11, 255), "coffe": (245, 158, 11, 255),
-    "beer": (234, 179, 8, 255), "wine": (225, 29, 72, 255),
-}
-
-_DEFAULT_UI_TXT_KEYS = {"yes", "no", "tea", "coffee"}
-_DEFAULT_UI_NUM_BOUNDS = {(0, 100), (100, 1000), (1000, 10000), (10000, 100000000)}
-_RELIEF_ALPHA_LUT: list[int] = [int(p * 0.3) for p in range(256)]
-
-_EUROPE_LABEL_SIZES: dict[str, int] = {
-    **{k: 70 for k in (
-        "cyprus", "kosovo", "montenegro", "slovenia", "latvia", "lithuania",
-        "estonia", "switzerland", "austria", "slovakia", "hungary", "croatia",
-        "netherlands", "belgium", "czechia", "moldova", "bosnia_and_herzegovina",
-        "serbia", "bulgaria", "albania", "greece", "ireland", "iceland",
-        "norway", "finland", "sweden", "denmark", "portugal",
-    )},
-    **{k: 100 for k in ("sweden", "norway", "finland")},
-    **{k: 125 for k in ("north_macedonia", "bosnia")},
-    **{k: 175 for k in (
-        "ukraine", "poland", "france", "spain", "turkey",
-        "romania", "italy", "belarus", "united_kingdom", "germany",
-    )},
-    **{k: 250 for k in ("russia", "usa")},
-}
-
-_WORLD_LABEL_SIZES: dict[str, int] = {
-    "asia": 200,
-    "africa": 100,
-    "europe": 110,
-    "australia": 50,
-    "south_america": 100,
-    "north_america": 120,
-}
-
-# Map types whose regions are painted from the cached region-ID map.
-# Flag-filled maps (``flag``, ``world_countries``) keep their underlying flag artwork.
-_PAINTED_MAP_TYPES: frozenset[str] = frozenset({"default", "world"})
-
-# Smallest base label size (before the global size modifier) still drawn on the
-# world countries map; smaller countries stay unlabeled to keep the map readable.
-_WORLD_COUNTRIES_MIN_LABEL = 1
-
-# Common alternative AI spellings mapped to canonical snake_case country keys.
-# Applied only when the alias target exists in the coordinates dictionary.
-_WORLD_COUNTRY_ALIASES: dict[str, tuple[str, ...]] = {
-    "usa": ("united_states", "united_states_of_america"),
-    "us": ("united_states", "united_states_of_america"),
-    "united_states_of_america": ("united_states",),
-    "america": ("united_states", "united_states_of_america"),
-    "uk": ("united_kingdom",),
-    "great_britain": ("united_kingdom",),
-    "britain": ("united_kingdom",),
-    "russian_federation": ("russia",),
-    "czech_republic": ("czechia",),
-    "turkiye": ("turkey",),
-    "ivory_coast": ("cote_d_ivoire", "cote_divoire"),
-    "cote_d_ivoire": ("ivory_coast",),
-    "cote_divoire": ("ivory_coast", "cote_d_ivoire"),
-    "drc": ("democratic_republic_of_the_congo", "dr_congo"),
-    "dr_congo": ("democratic_republic_of_the_congo",),
-    "congo_kinshasa": ("democratic_republic_of_the_congo", "dr_congo"),
-    "democratic_republic_of_congo": ("democratic_republic_of_the_congo", "dr_congo"),
-    "congo_brazzaville": ("republic_of_the_congo", "congo"),
-    "republic_of_congo": ("republic_of_the_congo", "congo"),
-    "south_korea": ("korea_south", "republic_of_korea"),
-    "korea": ("south_korea",),
-    "korea_south": ("south_korea",),
-    "republic_of_korea": ("south_korea",),
-    "north_korea": ("korea_north", "dprk"),
-    "korea_north": ("north_korea",),
-    "dprk": ("north_korea",),
-    "burma": ("myanmar",),
-    "swaziland": ("eswatini",),
-    "eswatini": ("swaziland",),
-    "macedonia": ("north_macedonia",),
-    "holland": ("netherlands",),
-    "the_netherlands": ("netherlands",),
-    "uae": ("united_arab_emirates",),
-    "east_timor": ("timor_leste",),
-    "timor_leste": ("east_timor",),
-    "cabo_verde": ("cape_verde",),
-    "cape_verde": ("cabo_verde",),
-    "vatican_city": ("vatican",),
-    "bosnia": ("bosnia_and_herzegovina",),
-    "the_gambia": ("gambia",),
-    "the_bahamas": ("bahamas",),
-    "united_republic_of_tanzania": ("tanzania",),
-    "republic_of_serbia": ("serbia",),
-    "state_of_palestine": ("palestine",),
-    "brunei_darussalam": ("brunei",),
-    "viet_nam": ("vietnam",),
-    "lao_pdr": ("laos",),
-}
-
 
 def _country_key(name: object) -> str:
     """Normalize a country name to snake_case ASCII ("Côte d'Ivoire" -> "cote_d_ivoire")."""
@@ -244,7 +46,7 @@ def _world_countries_answer_norm(ai_answer: dict[str, object], keys: object) -> 
     for k, v in (ai_answer or {}).items():
         norm.setdefault(_country_key(k), v)
     known = {_country_key(k) for k in keys}
-    for alias, targets in _WORLD_COUNTRY_ALIASES.items():
+    for alias, targets in constants._WORLD_COUNTRY_ALIASES.items():
         if alias not in norm:
             continue
         for target in targets:
@@ -310,7 +112,7 @@ def _prepared_relief(path: Path, size: tuple[int, int]) -> Image.Image:
     relief = _load_rgba(path)
     relief = relief.resize(size) if relief.size != tuple(size) else relief.copy()
     _, _, _, a = relief.split()
-    relief.putalpha(a.point(_RELIEF_ALPHA_LUT))
+    relief.putalpha(a.point(constants._RELIEF_ALPHA_LUT))
     if ckey is not None:
         with _CACHE_LOCK:
             _RELIEF_CACHE[ckey] = relief
@@ -409,6 +211,51 @@ def _region_index(map_path: Path, base: Image.Image, coords: dict) -> tuple[np.n
     return result
 
 
+_RUST_WARNED = False
+_LAST_RUST_WARNING: str | None = None
+
+
+def _record_rust_warning(msg: str) -> None:
+    global _RUST_WARNED, _LAST_RUST_WARNING
+    _LAST_RUST_WARNING = msg
+    if not _RUST_WARNED:
+        _RUST_WARNED = True
+        log.warning(msg)
+        logging.warning(msg)
+
+
+def _get_automap_rs():
+    """Return the native ``automap_rs`` module when available, else ``None``."""
+    global _LAST_RUST_WARNING
+    try:
+        import automap_rs
+        if hasattr(automap_rs, "paint_regions_rs") and hasattr(automap_rs, "alpha_composite_rs"):
+            _LAST_RUST_WARNING = None
+            return automap_rs
+        raise ImportError("automap_rs map functions not built")
+    except Exception as exc:
+        _record_rust_warning(
+            f"Rust map acceleration unavailable ({type(exc).__name__}: {exc}); falling back to Python/PIL."
+        )
+        return None
+
+
+def _alpha_composite(base: Image.Image, overlay: Image.Image) -> Image.Image:
+    """Alpha-composite ``overlay`` over ``base`` using Rust when available."""
+    rs = _get_automap_rs()
+    if rs is not None and base.size == overlay.size:
+        try:
+            base_rgba = base if base.mode == "RGBA" else base.convert("RGBA")
+            overlay_rgba = overlay if overlay.mode == "RGBA" else overlay.convert("RGBA")
+            out_bytes = rs.alpha_composite_rs(base_rgba.tobytes(), overlay_rgba.tobytes())
+            return Image.frombytes("RGBA", base.size, out_bytes)
+        except Exception as exc:
+            _record_rust_warning(
+                f"Rust alpha_composite_rs failed ({type(exc).__name__}: {exc}); falling back to PIL."
+            )
+    return Image.alpha_composite(base, overlay)
+
+
 def _paint_regions(img: Image.Image, flat: np.ndarray, ids: np.ndarray,
                    colors: dict[int, tuple[int, int, int, int]]) -> Image.Image:
     """Return a copy of ``img`` with region ``i`` painted ``colors[i]``."""
@@ -418,13 +265,29 @@ def _paint_regions(img: Image.Image, flat: np.ndarray, ids: np.ndarray,
     if ids.size:
         n = max(n, int(ids.max()) + 1)
     lut = np.zeros((n, 4), dtype=np.uint8)
-    use = np.zeros(n, dtype=bool)
+    use = np.zeros(n, dtype=np.uint8)
     for i, c in colors.items():
         lut[i] = c
-        use[i] = True
+        use[i] = 1
+    rs = _get_automap_rs()
+    if rs is not None:
+        try:
+            base_rgba = img if img.mode == "RGBA" else img.convert("RGBA")
+            out_bytes = rs.paint_regions_rs(
+                base_rgba.tobytes(),
+                np.ascontiguousarray(flat, dtype=np.uint32).tobytes(),
+                np.ascontiguousarray(ids, dtype=np.uint16).tobytes(),
+                lut.tobytes(),
+                use.tobytes(),
+            )
+            return Image.frombytes("RGBA", img.size, out_bytes)
+        except Exception as exc:
+            _record_rust_warning(
+                f"Rust paint_regions_rs failed ({type(exc).__name__}: {exc}); falling back to NumPy."
+            )
     arr = np.array(img, dtype=np.uint8)
     pix = arr.reshape(-1, 4)
-    sel = use[ids]
+    sel = use.astype(bool, copy=False)[ids]
     pix[flat[sel]] = lut[ids[sel]]
     return Image.fromarray(arr)
 
@@ -432,7 +295,7 @@ def _paint_regions(img: Image.Image, flat: np.ndarray, ids: np.ndarray,
 def _resolve_theme_name(palette_theme: str = "auto", prompt: str = "", mode: str = "text") -> str:
     """Pick a palette theme name from an explicit choice, prompt keywords, or mode."""
     theme = (palette_theme or "auto").strip().lower()
-    if theme in _PALETTE_THEMES and theme != "auto":
+    if theme in constants._PALETTE_THEMES and theme != "auto":
         return theme
     low = (prompt or "").lower()
     if any(w in low for w in ("nicholas", "christmas", "santa", "holiday", "xmas")):
@@ -596,7 +459,7 @@ def _auto_fill_from_ai(
     auto_txt: dict[str, tuple[int, int, int, int]] = {}
     auto_num: dict[tuple[float, float], tuple[int, int, int, int]] = {}
     resolved = _resolve_theme_name(palette_theme, prompt=prompt, mode=mode)
-    palette = _PALETTE_THEMES.get(resolved, _AUTO_PALETTE)
+    palette = constants._PALETTE_THEMES.get(resolved, constants._AUTO_PALETTE)
     use_semantic = (palette_theme or "auto").strip().lower() == "auto"
 
     if mode == "number":
@@ -645,7 +508,7 @@ def _auto_fill_from_ai(
                     b_idx = sum(1 for t in thresholds if num > t)
                     auto_txt[lbl] = palette[b_idx % len(palette)]
                 else:
-                    auto_txt.setdefault(lbl, _SEMANTIC_COLORS.get(lbl.lower(), palette[-1]))
+                    auto_txt.setdefault(lbl, constants._SEMANTIC_COLORS.get(lbl.lower(), palette[-1]))
         else:
             canonical: dict[str, str] = {}
             for lbl in labels:
@@ -653,8 +516,8 @@ def _auto_fill_from_ai(
             idx = 0
             for low_lbl, _ in Counter(lbl.lower() for lbl in labels).most_common():
                 orig = canonical[low_lbl]
-                if use_semantic and low_lbl in _SEMANTIC_COLORS:
-                    auto_txt[orig] = _SEMANTIC_COLORS[low_lbl]
+                if use_semantic and low_lbl in constants._SEMANTIC_COLORS:
+                    auto_txt[orig] = constants._SEMANTIC_COLORS[low_lbl]
                 else:
                     auto_txt[orig] = palette[idx % len(palette)]
                     idx += 1
@@ -783,6 +646,156 @@ def _draw_legend_overlay(
     return layer
 
 
+_RESERVED_HIGHLIGHT_COLORS: tuple[tuple[int, int, int], ...] = (
+    (0, 229, 255),   # Electric cyan (highest)
+    (255, 45, 170),  # Neon magenta (lowest)
+)
+
+
+def _random_region_color() -> tuple[int, int, int, int]:
+    """Pick a random bright RGBA color that stays distinct from reserved highlight colors."""
+    for _ in range(16):
+        c = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255))
+        if all(sum((c[i] - r[i]) ** 2 for i in range(3)) >= 90 ** 2 for r in _RESERVED_HIGHLIGHT_COLORS):
+            return (*c, 255)
+    return (120, 180, 120, 255)
+
+
+def _floodfill_bool_mask(interior: np.ndarray, seeds: list, max_pixels: int) -> np.ndarray | None:
+    """4-connected BFS flood fill on a boolean ``(H, W)`` interior mask, aborting if it exceeds ``max_pixels``."""
+    from collections import deque
+
+    h, w = interior.shape
+    visited = np.zeros((h, w), dtype=bool)
+    q: deque[tuple[int, int]] = deque()
+    for coord in seeds:
+        cx, cy = int(round(coord[0])), int(round(coord[1]))
+        seed = None
+        for dy in (0, -2, 2, -4, 4, -8, 8):
+            for dx in (0, -2, 2, -4, 4, -8, 8):
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < w and 0 <= ny < h and interior[ny, nx]:
+                    seed = (nx, ny)
+                    break
+            if seed is not None:
+                break
+        if seed is not None and not visited[seed[1], seed[0]]:
+            visited[seed[1], seed[0]] = True
+            q.append(seed)
+
+    if not q:
+        return None
+
+    count = 0
+    while q:
+        x, y = q.popleft()
+        count += 1
+        if count > max_pixels:
+            return None
+        if x > 0 and interior[y, x - 1] and not visited[y, x - 1]:
+            visited[y, x - 1] = True
+            q.append((x - 1, y))
+        if x + 1 < w and interior[y, x + 1] and not visited[y, x + 1]:
+            visited[y, x + 1] = True
+            q.append((x + 1, y))
+        if y > 0 and interior[y - 1, x] and not visited[y - 1, x]:
+            visited[y - 1, x] = True
+            q.append((x, y - 1))
+        if y + 1 < h and interior[y + 1, x] and not visited[y + 1, x]:
+            visited[y + 1, x] = True
+            q.append((x, y + 1))
+
+    return visited
+
+
+def _build_extrema_highlight_layer(
+    size: tuple[int, int],
+    highest_idx: int | None,
+    lowest_idx: int | None,
+    map_type: str,
+    dict_: dict,
+    flat: np.ndarray | None,
+    ids: np.ndarray | None,
+    borders: Image.Image | None,
+    base_map: Image.Image | None = None,
+    high_rgb: tuple[int, int, int] = _RESERVED_HIGHLIGHT_COLORS[0],
+    low_rgb: tuple[int, int, int] = _RESERVED_HIGHLIGHT_COLORS[1],
+) -> Image.Image | None:
+    """Create a soft tint + inner glow highlight layer for the highest and lowest regions."""
+    from PIL import ImageChops, ImageFilter
+
+    targets: list[tuple[int, tuple[int, int, int]]] = []
+    if highest_idx is not None:
+        targets.append((highest_idx, high_rgb))
+    if lowest_idx is not None and lowest_idx != highest_idx:
+        targets.append((lowest_idx, low_rgb))
+    if not targets:
+        return None
+
+    w, h = size
+    layer = Image.new("RGBA", size, (0, 0, 0, 0))
+    coords_list = list(dict_.values())
+
+    if map_type == "flag" and (flat is None or ids is None):
+        mask_path = Path(__file__).parent.parent / "resources" / "maps" / "default_map.png"
+        flat, ids = _region_index(mask_path, _load_rgba(mask_path), dict_)
+
+    inner_size = 37 if w >= 3000 else 21
+    outer_size = 25 if w >= 3000 else 15
+    wc_interior_crisp: np.ndarray | None = None
+    wc_base_alpha: np.ndarray | None = None
+    wc_border_alpha: np.ndarray | None = None
+    if map_type == "world_countries" and base_map is not None:
+        base_arr = np.asarray(base_map)
+        wc_base_alpha = base_arr[..., 3]
+        # Crisp dark country borders on world_countries_map.png cleanly separate adjacent nations.
+        wc_interior_crisp = (wc_base_alpha >= 128) & (base_arr[..., :3].max(axis=2) > 12)
+        if borders is not None:
+            wc_border_alpha = np.asarray(borders)[..., 3]
+
+    for region_idx, rgb in targets:
+        mask: Image.Image | None = None
+        if flat is not None and ids is not None:
+            pix_mask = np.zeros(w * h, dtype=np.uint8)
+            pix_mask[flat[ids == region_idx]] = 255
+            if pix_mask.any():
+                mask = Image.fromarray(pix_mask.reshape((h, w)), mode="L")
+        elif wc_interior_crisp is not None and 1 <= region_idx <= len(coords_list):
+            max_px = int(0.08 * w * h)
+            filled = _floodfill_bool_mask(wc_interior_crisp, coords_list[region_idx - 1], max_px)
+            if (filled is None or not filled.any()) and wc_base_alpha is not None and wc_border_alpha is not None:
+                for thr in (45, 65):
+                    interior = (wc_base_alpha >= 128) & (wc_border_alpha < thr)
+                    filled = _floodfill_bool_mask(interior, coords_list[region_idx - 1], max_px)
+                    if filled is not None and filled.any():
+                        break
+            if filled is not None and filled.any():
+                mask = Image.fromarray((filled.astype(np.uint8) * 255), mode="L")
+
+        if mask is None:
+            continue
+
+        # Downscale the binary mask before morphological filters so MinFilter/MaxFilter
+        # run in milliseconds instead of O(k^2) over 16M full-res pixels.
+        ds = 4 if w >= 2400 else 2
+        small_size = (max(1, w // ds), max(1, h // ds))
+        small_mask = mask.resize(small_size, Image.Resampling.BILINEAR)
+        small_inner = small_mask.filter(ImageFilter.MinFilter(9))
+        small_outer = small_mask.filter(ImageFilter.MaxFilter(7))
+        inner_ring = ImageChops.subtract(small_mask, small_inner).filter(ImageFilter.GaussianBlur(2))
+        outer_halo = ImageChops.subtract(small_outer, small_mask).filter(ImageFilter.GaussianBlur(2.5))
+        glow_small = ImageChops.lighter(inner_ring, outer_halo.point(lambda p: min(255, int(p * 0.95))))
+        glow_alpha = glow_small.resize((w, h), Image.Resampling.BILINEAR)
+        tint_alpha = mask.point(lambda p: 95 if p else 0)
+        combined_alpha = ImageChops.lighter(tint_alpha, glow_alpha)
+
+        overlay = Image.new("RGBA", size, (*rgb, 255))
+        overlay.putalpha(combined_alpha)
+        layer = Image.alpha_composite(layer, overlay)
+
+    return layer
+
+
 def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
              optional_feature: str, model: str, font_name: str,
              show_result: bool = True, io_res = False, api_key: str | None = None,
@@ -797,6 +810,9 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
              web_search: bool = False,
              max_search_requests: int = 5,
              show_legend: bool = False,
+             highlight_extrema: bool = False,
+             highlight_high_color: str = "#00e5ff",
+             highlight_low_color: str = "#ff2daa",
              progress_callback=None):
     """Create a map from an AI query and save it as ``result.png``.
 
@@ -819,7 +835,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
     def get_font(size):
         key = (font_name, size)
         if key not in _font_cache:
-            font_path = FONTS_DIR / font_name
+            font_path = constants.FONTS_DIR / font_name
             _font_cache[key] = ImageFont.truetype(str(font_path), size)
         return _font_cache[key]
 
@@ -896,13 +912,13 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
     wc_label_sizes: dict[str, int] = {}
     if map_type == "default":
         path = Path(__file__).parent.parent / "./resources/maps/default_map.png"
-        dict_ = europe_coords
+        dict_ = constants.europe_coords
     elif map_type == 'flag':
         path = Path(__file__).parent.parent / "./resources/maps/flag_map.png"
-        dict_ = europe_coords
+        dict_ = constants.europe_coords
     elif map_type == 'world':
         path = Path(__file__).parent.parent / "./resources/maps/world_map.png"
-        dict_ = world_coords
+        dict_ = constants.world_coords
     elif map_type == 'world_countries':
         path = Path(__file__).parent.parent / "./resources/maps/world_countries_map.png"
         dict_, wc_label_sizes = _load_world_countries()
@@ -958,7 +974,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         if mode == "text":
             merged_txt = dict(auto_txt)
             req_keys_low = {k.strip().lower() for k in req_txt}
-            if req_txt and (not theme_requested or req_keys_low != _DEFAULT_UI_TXT_KEYS):
+            if req_txt and (not theme_requested or req_keys_low != constants._DEFAULT_UI_TXT_KEYS):
                 ci_to_orig = {k.strip().lower(): k for k in merged_txt}
                 for rk, rv in req_txt.items():
                     short_rk = str(_format_short_number(rk)).strip() if has_short_form else rk
@@ -967,7 +983,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             filling_txt = merged_txt
             filling_txt_ci = {str(k).strip().lower(): v for k, v in filling_txt.items()}
         elif mode == "number":
-            if req_num and set(req_num.keys()) != _DEFAULT_UI_NUM_BOUNDS and not theme_requested:
+            if req_num and set(req_num.keys()) != constants._DEFAULT_UI_NUM_BOUNDS and not theme_requested:
                 filling_num = dict(req_num)
             elif auto_num:
                 filling_num = dict(auto_num)
@@ -1044,6 +1060,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             raw_ai_answer_norm["australia"] = raw_ai_answer_norm["oceania"]
 
     region_colors: dict[int, tuple[int, int, int, int]] = {}
+    numeric_region_values: dict[int, float] = {}
 
     for index, (name, points) in enumerate(dict_.items(), start=1):
         name_key = (
@@ -1055,13 +1072,15 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         if mode == 'number':
             try:
                 info = ai_answer_norm[name_key]
-                color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
+                color = _random_region_color()
                 num_value = _parse_short_number(info)
                 raw_num_value = _parse_short_number(raw_ai_answer_norm.get(name_key))
                 if num_value is None:
                     log.warning(f"Non-numeric value for {name}: {info!r}; using random color")
 
                 if num_value is not None:
+                    if highlight_extrema:
+                        numeric_region_values[index] = float(raw_num_value if raw_num_value is not None else num_value)
                     # Pick the colour of the first matching range. Ranges are
                     # treated as (low < value <= high) per the docs.
                     matched_bounds = None
@@ -1084,7 +1103,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             except KeyError as e:
                 info = ""
                 log.warning(f"No data / color for {e}; using random color")
-                color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
+                color = _random_region_color()
                 random_colors[name] = color
 
         elif mode == 'text':
@@ -1099,16 +1118,16 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
                 # so "Yes", "yes" and " yes " all find the same colour.
                 color = filling_txt_ci[info.lower()]
             except KeyError:
-                if map_type in _PAINTED_MAP_TYPES:
+                if map_type in constants._PAINTED_MAP_TYPES:
                     log.info(f"No filling color for '{info}'; using random")
                     # Repeated answers share a color so categories remain recognizable.
                     try:
                         color = random_colors[info]
                     except KeyError:
-                        color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
+                        color = _random_region_color()
                         random_colors[info] = color
                 else:
-                    color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
+                    color = _random_region_color()
             used_txt_rules.setdefault(info, color)
         else:
             showerror("Error", f"Unknown mode: {mode}")
@@ -1119,7 +1138,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         # Flag maps retain their original artwork. Other maps use every seed point
         # to fill disconnected pieces of a region, such as islands.
         # Painting is applied after the loop from a cached region-ID map.
-        if map_type in _PAINTED_MAP_TYPES:
+        if map_type in constants._PAINTED_MAP_TYPES:
             region_colors[index] = tuple(int(c) for c in color)
 
         if not points:
@@ -1137,7 +1156,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             elif len(info) >= 2:
                 x -= 30
 
-            size = _EUROPE_LABEL_SIZES.get(name, 125)
+            size = constants._EUROPE_LABEL_SIZES.get(name, 125)
             if name in ('russia', 'usa'):
                 y -= 10
             elif name in ('north_macedonia', 'bosnia'):
@@ -1162,7 +1181,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
                       stroke_fill=label_stroke_fill)
 
         elif map_type == 'world':  # text size for World map
-            size = _WORLD_LABEL_SIZES.get(name, 100)
+            size = constants._WORLD_LABEL_SIZES.get(name, 100)
 
             if label_auto_fit and len(info) >= 6:
                 size = max(40, int(size * max(0.55, 5.0 / len(info))))
@@ -1180,7 +1199,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             base_size = wc_label_sizes.get(name)
             if base_size is None:
                 base_size = wc_label_sizes.get(name_key, 0)
-            if base_size and base_size >= _WORLD_COUNTRIES_MIN_LABEL:
+            if base_size and base_size >= constants._WORLD_COUNTRIES_MIN_LABEL:
                 size = base_size
                 if label_auto_fit and len(info) >= 6:
                     size = max(14, int(size * max(0.55, 5.0 / len(info))))
@@ -1227,9 +1246,15 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         },
     }
 
-    if map_type in _PAINTED_MAP_TYPES:
+    flat = ids = None
+    if map_type in constants._PAINTED_MAP_TYPES:
         flat, ids = _region_index(path, img, dict_)
         img = _paint_regions(img, flat, ids, region_colors)
+
+    highest_idx = lowest_idx = None
+    if highlight_extrema and mode == "number" and numeric_region_values:
+        highest_idx = max(numeric_region_values, key=numeric_region_values.get)
+        lowest_idx = min(numeric_region_values, key=numeric_region_values.get)
 
     # adding relief map
     _report(3, "Adding relief, borders & overlays...")
@@ -1246,17 +1271,26 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         # Relief is resized and its opacity reduced once per process.
         maps_dir = Path(__file__).parent.parent / "resources" / "maps"
         relief = _prepared_relief(maps_dir / relief_name, img.size)
-        result = Image.alpha_composite(img, relief)
+        result = _alpha_composite(img, relief)
 
         # Restore borders above the relief, then put readable labels on top.
         borders = _load_rgba(maps_dir / borders_name)
-        result = Image.alpha_composite(result, borders)
-        result = Image.alpha_composite(result, text_layer)
+        if highest_idx is not None:
+            high_rgb = _hex_to_rgba(highlight_high_color, (*_RESERVED_HIGHLIGHT_COLORS[0], 255))[:3]
+            low_rgb = _hex_to_rgba(highlight_low_color, (*_RESERVED_HIGHLIGHT_COLORS[1], 255))[:3]
+            hl_layer = _build_extrema_highlight_layer(
+                img.size, highest_idx, lowest_idx, map_type, dict_, flat, ids, borders,
+                base_map=img, high_rgb=high_rgb, low_rgb=low_rgb,
+            )
+            if hl_layer is not None:
+                result = _alpha_composite(result, hl_layer)
+        result = _alpha_composite(result, borders)
+        result = _alpha_composite(result, text_layer)
 
         if has_most_least and map_type != "world" and most_least is not None:
-            result = Image.alpha_composite(result, most_least)
+            result = _alpha_composite(result, most_least)
     else:
-        result = Image.alpha_composite(img, text_layer)
+        result = _alpha_composite(img, text_layer)
 
     if show_legend:
         if mode == "number":
@@ -1284,15 +1318,17 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             has_ml,
         )
         if legend_layer is not None:
-            result = Image.alpha_composite(result, legend_layer)
+            result = _alpha_composite(result, legend_layer)
 
 
     _report(4, "Encoding final PNG...")
+    if _LAST_RUST_WARNING:
+        render_meta["rust_warning"] = _LAST_RUST_WARNING
     if io_res:
         # Return an in-memory PNG for the web API instead of writing result.png.
 
         buffer = io.BytesIO()
-        result.save(buffer, format='PNG')
+        result.save(buffer, format='PNG', compress_level=1)
         # Consumers should be able to read the PNG from its first byte.
         buffer.seek(0)
         buffer.map_meta = render_meta
@@ -1302,7 +1338,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
     out_path = Path(__file__).parent.parent / "result.png"
     log.step(f"Saving result to {out_path}")
-    result.save(out_path)
+    result.save(out_path, compress_level=1)
 
     if show_result:
         result.show("Map")

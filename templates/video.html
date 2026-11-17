@@ -253,10 +253,12 @@ limitations under the License.
         }
         .codec-card:disabled { opacity: .4; cursor: not-allowed; }
         #stageMapArea {
+            position: relative;
             display: flex;
             flex: 1;
             min-height: 0;
-            width: 100%;
+            width: 1080px;
+            margin-inline: -20px;
             align-items: center;
             justify-content: center;
         }
@@ -870,6 +872,84 @@ limitations under the License.
                                 <input id="introFadeToggle" type="checkbox" onchange="saveVideoSettings()" class="accent-emerald-400">
                                 Smooth intro fade-in from black (0.0s &rarr; 0.8s)
                             </label>
+                            <label class="flex items-center gap-2 text-xs text-slate-300">
+                                <input id="mapZoomToggle" type="checkbox" onchange="updateMapZoomUI(true); saveVideoSettings()" class="accent-emerald-400">
+                                Camera zoom to point on map
+                            </label>
+                            <div id="mapZoomPanel" class="hidden rounded-xl border border-slate-800 bg-slate-950/70 p-3 space-y-2.5">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-[11px] font-medium text-slate-300">Click country <span class="text-slate-500">(Ctrl = free point)</span></span>
+                                    <span id="zoomTargetCountry" class="text-[11px] font-mono text-cyan-300">Russia (81%, 36%)</span>
+                                </div>
+                                <div id="zoomPickerWrap"
+                                    onclick="pickZoomPoint(event)"
+                                    onpointermove="hoverZoomPoint(event)"
+                                    onpointerleave="clearZoomHover()"
+                                    class="relative mx-auto w-full max-w-[340px] rounded-lg overflow-hidden border border-slate-700/80 bg-slate-900 cursor-pointer select-none">
+                                    <img id="zoomPickerImg" draggable="false" alt="Zoom target picker" class="w-full h-auto block hidden pointer-events-none select-none">
+                                    <img id="zoomHoverOutline" draggable="false" alt="" class="hidden pointer-events-none absolute inset-0 w-full h-full object-fill select-none">
+                                    <div id="zoomPickerPlaceholder" class="py-6 text-center text-[11px] text-slate-500">Upload or load a map first</div>
+                                    <div id="zoomHoverPin" class="hidden pointer-events-none absolute w-7 h-7 -ml-3.5 -mt-3.5 rounded-full border-2 border-amber-300 bg-amber-400/25 shadow-[0_0_14px_rgba(252,211,77,0.95)]"></div>
+                                    <div id="zoomHoverLabel" class="hidden pointer-events-none absolute px-2 py-0.5 rounded-md bg-slate-950/90 border border-amber-400/60 text-[10px] font-semibold text-amber-200 whitespace-nowrap shadow-lg -translate-x-1/2 -translate-y-full -mt-4"></div>
+                                    <div id="zoomPickerPin" class="pointer-events-none absolute w-5 h-5 -ml-2.5 -mt-2.5 rounded-full border-2 border-cyan-300 bg-rose-500/80 shadow-[0_0_10px_rgba(34,211,238,0.9)]" style="left:80.7%;top:35.8%;"></div>
+                                </div>
+                                <input id="mapZoomX" type="hidden" value="0.807">
+                                <input id="mapZoomY" type="hidden" value="0.358">
+                                <input id="mapZoomCountry" type="hidden" value="Russia">
+                                <input id="mapZoomCountryKey" type="hidden" value="russia">
+                                <div class="grid grid-cols-3 gap-2">
+                                    <label class="text-[11px] text-slate-400">
+                                        <span>Zoom (x)</span>
+                                        <input id="mapZoomScale" type="number" min="1.2" max="3.5" step="0.1" value="2.0" onchange="saveVideoSettings()"
+                                            class="mt-1 w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                    </label>
+                                    <label class="text-[11px] text-slate-400">
+                                        <span>Start (s)</span>
+                                        <input id="mapZoomStart" type="number" min="0" max="15" step="0.5" value="1.5" onchange="saveVideoSettings()"
+                                            class="mt-1 w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                    </label>
+                                    <label class="text-[11px] text-slate-400">
+                                        <span>Duration (s)</span>
+                                        <input id="mapZoomDuration" type="number" min="0.5" max="10" step="0.5" value="2.5" onchange="saveVideoSettings()"
+                                            class="mt-1 w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                    </label>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2 items-end pt-1">
+                                    <label class="flex items-center gap-2 text-xs text-slate-300 pb-1.5">
+                                        <input id="mapZoomOutToggle" type="checkbox" checked onchange="updateZoomOutUI(); saveVideoSettings()" class="accent-cyan-400">
+                                        <span>Zoom out at end</span>
+                                    </label>
+                                    <label id="mapZoomOutDurationWrap" class="text-[11px] text-slate-400">
+                                        <span>Zoom out (s)</span>
+                                        <input id="mapZoomOutDuration" type="number" min="0.5" max="10" step="0.5" value="2.0" onchange="saveVideoSettings()"
+                                            class="mt-1 w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                    </label>
+                                </div>
+                                <div class="pt-1.5 border-t border-slate-800/80 space-y-2">
+                                    <label class="flex items-center gap-2 text-xs text-slate-300">
+                                        <input id="revealCountryToggle" type="checkbox" checked onchange="updateRevealUI(true); saveVideoSettings()" class="accent-emerald-400">
+                                        <span>Country reveal animation (cover + &quot;...&quot; &rarr; reveal color &amp; value)</span>
+                                    </label>
+                                    <div id="revealControlsPanel" class="hidden pl-5 space-y-1.5">
+                                        <div class="flex flex-wrap items-end gap-3">
+                                            <label class="block text-[11px] text-slate-400">
+                                                <span>Reveal at (s)</span>
+                                                <input id="revealTimeInput" type="number" min="0.5" max="20" step="0.1" value="5.5" onchange="updateRevealUI(); saveVideoSettings()"
+                                                    class="mt-1 w-28 block px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                            </label>
+                                            <label class="block text-[11px] text-slate-400">
+                                                <span>Cover color</span>
+                                                <span class="mt-1 flex items-center gap-1.5">
+                                                    <input id="revealColorInput" type="color" value="#000000" onchange="onRevealColorChange()"
+                                                        class="w-9 h-8 rounded-lg bg-slate-900 border border-slate-700 cursor-pointer p-0.5">
+                                                    <span id="revealColorHex" class="text-[11px] font-mono text-slate-300">#000000</span>
+                                                </span>
+                                            </label>
+                                        </div>
+                                        <p class="text-[10px] text-slate-500">Timeline: 3 dots appear &rarr; camera zooms while country &amp; dots stay visible &rarr; after zoom, dots vanish &amp; country reveals.</p>
+                                    </div>
+                                </div>
+                            </div>
 
                             <!-- Shorts Auto-Montage Overlays (Top Stickers + Animated Subscribe Pill) -->
                             <div class="mt-2 pt-3 border-t border-slate-800/80 flex flex-col gap-2.5">
@@ -1272,6 +1352,7 @@ limitations under the License.
                                 </div>
                                 <div id="stageMapArea">
                                     <img id="stageMapPreview" alt="Map frame preview" class="hidden object-contain">
+                                    <canvas id="stageRevealCanvas" class="hidden pointer-events-none absolute inset-0 w-full h-full z-10"></canvas>
                                     <div id="stageEmptyPlaceholder" class="flex flex-col items-center gap-2 text-slate-500">
                                         <div class="w-12 h-12 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-center text-slate-400 shadow-inner">
                                             <i class="fa-solid fa-photo-film text-xl text-indigo-400/80"></i>
@@ -1285,11 +1366,66 @@ limitations under the License.
                                 <div id="stageWatermarkStars" class="hidden"></div>
                             </div>
 
+                            <!-- Intro Fade Veil -->
+                            <div id="stageIntroVeil" class="hidden pointer-events-none absolute inset-0 z-[15] bg-black"></div>
+
                             <!-- Watermarks share the same 1080×1920 coordinate space as the map. -->
                             <!-- Rendered Final Video Player (revealed when /api/render_video succeeds) -->
                             <video id="renderedVideoPlayer" class="hidden absolute inset-0 z-20 w-full h-full object-contain bg-black" controls playsinline></video>
                         </div>
+
+                        <!-- Live Animation Transport Bar -->
+                        <div id="previewPlaybackBar" class="relative z-10 mt-2.5 flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/85 border border-slate-800/90 text-[11px] font-mono">
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" id="previewPlayPauseBtn" onclick="togglePreviewAnimation()"
+                                    class="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 transition flex items-center gap-1.5">
+                                    <i id="previewPlayPauseIcon" class="fa-solid fa-pause text-[10px]"></i>
+                                    <span id="previewPlayPauseLabel">Pause</span>
+                                </button>
+                                <button type="button" id="previewRestartBtn" onclick="restartPreviewAnimation()"
+                                    class="px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1" title="Restart preview animation">
+                                    <i class="fa-solid fa-rotate-left text-[10px]"></i>
+                                    <span>Restart</span>
+                                </button>
+                            </div>
+                            <span id="previewTimeIndicator" class="text-slate-300 tabular-nums">00:00.0 / 00:08.0</span>
+                        </div>
                     </div>
+
+                    <details class="p-4 rounded-xl bg-slate-950/80 border border-slate-700 space-y-3" id="youtubePanel">
+                        <summary class="cursor-pointer text-sm font-semibold text-rose-300"><i class="fa-brands fa-youtube mr-2"></i>YouTube upload</summary>
+                        <div class="space-y-3 mt-3 text-xs">
+                            <p class="text-slate-400">Connect your channel once, then upload automatically after rendering. Credentials stay on the server.</p>
+                            <label class="block">Google OAuth client secret (.json)
+                                <input id="youtubeSecret" type="file" accept=".json,application/json" class="block w-full mt-1 text-slate-300">
+                            </label>
+                            <p class="text-slate-400 break-all">Web application redirect URI: <code id="youtubeRedirect">Loading…</code>. Desktop app files work on localhost.</p>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" id="youtubeConnect" onclick="connectYouTube()" class="px-3 py-2 rounded-lg bg-rose-700 hover:bg-rose-600">Connect Google / YouTube</button>
+                                <button type="button" onclick="disconnectYouTube()" class="px-3 py-2 rounded-lg bg-slate-700">Disconnect</button>
+                            </div>
+                            <p id="youtubeConnection" role="status" class="text-slate-300">Checking connection…</p>
+                            <label class="flex items-center gap-2"><input id="youtubeAuto" type="checkbox">Automatically upload after rendering</label>
+                            <label class="block">YouTube title <span class="text-slate-400">(empty = video title)</span>
+                                <input id="youtubeTitle" maxlength="100" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700" placeholder="Title on YouTube">
+                            </label>
+                            <label class="block">Description
+                                <textarea id="youtubeDescription" rows="3" maxlength="5000" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700"></textarea>
+                            </label>
+                            <label class="block">Tags <span class="text-slate-400">(separated by commas)</span>
+                                <input id="youtubeTags" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700" placeholder="maps, geography, shorts">
+                            </label>
+                            <label class="block">Visibility
+                                <select id="youtubePrivacy" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700">
+                                    <option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option>
+                                </select>
+                            </label>
+                            <label class="flex items-center gap-2"><input id="youtubeKids" type="checkbox">Made for kids</label>
+                            <button type="button" id="youtubeUpload" onclick="uploadToYouTube()" disabled class="px-3 py-2 rounded-lg bg-rose-700 disabled:opacity-50">Upload rendered video to YouTube</button>
+                            <p id="youtubeUploadStatus" role="status" aria-live="polite" class="text-slate-300"></p>
+                            <a id="youtubeVideoLink" class="hidden text-rose-300 underline" target="_blank" rel="noopener noreferrer">Open video on YouTube</a>
+                        </div>
+                    </details>
 
                     <!-- Render button & Master Action Bar -->
                     <div class="mt-auto pt-1 flex flex-col gap-3">
@@ -1363,6 +1499,8 @@ limitations under the License.
         const VIDEO_SETTING_IDS = ['musicUrlInput', 'musicCookiesInput', 'cutStartInput', 'cutDurationInput',
             'videoTitleInput', 'titleFontSelect', 'titleFontSize', 'titleFirstLineColor',
             'titleOtherLinesColor', 'titleUppercase', 'visualEffects', 'introFadeToggle',
+            'mapZoomToggle', 'mapZoomX', 'mapZoomY', 'mapZoomCountry', 'mapZoomCountryKey',
+            'mapZoomScale', 'mapZoomStart', 'mapZoomDuration', 'mapZoomOutToggle', 'mapZoomOutDuration', 'revealCountryToggle', 'revealTimeInput', 'revealColorInput',
             'topLeftStickerSelect', 'topRightStickerSelect', 'subscribeBadgeToggle',
             'subscribeTextInput', 'subscribeDelayInput', 'watermarkTextInput',
             'watermarkFontSelect', 'watermarkColor', 'watermarkStarsToggle', 'codecSelect'];
@@ -1414,6 +1552,17 @@ limitations under the License.
                             input.value = input.maxLength > 0 ? normalized.slice(0, input.maxLength) : normalized;
                         }
                     });
+                    if (typeof saved.mapZoomCountryKey !== 'string') {
+                        const savedCountry = (document.getElementById('mapZoomCountry')?.value || '').trim();
+                        const keyEl = document.getElementById('mapZoomCountryKey');
+                        if (keyEl) {
+                            keyEl.value = (!savedCountry || savedCountry.toLowerCase() === 'custom point')
+                                ? ''
+                                : savedCountry.toLowerCase().replace(/\s+/g, '_');
+                        }
+                    }
+                    updateMapZoomUI();
+                    updateRevealUI();
                 }
             } catch (error) {
                 // Invalid or unavailable saved settings should not prevent opening the studio.
@@ -1444,13 +1593,15 @@ limitations under the License.
                 // A newer generated map wins. A manually selected or removed map
                 // remains the user's choice until another map is generated.
                 const map = latest && (!selected || latest.updatedAt > selected.updatedAt) ? latest : selected;
+                const isNewGeneratedMap = !!(map && map === latest);
                 if (map?.file && materialVersions.mapFileInput === 0) {
-                    const file = map === latest ? await prepareGeneratedMap(map.file) : map.file;
+                    const file = isNewGeneratedMap ? await prepareGeneratedMap(map.file) : map.file;
                     if (materialVersions.mapFileInput === 0) {
-                        acceptFile('mapFileInput', file, map === latest, map.topic);
-                        if (renderFiles.mapFileInput === file && !manualVideoTitle && typeof map.topic === 'string' && map.topic.trim()) {
+                        acceptFile('mapFileInput', file, isNewGeneratedMap, map.topic);
+                        if (renderFiles.mapFileInput === file && (isNewGeneratedMap || !manualVideoTitle) && typeof map.topic === 'string' && map.topic.trim()) {
                             const title = document.getElementById('videoTitleInput');
                             title.value = map.topic.trim().slice(0, title.maxLength);
+                            manualVideoTitle = false;
                             updateStageTitlePreview(title.value);
                             saveVideoSettings();
                         }
@@ -2157,6 +2308,18 @@ limitations under the License.
                 title_uppercase: document.getElementById('titleUppercase').checked,
                 visual_effects: document.getElementById('visualEffects').checked,
                 intro_fade: document.getElementById('introFadeToggle').checked,
+                zoom_enabled: document.getElementById('mapZoomToggle').checked,
+                zoom_x: Number(document.getElementById('mapZoomX').value || 0.80),
+                zoom_y: Number(document.getElementById('mapZoomY').value || 0.35),
+                zoom_country_key: (document.getElementById('mapZoomCountryKey')?.value || '').trim(),
+                zoom_scale: Number(document.getElementById('mapZoomScale').value || 2.0),
+                zoom_start: Number(document.getElementById('mapZoomStart').value || 1.5),
+                zoom_duration: Number(document.getElementById('mapZoomDuration').value || 2.5),
+                zoom_out_enabled: !!document.getElementById('mapZoomOutToggle')?.checked,
+                zoom_out_duration: Number(document.getElementById('mapZoomOutDuration')?.value || 2.0),
+                reveal_enabled: !!document.getElementById('mapZoomToggle')?.checked && !!document.getElementById('revealCountryToggle')?.checked,
+                reveal_time: Number(document.getElementById('revealTimeInput')?.value || 5.5),
+                reveal_color: document.getElementById('revealColorInput')?.value || '#000000',
                 top_left_sticker: document.getElementById('topLeftStickerSelect').value,
                 top_right_sticker: document.getElementById('topRightStickerSelect').value,
                 subscribe_badge: document.getElementById('subscribeBadgeToggle').checked,
@@ -2165,11 +2328,191 @@ limitations under the License.
             };
         }
 
+        let zoomCountriesCache = null;
+
+        async function loadZoomCountries() {
+            if (zoomCountriesCache) return zoomCountriesCache;
+            try {
+                const resp = await fetch('/api/zoom_countries');
+                if (resp.ok) zoomCountriesCache = await resp.json();
+            } catch {
+                // Fall back to direct click coordinates if country index fails to load.
+            }
+            return zoomCountriesCache;
+        }
+
+        function updateZoomOutUI() {
+            const enabled = !!document.getElementById('mapZoomOutToggle')?.checked;
+            const input = document.getElementById('mapZoomOutDuration');
+            const wrap = document.getElementById('mapZoomOutDurationWrap');
+            if (input) input.disabled = !enabled;
+            if (wrap) wrap.classList.toggle('opacity-50', !enabled);
+        }
+
+        function updateRevealUI(restart = false) {
+            const zoomEnabled = !!document.getElementById('mapZoomToggle')?.checked;
+            const enabled = zoomEnabled && !!document.getElementById('revealCountryToggle')?.checked;
+            const panel = document.getElementById('revealControlsPanel');
+            if (panel) panel.classList.toggle('hidden', !enabled);
+            if (restart && zoomEnabled) {
+                previewAnimTime = 0;
+                previewLastTs = null;
+            }
+            if (typeof syncPreviewAnimationLoop === 'function') {
+                syncPreviewAnimationLoop();
+            } else if (typeof renderPreviewFrame === 'function') {
+                renderPreviewFrame(previewAnimTime);
+            }
+        }
+
+        function updateMapZoomUI(restart = false) {
+            const enabled = !!document.getElementById('mapZoomToggle')?.checked;
+            const panel = document.getElementById('mapZoomPanel');
+            if (panel) panel.classList.toggle('hidden', !enabled);
+            if (enabled) loadZoomCountries();
+            updateZoomOutUI();
+            updateRevealUI(restart);
+            const pin = document.getElementById('zoomPickerPin');
+            const rawX = parseFloat(document.getElementById('mapZoomX')?.value);
+            const rawY = parseFloat(document.getElementById('mapZoomY')?.value);
+            const zx = Math.max(0, Math.min(1, Number.isFinite(rawX) ? rawX : 0.807));
+            const zy = Math.max(0, Math.min(1, Number.isFinite(rawY) ? rawY : 0.358));
+            if (pin) {
+                pin.style.left = `${(zx * 100).toFixed(1)}%`;
+                pin.style.top = `${(zy * 100).toFixed(1)}%`;
+            }
+            const countryName = (document.getElementById('mapZoomCountry')?.value || '').trim();
+            const labelEl = document.getElementById('zoomTargetCountry');
+            if (labelEl) {
+                const coordsText = `(${Math.round(zx * 100)}%, ${Math.round(zy * 100)}%)`;
+                labelEl.textContent = countryName ? `${countryName} ${coordsText}` : coordsText;
+            }
+        }
+
+        function setZoomTarget(x, y, countryName = '', countryKey = '') {
+            document.getElementById('mapZoomX').value = Number(x).toFixed(4);
+            document.getElementById('mapZoomY').value = Number(y).toFixed(4);
+            const countryEl = document.getElementById('mapZoomCountry');
+            if (countryEl) countryEl.value = countryName;
+            const keyEl = document.getElementById('mapZoomCountryKey');
+            if (keyEl) {
+                const normalizedName = (countryName || '').trim().toLowerCase();
+                keyEl.value = countryKey || (normalizedName === 'russia' ? 'russia' : '');
+            }
+            updateMapZoomUI(true);
+            saveVideoSettings();
+        }
+
+        let lastZoomPointerPos = null;
+
+        function resolveZoomTargetFromEvent(event) {
+            const img = document.getElementById('zoomPickerImg');
+            if (!img || img.classList.contains('hidden')) return null;
+            const rect = img.getBoundingClientRect();
+            if (!rect.width || !rect.height) return null;
+            const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+            const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+            const aspect = (img.naturalWidth && img.naturalHeight) ? (img.naturalWidth / img.naturalHeight) : 1.0;
+            const mapKind = aspect < 1.25 ? 'europe' : 'world';
+
+            if (event.ctrlKey) {
+                return { x, y, name: 'Custom point', key: '', mapKind };
+            }
+
+            const data = zoomCountriesCache;
+            const list = data ? data[mapKind] : null;
+            if (Array.isArray(list) && list.length) {
+                let best = null;
+                let bestDist = Infinity;
+                for (const c of list) {
+                    const dx = c.x - x;
+                    const dy = c.y - y;
+                    const dist = dx * dx + dy * dy;
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        best = c;
+                    }
+                }
+                if (best && bestDist <= 0.18 * 0.18) {
+                    const resolvedKey = best.key || ((best.name || '').trim().toLowerCase() === 'russia' ? 'russia' : '');
+                    return { x: best.x, y: best.y, name: best.name, key: resolvedKey, mapKind };
+                }
+            }
+            return { x, y, name: '', key: '', mapKind };
+        }
+
+        let lastHoverOutlineKey = '';
+        function hoverZoomPoint(event) {
+            lastZoomPointerPos = { clientX: event.clientX, clientY: event.clientY };
+            if (!zoomCountriesCache) {
+                loadZoomCountries().then(data => {
+                    if (data && lastZoomPointerPos) hoverZoomPoint({ ...lastZoomPointerPos, ctrlKey: !!event.ctrlKey });
+                });
+            }
+            const target = resolveZoomTargetFromEvent(event);
+            const hoverPin = document.getElementById('zoomHoverPin');
+            const hoverLabel = document.getElementById('zoomHoverLabel');
+            const hoverOutline = document.getElementById('zoomHoverOutline');
+            if (!target || !hoverPin || !hoverLabel) return;
+            const leftPct = `${(target.x * 100).toFixed(1)}%`;
+            const topPct = `${(target.y * 100).toFixed(1)}%`;
+            hoverPin.classList.toggle('transition-all', !event.ctrlKey);
+            hoverPin.classList.toggle('duration-75', !event.ctrlKey);
+            hoverPin.style.left = leftPct;
+            hoverPin.style.top = topPct;
+            hoverPin.classList.remove('hidden');
+
+            if (hoverOutline) {
+                if (target.key) {
+                    const outlineKey = `${target.mapKind}:${target.key}`;
+                    if (outlineKey !== lastHoverOutlineKey) {
+                        lastHoverOutlineKey = outlineKey;
+                        hoverOutline.src = `/api/zoom_country_outline?map=${encodeURIComponent(target.mapKind)}&key=${encodeURIComponent(target.key)}`;
+                    }
+                    hoverOutline.classList.remove('hidden');
+                } else {
+                    lastHoverOutlineKey = '';
+                    hoverOutline.classList.add('hidden');
+                }
+            }
+
+            if (target.name) {
+                hoverLabel.textContent = target.name;
+                hoverLabel.style.left = `${Math.max(14, Math.min(86, target.x * 100)).toFixed(1)}%`;
+                hoverLabel.style.top = `${Math.max(14, target.y * 100).toFixed(1)}%`;
+                hoverLabel.classList.remove('hidden');
+            } else {
+                hoverLabel.classList.add('hidden');
+            }
+        }
+
+        function clearZoomHover() {
+            lastZoomPointerPos = null;
+            lastHoverOutlineKey = '';
+            document.getElementById('zoomHoverPin')?.classList.add('hidden');
+            document.getElementById('zoomHoverLabel')?.classList.add('hidden');
+            document.getElementById('zoomHoverOutline')?.classList.add('hidden');
+        }
+
+        function pickZoomPoint(event) {
+            const target = resolveZoomTargetFromEvent(event);
+            if (!target) return;
+            setZoomTarget(target.x, target.y, target.name, target.key || '');
+        }
+
+        for (const evtName of ['keydown', 'keyup']) {
+            window.addEventListener(evtName, e => {
+                if (e.key === 'Control' && lastZoomPointerPos) {
+                    hoverZoomPoint({ ...lastZoomPointerPos, ctrlKey: e.ctrlKey });
+                }
+            });
+        }
+
         function fitStageMap() {
             const map = document.getElementById('stageMapPreview');
             const area = document.getElementById('stageMapArea');
             if (!map.naturalWidth || !map.naturalHeight) return;
-            const scale = Math.min(area.clientWidth / map.naturalWidth, area.clientHeight / map.naturalHeight) * 1.14;
+            const scale = Math.min(area.clientWidth / map.naturalWidth, area.clientHeight / map.naturalHeight);
             map.style.width = `${map.naturalWidth * scale}px`;
             map.style.height = `${map.naturalHeight * scale}px`;
         }
@@ -2177,11 +2520,14 @@ limitations under the License.
         function updatePreviewPlayback() {
             const bg = document.getElementById('stageBgPreview');
             const player = document.getElementById('renderedVideoPlayer');
-            if (previewVisible && !document.hidden && player.classList.contains('hidden') && bg.getAttribute('src')) {
-                bg.play().catch(() => {});
+            const liveActive = previewVisible && !document.hidden && player && player.classList.contains('hidden');
+            if (liveActive && bg.getAttribute('src')) {
+                if (previewAnimPlaying) bg.play().catch(() => {});
+                else bg.pause();
             } else {
                 bg.pause();
             }
+            syncPreviewAnimationLoop();
         }
 
         function showLiveComposite() {
@@ -2190,6 +2536,388 @@ limitations under the License.
             player.classList.add('hidden');
             document.getElementById('stageModeLabel').textContent = 'Live Frame Composite';
             updatePreviewPlayback();
+        }
+
+        let previewAnimPlaying = true;
+        let previewAnimTime = 0;
+        let previewLastTs = null;
+        let previewRafId = null;
+        const revealMaskCache = { key: '', silhouette: null, cx: 0.5, cy: 0.5, loadingKey: '' };
+
+        function smootherstep(u) {
+            const c = Math.max(0, Math.min(1, u));
+            return c * c * c * (c * (c * 6 - 15) + 10);
+        }
+
+        function formatPreviewClock(sec) {
+            const s = Math.max(0, Number(sec) || 0);
+            const mins = Math.floor(s / 60);
+            const rem = (s % 60).toFixed(1).padStart(4, '0');
+            return `${String(mins).padStart(2, '0')}:${rem}`;
+        }
+
+        function parseHexRgb(hexStr) {
+            const s = String(hexStr || '#000000').trim().replace(/^#/, '');
+            if (/^[0-9a-fA-F]{6}$/.test(s)) {
+                return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)];
+            }
+            if (/^[0-9a-fA-F]{3}$/.test(s)) {
+                return [parseInt(s[0] + s[0], 16), parseInt(s[1] + s[1], 16), parseInt(s[2] + s[2], 16)];
+            }
+            return [0, 0, 0];
+        }
+
+        function onRevealColorChange() {
+            const colorVal = document.getElementById('revealColorInput')?.value || '#000000';
+            const hexLabel = document.getElementById('revealColorHex');
+            if (hexLabel) hexLabel.textContent = colorVal.toLowerCase();
+            revealMaskCache.key = '';
+            revealMaskCache.loadingKey = '';
+            updateRevealUI();
+            saveVideoSettings();
+        }
+
+        function ensureRevealMaskLoaded() {
+            const map = document.getElementById('stageMapPreview');
+            if (!map || map.classList.contains('hidden') || !map.naturalWidth || !map.naturalHeight) return null;
+
+            const colorHex = (document.getElementById('revealColorInput')?.value || '#000000').toLowerCase();
+            const hexLabel = document.getElementById('revealColorHex');
+            if (hexLabel && hexLabel.textContent !== colorHex) hexLabel.textContent = colorHex;
+
+            const customDataUrl = (typeof window.revealMaskDataUrl === 'string' && window.revealMaskDataUrl) ? window.revealMaskDataUrl : '';
+            let maskKey = '';
+            let maskSrc = '';
+            if (customDataUrl) {
+                maskKey = `custom:${customDataUrl.slice(0, 64)}:${colorHex}`;
+                maskSrc = customDataUrl;
+            } else {
+                const aspect = map.naturalWidth / map.naturalHeight;
+                const mapKind = aspect < 1.25 ? 'europe' : 'world';
+                let countryKey = (document.getElementById('mapZoomCountryKey')?.value || '').trim();
+                if (!countryKey) {
+                    if (!zoomCountriesCache) {
+                        loadZoomCountries().then(() => renderPreviewFrame(previewAnimTime));
+                        return null;
+                    }
+                    const list = zoomCountriesCache[mapKind];
+                    const zx = parseFloat(document.getElementById('mapZoomX')?.value || '0.807');
+                    const zy = parseFloat(document.getElementById('mapZoomY')?.value || '0.358');
+                    if (Array.isArray(list) && list.length) {
+                        let best = null;
+                        let bestDist = Infinity;
+                        for (const c of list) {
+                            const d = (c.x - zx) ** 2 + (c.y - zy) ** 2;
+                            if (d < bestDist) {
+                                bestDist = d;
+                                best = c;
+                            }
+                        }
+                        if (best && bestDist <= 0.18 * 0.18) {
+                            countryKey = best.key || '';
+                            const keyEl = document.getElementById('mapZoomCountryKey');
+                            if (keyEl && countryKey) keyEl.value = countryKey;
+                        }
+                    }
+                }
+                if (!countryKey) return null;
+                maskKey = `${mapKind}:${countryKey}:${colorHex}`;
+                maskSrc = `/api/zoom_country_outline?map=${encodeURIComponent(mapKind)}&key=${encodeURIComponent(countryKey)}&solid=1`;
+            }
+
+            if (revealMaskCache.key === maskKey && revealMaskCache.silhouette) {
+                return revealMaskCache;
+            }
+            if (revealMaskCache.loadingKey === maskKey) {
+                return null;
+            }
+
+            const [cr, cg, cb] = parseHexRgb(colorHex);
+            revealMaskCache.loadingKey = maskKey;
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                if (revealMaskCache.loadingKey !== maskKey) return;
+                const w = img.naturalWidth || 1;
+                const h = img.naturalHeight || 1;
+                const off = document.createElement('canvas');
+                off.width = w;
+                off.height = h;
+                const octx = off.getContext('2d');
+                octx.drawImage(img, 0, 0, w, h);
+                const imgData = octx.getImageData(0, 0, w, h);
+                const data = imgData.data;
+                let sumX = 0;
+                let sumY = 0;
+                let count = 0;
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        const idx = (y * w + x) * 4;
+                        const a = data[idx + 3];
+                        if (a > 20) {
+                            data[idx] = cr;
+                            data[idx + 1] = cg;
+                            data[idx + 2] = cb;
+                            data[idx + 3] = 255;
+                            sumX += x;
+                            sumY += y;
+                            count++;
+                        } else {
+                            data[idx + 3] = 0;
+                        }
+                    }
+                }
+                octx.putImageData(imgData, 0, 0);
+                revealMaskCache.key = maskKey;
+                revealMaskCache.silhouette = off;
+                revealMaskCache.cx = count > 0 ? (sumX / count) / w : 0.5;
+                revealMaskCache.cy = count > 0 ? (sumY / count) / h : 0.5;
+                revealMaskCache.loadingKey = '';
+                renderPreviewFrame(previewAnimTime);
+            };
+            img.onerror = () => {
+                if (revealMaskCache.loadingKey === maskKey) revealMaskCache.loadingKey = '';
+            };
+            img.src = maskSrc;
+            return null;
+        }
+
+        function renderPreviewFrame(t) {
+            const stage = document.querySelector('.video-preview-stage');
+            const composite = document.getElementById('stageCompositeBox');
+            const player = document.getElementById('renderedVideoPlayer');
+            const veil = document.getElementById('stageIntroVeil');
+            const revealCanvas = document.getElementById('stageRevealCanvas');
+            const subBox = document.getElementById('stageSubscribeBanner');
+            const starsBox = document.getElementById('stageWatermarkStars');
+            const timeEl = document.getElementById('previewTimeIndicator');
+            const totalDur = getCutDuration();
+            const baseScale = stage && stage.clientWidth ? (stage.clientWidth / 1080) : 1;
+
+            if (timeEl) {
+                timeEl.textContent = `${formatPreviewClock(t)} / ${formatPreviewClock(totalDur)}`;
+            }
+
+            if (!player || !player.classList.contains('hidden')) {
+                if (composite) composite.style.transform = `scale(${baseScale})`;
+                if (veil) veil.classList.add('hidden');
+                if (revealCanvas) revealCanvas.classList.add('hidden');
+                if (subBox) subBox.style.opacity = '';
+                if (starsBox) starsBox.style.opacity = '';
+                return;
+            }
+
+            const introFade = !!document.getElementById('introFadeToggle')?.checked;
+            if (veil) {
+                if (introFade && t < 0.8) {
+                    veil.classList.remove('hidden');
+                    veil.style.opacity = String(Math.max(0, 1 - t / 0.8));
+                } else {
+                    veil.classList.add('hidden');
+                    veil.style.opacity = '0';
+                }
+            }
+
+            const subEnabled = !!document.getElementById('subscribeBadgeToggle')?.checked;
+            const subDelay = Number(document.getElementById('subscribeDelayInput')?.value || 2.5);
+            if (subBox) {
+                if (subEnabled && !subBox.classList.contains('hidden')) {
+                    subBox.style.opacity = String(t < subDelay ? 0 : Math.min(1, (t - subDelay) / 0.4));
+                } else {
+                    subBox.style.opacity = '';
+                }
+            }
+
+            const starsEnabled = !!document.getElementById('watermarkStarsToggle')?.checked;
+            if (starsBox) {
+                if (starsEnabled && !starsBox.classList.contains('hidden')) {
+                    starsBox.style.opacity = String(Math.min(1, Math.max(0, (t - 0.3) / 0.5)));
+                } else {
+                    starsBox.style.opacity = '';
+                }
+            }
+
+            const zoomEnabled = !!document.getElementById('mapZoomToggle')?.checked;
+            const revealEnabled = zoomEnabled && !!document.getElementById('revealCountryToggle')?.checked;
+            const zStartVal = Number(document.getElementById('mapZoomStart')?.value || 1.5);
+            const zDurVal = Math.max(0.1, Number(document.getElementById('mapZoomDuration')?.value || 2.5));
+            const rawRTime = Number(document.getElementById('revealTimeInput')?.value || 5.5);
+            const rTime = zoomEnabled ? Math.max(zStartVal + zDurVal + 0.5, rawRTime) : Math.max(0.2, rawRTime);
+            const map = document.getElementById('stageMapPreview');
+            const area = document.getElementById('stageMapArea');
+
+            let s = 1;
+            let tx = 0;
+            let ty = 0;
+            if (zoomEnabled) {
+                const rawX = parseFloat(document.getElementById('mapZoomX')?.value);
+                const rawY = parseFloat(document.getElementById('mapZoomY')?.value);
+                const zx = Math.max(0, Math.min(1, Number.isFinite(rawX) ? rawX : 0.80));
+                const zy = Math.max(0, Math.min(1, Number.isFinite(rawY) ? rawY : 0.35));
+                const targetScale = Math.max(1, Number(document.getElementById('mapZoomScale')?.value || 2.0));
+                const zStart = Number(document.getElementById('mapZoomStart')?.value || 1.5);
+                const zDur = Math.max(0.1, Number(document.getElementById('mapZoomDuration')?.value || 2.5));
+                const zEnd = zStart + zDur;
+                const zOutEnabled = !!document.getElementById('mapZoomOutToggle')?.checked;
+                const zOutDur = Math.max(0.1, Number(document.getElementById('mapZoomOutDuration')?.value || 2.0));
+                const zOutStart = Math.max(zEnd, totalDur - zOutDur);
+
+                let ease = 0;
+                if (t >= zStart && t < zEnd) {
+                    ease = smootherstep((t - zStart) / zDur);
+                } else if (t >= zEnd) {
+                    ease = (zOutEnabled && t >= zOutStart) ? (1 - smootherstep((t - zOutStart) / zOutDur)) : 1;
+                }
+                s = 1 + (targetScale - 1) * ease;
+                const targetX = (map && map.offsetWidth > 0 && area)
+                    ? (area.offsetLeft + map.offsetLeft + zx * map.offsetWidth)
+                    : (zx * 1080);
+                const targetY = (map && map.offsetHeight > 0 && area)
+                    ? (area.offsetTop + map.offsetTop + zy * map.offsetHeight)
+                    : (zy * 1920);
+                tx = Math.min(0, Math.max(1080 * (1 - s), 540 - targetX * s));
+                ty = Math.min(0, Math.max(1920 * (1 - s), 960 - targetY * s));
+            }
+
+            let shakeX = 0;
+            let shakeY = 0;
+            if (revealEnabled && t >= rTime && t < rTime + 0.5) {
+                const dt = t - rTime;
+                const decay = Math.exp(-dt * 9.0) * (1 - dt / 0.5);
+                const amp = 18 * decay;
+                shakeX = Math.sin(dt * 55) * amp;
+                shakeY = Math.cos(dt * 47) * amp * 0.7;
+            }
+
+            if (composite) {
+                composite.style.transform = `scale(${baseScale}) translate3d(${(tx + shakeX).toFixed(2)}px, ${(ty + shakeY).toFixed(2)}px, 0) scale(${s.toFixed(4)})`;
+            }
+
+            const fadeDur = 0.25;
+            const mask = revealEnabled ? ensureRevealMaskLoaded() : null;
+            if (revealCanvas && revealEnabled && mask && mask.silhouette && map && !map.classList.contains('hidden') && map.offsetWidth > 0 && area && t < rTime + fadeDur) {
+                revealCanvas.classList.remove('hidden');
+                const aw = Math.max(1, area.clientWidth);
+                const ah = Math.max(1, area.clientHeight);
+                if (revealCanvas.width !== aw) revealCanvas.width = aw;
+                if (revealCanvas.height !== ah) revealCanvas.height = ah;
+                const ctx = revealCanvas.getContext('2d');
+                ctx.clearRect(0, 0, aw, ah);
+                const alpha = t < rTime ? 1.0 : Math.max(0, 1 - (t - rTime) / fadeDur);
+                const mx = map.offsetLeft;
+                const my = map.offsetTop;
+                const mw = map.offsetWidth;
+                const mh = map.offsetHeight;
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.drawImage(mask.silhouette, mx, my, mw, mh);
+                if (t < rTime) {
+                    const dotCount = t < rTime * 0.30 ? 1 : (t < rTime * 0.60 ? 2 : 3);
+                    const cx = mx + mask.cx * mw;
+                    const cy = my + mask.cy * mh;
+                    const r = Math.max(5, Math.min(11, mw * 0.011));
+                    const gap = r * 2.8;
+                    const startX = cx - ((dotCount - 1) * gap) / 2;
+                    const [cr, cg, cb] = parseHexRgb(document.getElementById('revealColorInput')?.value || '#000000');
+                    const isLightCover = (0.299 * cr + 0.587 * cg + 0.114 * cb) > 175;
+                    for (let i = 0; i < dotCount; i++) {
+                        const dx = startX + i * gap;
+                        ctx.beginPath();
+                        ctx.arc(dx, cy, r, 0, Math.PI * 2);
+                        ctx.fillStyle = isLightCover ? '#0f172a' : '#ffffff';
+                        ctx.shadowColor = isLightCover ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.75)';
+                        ctx.shadowBlur = 8;
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = isLightCover ? 'rgba(255,255,255,0.85)' : 'rgba(15,23,42,0.85)';
+                        ctx.stroke();
+                    }
+                }
+                ctx.restore();
+            } else if (revealCanvas) {
+                revealCanvas.classList.add('hidden');
+            }
+        }
+
+        function syncPreviewTransportUI() {
+            const icon = document.getElementById('previewPlayPauseIcon');
+            const label = document.getElementById('previewPlayPauseLabel');
+            const bar = document.getElementById('previewPlaybackBar');
+            const player = document.getElementById('renderedVideoPlayer');
+            const mp4Active = player && !player.classList.contains('hidden');
+            if (icon) icon.className = previewAnimPlaying ? 'fa-solid fa-pause text-[10px]' : 'fa-solid fa-play text-[10px]';
+            if (label) label.textContent = previewAnimPlaying ? 'Pause' : 'Play';
+            if (bar) bar.classList.toggle('opacity-40', !!mp4Active);
+        }
+
+        function stepPreviewAnimation(ts) {
+            const player = document.getElementById('renderedVideoPlayer');
+            if (!previewAnimPlaying || !previewVisible || document.hidden || !player || !player.classList.contains('hidden')) {
+                previewRafId = null;
+                previewLastTs = null;
+                renderPreviewFrame(previewAnimTime);
+                return;
+            }
+            if (previewLastTs !== null) {
+                const dt = Math.min(0.1, Math.max(0, (ts - previewLastTs) / 1000));
+                const dur = getCutDuration();
+                previewAnimTime = (previewAnimTime + dt) % Math.max(0.5, dur);
+            }
+            previewLastTs = ts;
+            renderPreviewFrame(previewAnimTime);
+            previewRafId = requestAnimationFrame(stepPreviewAnimation);
+        }
+
+        function hasActivePreviewAnimations() {
+            const zoomEnabled = !!document.getElementById('mapZoomToggle')?.checked;
+            return !!(
+                document.getElementById('introFadeToggle')?.checked
+                || document.getElementById('subscribeBadgeToggle')?.checked
+                || document.getElementById('watermarkStarsToggle')?.checked
+                || zoomEnabled
+            );
+        }
+
+        function syncPreviewAnimationLoop() {
+            syncPreviewTransportUI();
+            const player = document.getElementById('renderedVideoPlayer');
+            const hasAnims = hasActivePreviewAnimations();
+            const shouldRun = hasAnims && previewAnimPlaying && previewVisible && !document.hidden && player && player.classList.contains('hidden');
+            if (shouldRun && previewRafId === null) {
+                previewLastTs = null;
+                previewRafId = requestAnimationFrame(stepPreviewAnimation);
+            } else if (!shouldRun) {
+                if (previewRafId !== null) {
+                    cancelAnimationFrame(previewRafId);
+                    previewRafId = null;
+                }
+                previewLastTs = null;
+                if (!hasAnims) previewAnimTime = 0;
+            }
+            // Apply edits immediately, including while a RAF is already scheduled.
+            renderPreviewFrame(previewAnimTime);
+        }
+
+        function togglePreviewAnimation() {
+            const player = document.getElementById('renderedVideoPlayer');
+            if (player && !player.classList.contains('hidden')) return;
+            previewAnimPlaying = !previewAnimPlaying;
+            updatePreviewPlayback();
+        }
+
+        function restartPreviewAnimation() {
+            const player = document.getElementById('renderedVideoPlayer');
+            if (player && !player.classList.contains('hidden')) return;
+            previewAnimTime = 0;
+            previewLastTs = null;
+            const bg = document.getElementById('stageBgPreview');
+            if (bg && bg.getAttribute('src')) {
+                try { bg.currentTime = 0; } catch {}
+            }
+            previewAnimPlaying = true;
+            updatePreviewPlayback();
+            renderPreviewFrame(0);
         }
 
         function updateTitleStyle() {
@@ -3367,8 +4095,15 @@ limitations under the License.
             materialPreviewUrls[inputId] = file ? URL.createObjectURL(file) : null;
 
             if (inputId === 'mapFileInput') {
+                const zoomImg = document.getElementById('zoomPickerImg');
+                const zoomPlaceholder = document.getElementById('zoomPickerPlaceholder');
                 if (file) {
                     const url = materialPreviewUrls[inputId];
+                    if (zoomImg) {
+                        zoomImg.src = url;
+                        zoomImg.classList.remove('hidden');
+                    }
+                    if (zoomPlaceholder) zoomPlaceholder.classList.add('hidden');
                     if (stageMap) {
                         stageMap.onload = fitStageMap;
                         stageMap.src = url;
@@ -3380,6 +4115,11 @@ limitations under the License.
                         mapThumbIcon.classList.add('hidden');
                     }
                 } else {
+                    if (zoomImg) {
+                        zoomImg.removeAttribute('src');
+                        zoomImg.classList.add('hidden');
+                    }
+                    if (zoomPlaceholder) zoomPlaceholder.classList.remove('hidden');
                     if (stageMap) {
                         stageMap.src = '';
                         stageMap.classList.add('hidden');
@@ -3495,7 +4235,15 @@ limitations under the License.
                 return;
             }
 
+            let youtube = null;
+            if (document.getElementById('youtubeAuto').checked) {
+                try {
+                    if (!youtubeConnected) throw new Error('Connect your YouTube account first.');
+                    youtube = youtubeSettings();
+                } catch (error) { showToast(error.message, 'error'); return; }
+            }
             renderResultData = null;
+            document.getElementById('youtubeUpload').disabled = true;
             btn.disabled = true;
             btn.classList.add('opacity-70');
             btnText.textContent = "Rendering...";
@@ -3524,6 +4272,7 @@ limitations under the License.
                     duration: parseInt(durationSecs, 10),
                     ...overlaySettings,
                     render_id: renderId,
+                    ...(youtube ? {youtube} : {}),
                 };
                 const audioSource = includeAudio ? (cutAudioFile || musicAudioFile) : null;
                 const formData = new FormData();
@@ -3546,6 +4295,7 @@ limitations under the License.
                 stopProgress = startRenderProgress(renderId);
                 const response = await fetch('/api/render_video', {
                     method: 'POST',
+                    headers: youtube ? {'X-YouTube-CSRF': youtubeCsrf} : {},
                     body: formData,
                 });
 
@@ -3564,6 +4314,12 @@ limitations under the License.
                 stopProgress();
                 setRenderProgress(100, 'Complete');
                 renderResultData = result;
+                document.getElementById('youtubeUpload').disabled = !result.upload_token;
+                if (result.youtube_job_id) watchYouTubeUpload(result.youtube_job_id);
+                if (result.youtube_error) {
+                    document.getElementById('youtubeUploadStatus').textContent = result.youtube_error;
+                    showToast(result.youtube_error, 'warn');
+                }
                 const filePath = result.file_path || result.path || result.file || '(unknown path)';
 
                 const resultBox = document.getElementById('renderResult');
@@ -3587,8 +4343,13 @@ limitations under the License.
                 }
 
                 logToConsole(`[Success] Video rendered: ${filePath}`, 'success');
+                if (result.warning) {
+                    logToConsole(`[Warning] ${result.warning}`, 'warn');
+                    showToast(result.warning, 'warn');
+                } else {
+                    showToast(result.has_audio ? 'Video rendered with music! Click Download video.' : 'Video rendered without music.', 'success');
+                }
                 metaBadge.textContent = `Done (${new Date().toLocaleTimeString()})`;
-                showToast(result.has_audio ? 'Video rendered with music! Click Download video.' : 'Video rendered without music.', 'success');
             } catch (error) {
                 logToConsole(`[API Error] ${error.message}`, 'error');
                 showToast(error.message || "Video render failed. Check console logs.", 'error');
@@ -3635,16 +4396,19 @@ limitations under the License.
                 if (VIDEO_SETTING_IDS.includes(event.target.id)) saveVideoSettings();
             }));
             const stage = document.querySelector('.video-preview-stage');
-            const composite = document.getElementById('stageCompositeBox');
             new ResizeObserver(() => {
-                composite.style.transform = `scale(${stage.clientWidth / 1080})`;
+                renderPreviewFrame(previewAnimTime);
             }).observe(stage);
-            new ResizeObserver(fitStageMap).observe(document.getElementById('stageMapArea'));
+            new ResizeObserver(() => {
+                fitStageMap();
+                renderPreviewFrame(previewAnimTime);
+            }).observe(document.getElementById('stageMapArea'));
             new IntersectionObserver(([entry]) => {
                 previewVisible = entry.isIntersecting;
                 updatePreviewPlayback();
             }).observe(stage);
             document.addEventListener('visibilitychange', updatePreviewPlayback);
+            syncPreviewAnimationLoop();
             window.addEventListener('pagehide', (event) => {
                 // Keep blob URLs alive when the browser caches this page for Back.
                 if (event.persisted) return;
@@ -3686,5 +4450,6 @@ limitations under the License.
             }, 3000);
         }
     </script>
+    <script src="{{ url_for('static', filename='youtube-upload.js') }}"></script>
 </body>
 </html>

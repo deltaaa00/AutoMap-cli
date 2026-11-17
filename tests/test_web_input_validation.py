@@ -15,19 +15,19 @@
 """Malformed client requests and interrupted downloads stay controlled."""
 from unittest.mock import Mock
 
-import pytest
 
-
-@pytest.mark.parametrize('path', [
-    '/api/generate', '/api/generate_batch', '/api/analyze_map', '/api/restyle_map',
-    '/api/music_download', '/api/music_cut', '/api/render_video', '/api/models',
-    '/api/video_title_preview',
-])
-@pytest.mark.parametrize('body', ['[1]', '"text"', '12', 'null', '{broken'])
-def test_non_object_json_is_a_client_error(web, path, body):
-    response = web.app.test_client().post(path, data=body, content_type='application/json')
-    assert response.status_code == 400
-    assert response.json['status'] == 'error'
+def test_non_object_json_is_a_client_error(web):
+    client = web.app.test_client()
+    paths = (
+        '/api/generate', '/api/generate_batch', '/api/analyze_map', '/api/restyle_map',
+        '/api/music_download', '/api/music_cut', '/api/render_video', '/api/models',
+        '/api/video_title_preview',
+    )
+    for path in paths:
+        for body in ('[1]', '"text"', '12', 'null', '{broken'):
+            response = client.post(path, data=body, content_type='application/json')
+            assert response.status_code == 400, (path, body)
+            assert response.json['status'] == 'error', (path, body)
 
 
 def test_upload_limit_returns_json(web):
@@ -38,22 +38,24 @@ def test_upload_limit_returns_json(web):
     assert response.json['status'] == 'error'
 
 
-@pytest.mark.parametrize('path,field', [('/api/generate', 'api_key'), ('/api/music_download', 'url')])
-@pytest.mark.parametrize('value', [42, True, ['value'], {'value': 'text'}])
-def test_invalid_string_fields_are_client_errors(web, path, field, value):
-    response = web.app.test_client().post(path, json={field: value})
-    assert response.status_code == 400
-    assert field in response.json['error']
+def test_invalid_string_fields_are_client_errors(web):
+    client = web.app.test_client()
+    for path, field in (('/api/generate', 'api_key'), ('/api/music_download', 'url')):
+        for value in (42, True, ['value'], {'value': 'text'}):
+            response = client.post(path, json={field: value})
+            assert response.status_code == 400, (path, field, value)
+            assert field in response.json['error'], (path, field, value)
 
 
-@pytest.mark.parametrize('status', [200, 404])
-def test_video_proxy_releases_connection(web, monkeypatch, status):
-    upstream = Mock(status_code=status, headers={'Content-Type': 'application/json'})
-    upstream.json.return_value = {'error': 'missing'}
-    upstream.iter_content.return_value = iter([b'video'])
-    monkeypatch.setattr(web.requests, 'get', Mock(return_value=upstream))
-    response = web.app.test_client().get('/api/download_video?path=clip.mp4', buffered=True)
-    assert response.status_code == status
-    if status == 200:
-        assert response.data == b'video'
-    assert upstream.close.called
+def test_video_proxy_releases_connection(web, monkeypatch):
+    client = web.app.test_client()
+    for status in (200, 404):
+        upstream = Mock(status_code=status, headers={'Content-Type': 'application/json'})
+        upstream.json.return_value = {'error': 'missing'}
+        upstream.iter_content.return_value = iter([b'video'])
+        monkeypatch.setattr(web.requests, 'get', Mock(return_value=upstream))
+        response = client.get('/api/download_video?path=clip.mp4', buffered=True)
+        assert response.status_code == status
+        if status == 200:
+            assert response.data == b'video'
+        assert upstream.close.called
