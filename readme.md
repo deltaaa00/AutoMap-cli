@@ -333,13 +333,19 @@ if png is not None:
 | --- | --- |
 | `GEMINI_API_KEY` | Server key for Gemini/Gemma models |
 | `DEEPSEEK_API_KEY` | Server key for DeepSeek models |
-| `SERVER` | Exact `TRUE` enables Waitress and web authentication |
+| `SERVER` | Defaults to local mode (`FALSE`). Exact `TRUE` enables Waitress and web authentication |
 | `WEB_LOGIN` | Login name; default `deltaaa` |
 | `WEB_PASSWORD` | Login password; default `deltaaa00!` |
 | `WEB_SECRET_KEY` | Optional stable session-signing secret |
 | `WEB_AUTH_SECRET_FILE` | Native deployment override for the generated secret file |
 | `PORT` | Native service port; web default `5000`, worker default `8080` |
-| `YTDLP_URL` | Web-to-worker URL; default `http://yt-dlp-worker:8080` |
+| `YTDLP_URL` | Native default `http://127.0.0.1:8080`; Docker Compose sets `http://yt-dlp-worker:8080` |
+
+Local mode is enabled by default, including in `example.env`. Its YouTube callback
+uses the current local host and port (`localhost:3000` with Compose, or
+`localhost:5000` for a native web launch), ignoring a leftover hosted callback.
+The server keeps `SERVER=TRUE` and its public `YOUTUBE_REDIRECT_URI` in its own
+`.env`; these deployment values survive GitHub Actions updates.
 
 Login sessions are valid for up to a year. Changing the credentials or signing secret invalidates existing sessions. Without `WEB_SECRET_KEY`, a secret is generated in `instance/web-session-secret`; keep that file across native restarts or retain the Compose session volume. For Compose, add an explicit environment entry to use `WEB_AUTH_SECRET_FILE`. Compose already fixes `YTDLP_URL` to the private worker address; edit that entry only if you change the service layout.
 
