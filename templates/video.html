@@ -253,6 +253,7 @@ limitations under the License.
         }
         .codec-card:disabled { opacity: .4; cursor: not-allowed; }
         #stageMapArea {
+            position: relative;
             display: flex;
             flex: 1;
             min-height: 0;
@@ -1340,6 +1341,7 @@ limitations under the License.
                                 </div>
                                 <div id="stageMapArea">
                                     <img id="stageMapPreview" alt="Map frame preview" class="hidden object-contain">
+                                    <canvas id="stageRevealCanvas" class="hidden pointer-events-none absolute inset-0 w-full h-full z-10"></canvas>
                                     <div id="stageEmptyPlaceholder" class="flex flex-col items-center gap-2 text-slate-500">
                                         <div class="w-12 h-12 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-center text-slate-400 shadow-inner">
                                             <i class="fa-solid fa-photo-film text-xl text-indigo-400/80"></i>
@@ -1353,9 +1355,29 @@ limitations under the License.
                                 <div id="stageWatermarkStars" class="hidden"></div>
                             </div>
 
+                            <!-- Intro Fade Veil -->
+                            <div id="stageIntroVeil" class="hidden pointer-events-none absolute inset-0 z-[15] bg-black"></div>
+
                             <!-- Watermarks share the same 1080×1920 coordinate space as the map. -->
                             <!-- Rendered Final Video Player (revealed when /api/render_video succeeds) -->
                             <video id="renderedVideoPlayer" class="hidden absolute inset-0 z-20 w-full h-full object-contain bg-black" controls playsinline></video>
+                        </div>
+
+                        <!-- Live Animation Transport Bar -->
+                        <div id="previewPlaybackBar" class="relative z-10 mt-2.5 flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/85 border border-slate-800/90 text-[11px] font-mono">
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" id="previewPlayPauseBtn" onclick="togglePreviewAnimation()"
+                                    class="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 transition flex items-center gap-1.5">
+                                    <i id="previewPlayPauseIcon" class="fa-solid fa-pause text-[10px]"></i>
+                                    <span id="previewPlayPauseLabel">Pause</span>
+                                </button>
+                                <button type="button" id="previewRestartBtn" onclick="restartPreviewAnimation()"
+                                    class="px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1" title="Restart preview animation">
+                                    <i class="fa-solid fa-rotate-left text-[10px]"></i>
+                                    <span>Restart</span>
+                                </button>
+                            </div>
+                            <span id="previewTimeIndicator" class="text-slate-300 tabular-nums">00:00.0 / 00:08.0</span>
                         </div>
                     </div>
 
@@ -2284,6 +2306,7 @@ limitations under the License.
             const enabled = !!document.getElementById('revealCountryToggle')?.checked;
             const panel = document.getElementById('revealControlsPanel');
             if (panel) panel.classList.toggle('hidden', !enabled);
+            if (typeof renderPreviewFrame === 'function') renderPreviewFrame(previewAnimTime);
         }
 
         function updateMapZoomUI() {
@@ -2441,11 +2464,14 @@ limitations under the License.
         function updatePreviewPlayback() {
             const bg = document.getElementById('stageBgPreview');
             const player = document.getElementById('renderedVideoPlayer');
-            if (previewVisible && !document.hidden && player.classList.contains('hidden') && bg.getAttribute('src')) {
-                bg.play().catch(() => {});
+            const liveActive = previewVisible && !document.hidden && player && player.classList.contains('hidden');
+            if (liveActive && bg.getAttribute('src')) {
+                if (previewAnimPlaying) bg.play().catch(() => {});
+                else bg.pause();
             } else {
                 bg.pause();
             }
+            syncPreviewAnimationLoop();
         }
 
         function showLiveComposite() {
@@ -2454,6 +2480,319 @@ limitations under the License.
             player.classList.add('hidden');
             document.getElementById('stageModeLabel').textContent = 'Live Frame Composite';
             updatePreviewPlayback();
+        }
+
+        let previewAnimPlaying = true;
+        let previewAnimTime = 0;
+        let previewLastTs = null;
+        let previewRafId = null;
+        const revealMaskCache = { key: '', silhouette: null, cx: 0.5, cy: 0.5, loadingKey: '' };
+
+        function smootherstep(u) {
+            const c = Math.max(0, Math.min(1, u));
+            return c * c * c * (c * (c * 6 - 15) + 10);
+        }
+
+        function formatPreviewClock(sec) {
+            const s = Math.max(0, Number(sec) || 0);
+            const mins = Math.floor(s / 60);
+            const rem = (s % 60).toFixed(1).padStart(4, '0');
+            return `${String(mins).padStart(2, '0')}:${rem}`;
+        }
+
+        function ensureRevealMaskLoaded() {
+            const map = document.getElementById('stageMapPreview');
+            if (!map || map.classList.contains('hidden') || !map.naturalWidth || !map.naturalHeight) return null;
+
+            const customDataUrl = (typeof window.revealMaskDataUrl === 'string' && window.revealMaskDataUrl) ? window.revealMaskDataUrl : '';
+            let maskKey = '';
+            let maskSrc = '';
+            if (customDataUrl) {
+                maskKey = `custom:${customDataUrl.slice(0, 64)}`;
+                maskSrc = customDataUrl;
+            } else {
+                const countryKey = (document.getElementById('mapZoomCountryKey')?.value || '').trim();
+                if (!countryKey) return null;
+                const aspect = map.naturalWidth / map.naturalHeight;
+                const mapKind = aspect < 1.25 ? 'europe' : 'world';
+                maskKey = `${mapKind}:${countryKey}`;
+                maskSrc = `/api/zoom_country_outline?map=${encodeURIComponent(mapKind)}&key=${encodeURIComponent(countryKey)}`;
+            }
+
+            if (revealMaskCache.key === maskKey && revealMaskCache.silhouette) {
+                return revealMaskCache;
+            }
+            if (revealMaskCache.loadingKey === maskKey) {
+                return null;
+            }
+
+            revealMaskCache.loadingKey = maskKey;
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                if (revealMaskCache.loadingKey !== maskKey) return;
+                const w = img.naturalWidth || 1;
+                const h = img.naturalHeight || 1;
+                const off = document.createElement('canvas');
+                off.width = w;
+                off.height = h;
+                const octx = off.getContext('2d');
+                octx.drawImage(img, 0, 0, w, h);
+                const imgData = octx.getImageData(0, 0, w, h);
+                const data = imgData.data;
+                let sumX = 0;
+                let sumY = 0;
+                let count = 0;
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        const idx = (y * w + x) * 4;
+                        const a = data[idx + 3];
+                        if (a > 20) {
+                            data[idx] = 14;
+                            data[idx + 1] = 14;
+                            data[idx + 2] = 22;
+                            data[idx + 3] = Math.round(a * 0.95);
+                            sumX += x;
+                            sumY += y;
+                            count++;
+                        } else {
+                            data[idx + 3] = 0;
+                        }
+                    }
+                }
+                octx.putImageData(imgData, 0, 0);
+                revealMaskCache.key = maskKey;
+                revealMaskCache.silhouette = off;
+                revealMaskCache.cx = count > 0 ? (sumX / count) / w : 0.5;
+                revealMaskCache.cy = count > 0 ? (sumY / count) / h : 0.5;
+                revealMaskCache.loadingKey = '';
+                renderPreviewFrame(previewAnimTime);
+            };
+            img.onerror = () => {
+                if (revealMaskCache.loadingKey === maskKey) revealMaskCache.loadingKey = '';
+            };
+            img.src = maskSrc;
+            return null;
+        }
+
+        function renderPreviewFrame(t) {
+            const stage = document.querySelector('.video-preview-stage');
+            const composite = document.getElementById('stageCompositeBox');
+            const player = document.getElementById('renderedVideoPlayer');
+            const veil = document.getElementById('stageIntroVeil');
+            const revealCanvas = document.getElementById('stageRevealCanvas');
+            const subBox = document.getElementById('stageSubscribeBanner');
+            const starsBox = document.getElementById('stageWatermarkStars');
+            const timeEl = document.getElementById('previewTimeIndicator');
+            const totalDur = getCutDuration();
+            const baseScale = stage && stage.clientWidth ? (stage.clientWidth / 1080) : 1;
+
+            if (timeEl) {
+                timeEl.textContent = `${formatPreviewClock(t)} / ${formatPreviewClock(totalDur)}`;
+            }
+
+            if (!player || !player.classList.contains('hidden')) {
+                if (composite) composite.style.transform = `scale(${baseScale})`;
+                if (veil) veil.classList.add('hidden');
+                if (revealCanvas) revealCanvas.classList.add('hidden');
+                if (subBox) subBox.style.opacity = '';
+                if (starsBox) starsBox.style.opacity = '';
+                return;
+            }
+
+            const introFade = !!document.getElementById('introFadeToggle')?.checked;
+            if (veil) {
+                if (introFade && t < 0.8) {
+                    veil.classList.remove('hidden');
+                    veil.style.opacity = String(Math.max(0, 1 - t / 0.8));
+                } else {
+                    veil.classList.add('hidden');
+                    veil.style.opacity = '0';
+                }
+            }
+
+            const subEnabled = !!document.getElementById('subscribeBadgeToggle')?.checked;
+            const subDelay = Number(document.getElementById('subscribeDelayInput')?.value || 2.5);
+            if (subBox) {
+                if (subEnabled && !subBox.classList.contains('hidden')) {
+                    subBox.style.opacity = String(t < subDelay ? 0 : Math.min(1, (t - subDelay) / 0.4));
+                } else {
+                    subBox.style.opacity = '';
+                }
+            }
+
+            const starsEnabled = !!document.getElementById('watermarkStarsToggle')?.checked;
+            if (starsBox) {
+                if (starsEnabled && !starsBox.classList.contains('hidden')) {
+                    starsBox.style.opacity = String(Math.min(1, Math.max(0, (t - 0.3) / 0.5)));
+                } else {
+                    starsBox.style.opacity = '';
+                }
+            }
+
+            const zoomEnabled = !!document.getElementById('mapZoomToggle')?.checked;
+            const revealEnabled = !!document.getElementById('revealCountryToggle')?.checked;
+            const rTime = Number(document.getElementById('revealTimeInput')?.value || 5.5);
+            const map = document.getElementById('stageMapPreview');
+            const area = document.getElementById('stageMapArea');
+
+            let s = 1;
+            let tx = 0;
+            let ty = 0;
+            if (zoomEnabled) {
+                const rawX = parseFloat(document.getElementById('mapZoomX')?.value);
+                const rawY = parseFloat(document.getElementById('mapZoomY')?.value);
+                const zx = Math.max(0, Math.min(1, Number.isFinite(rawX) ? rawX : 0.80));
+                const zy = Math.max(0, Math.min(1, Number.isFinite(rawY) ? rawY : 0.35));
+                const targetScale = Math.max(1, Number(document.getElementById('mapZoomScale')?.value || 2.0));
+                const zStart = Number(document.getElementById('mapZoomStart')?.value || 1.5);
+                const zDur = Math.max(0.1, Number(document.getElementById('mapZoomDuration')?.value || 2.5));
+                const zEnd = zStart + zDur;
+                const zOutEnabled = !!document.getElementById('mapZoomOutToggle')?.checked;
+                const zOutDur = Math.max(0.1, Number(document.getElementById('mapZoomOutDuration')?.value || 2.0));
+                const zOutStart = Math.max(zEnd, totalDur - zOutDur);
+
+                let ease = 0;
+                if (t >= zStart && t < zEnd) {
+                    ease = smootherstep((t - zStart) / zDur);
+                } else if (t >= zEnd) {
+                    ease = (zOutEnabled && t >= zOutStart) ? (1 - smootherstep((t - zOutStart) / zOutDur)) : 1;
+                }
+                s = 1 + (targetScale - 1) * ease;
+                const targetX = (map && map.offsetWidth > 0 && area)
+                    ? (area.offsetLeft + map.offsetLeft + zx * map.offsetWidth)
+                    : (zx * 1080);
+                const targetY = (map && map.offsetHeight > 0 && area)
+                    ? (area.offsetTop + map.offsetTop + zy * map.offsetHeight)
+                    : (zy * 1920);
+                tx = Math.min(0, Math.max(1080 * (1 - s), 540 - targetX * s));
+                ty = Math.min(0, Math.max(1920 * (1 - s), 960 - targetY * s));
+            }
+
+            let shakeX = 0;
+            let shakeY = 0;
+            if (revealEnabled && t >= rTime && t < rTime + 0.5) {
+                const dt = t - rTime;
+                const decay = Math.exp(-dt * 9.0) * (1 - dt / 0.5);
+                const amp = 18 * decay;
+                shakeX = Math.sin(dt * 55) * amp;
+                shakeY = Math.cos(dt * 47) * amp * 0.7;
+            }
+
+            if (composite) {
+                composite.style.transform = `scale(${baseScale}) translate3d(${(tx + shakeX).toFixed(2)}px, ${(ty + shakeY).toFixed(2)}px, 0) scale(${s.toFixed(4)})`;
+            }
+
+            const fadeDur = 0.25;
+            const mask = revealEnabled ? ensureRevealMaskLoaded() : null;
+            if (revealCanvas && revealEnabled && mask && mask.silhouette && map && !map.classList.contains('hidden') && map.offsetWidth > 0 && area && t < rTime + fadeDur) {
+                revealCanvas.classList.remove('hidden');
+                const aw = Math.max(1, area.clientWidth);
+                const ah = Math.max(1, area.clientHeight);
+                if (revealCanvas.width !== aw) revealCanvas.width = aw;
+                if (revealCanvas.height !== ah) revealCanvas.height = ah;
+                const ctx = revealCanvas.getContext('2d');
+                ctx.clearRect(0, 0, aw, ah);
+                const alpha = t < rTime ? 1.0 : Math.max(0, 1 - (t - rTime) / fadeDur);
+                const mx = map.offsetLeft;
+                const my = map.offsetTop;
+                const mw = map.offsetWidth;
+                const mh = map.offsetHeight;
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.drawImage(mask.silhouette, mx, my, mw, mh);
+                if (t < rTime) {
+                    const dotCount = t < rTime * 0.30 ? 1 : (t < rTime * 0.60 ? 2 : 3);
+                    const cx = mx + mask.cx * mw;
+                    const cy = my + mask.cy * mh;
+                    const r = Math.max(5, Math.min(11, mw * 0.011));
+                    const gap = r * 2.8;
+                    const startX = cx - ((dotCount - 1) * gap) / 2;
+                    for (let i = 0; i < dotCount; i++) {
+                        const dx = startX + i * gap;
+                        ctx.beginPath();
+                        ctx.arc(dx, cy, r, 0, Math.PI * 2);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.shadowColor = 'rgba(0,0,0,0.75)';
+                        ctx.shadowBlur = 8;
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = 'rgba(15,23,42,0.85)';
+                        ctx.stroke();
+                    }
+                }
+                ctx.restore();
+            } else if (revealCanvas) {
+                revealCanvas.classList.add('hidden');
+            }
+        }
+
+        function syncPreviewTransportUI() {
+            const icon = document.getElementById('previewPlayPauseIcon');
+            const label = document.getElementById('previewPlayPauseLabel');
+            const bar = document.getElementById('previewPlaybackBar');
+            const player = document.getElementById('renderedVideoPlayer');
+            const mp4Active = player && !player.classList.contains('hidden');
+            if (icon) icon.className = previewAnimPlaying ? 'fa-solid fa-pause text-[10px]' : 'fa-solid fa-play text-[10px]';
+            if (label) label.textContent = previewAnimPlaying ? 'Pause' : 'Play';
+            if (bar) bar.classList.toggle('opacity-40', !!mp4Active);
+        }
+
+        function stepPreviewAnimation(ts) {
+            const player = document.getElementById('renderedVideoPlayer');
+            if (!previewAnimPlaying || !previewVisible || document.hidden || !player || !player.classList.contains('hidden')) {
+                previewRafId = null;
+                previewLastTs = null;
+                renderPreviewFrame(previewAnimTime);
+                return;
+            }
+            if (previewLastTs !== null) {
+                const dt = Math.min(0.1, Math.max(0, (ts - previewLastTs) / 1000));
+                const dur = getCutDuration();
+                previewAnimTime = (previewAnimTime + dt) % Math.max(0.5, dur);
+            }
+            previewLastTs = ts;
+            renderPreviewFrame(previewAnimTime);
+            previewRafId = requestAnimationFrame(stepPreviewAnimation);
+        }
+
+        function syncPreviewAnimationLoop() {
+            syncPreviewTransportUI();
+            const player = document.getElementById('renderedVideoPlayer');
+            const shouldRun = previewAnimPlaying && previewVisible && !document.hidden && player && player.classList.contains('hidden');
+            if (shouldRun && previewRafId === null) {
+                previewLastTs = null;
+                previewRafId = requestAnimationFrame(stepPreviewAnimation);
+            } else if (!shouldRun) {
+                if (previewRafId !== null) {
+                    cancelAnimationFrame(previewRafId);
+                    previewRafId = null;
+                }
+                previewLastTs = null;
+                renderPreviewFrame(previewAnimTime);
+            }
+        }
+
+        function togglePreviewAnimation() {
+            const player = document.getElementById('renderedVideoPlayer');
+            if (player && !player.classList.contains('hidden')) return;
+            previewAnimPlaying = !previewAnimPlaying;
+            updatePreviewPlayback();
+        }
+
+        function restartPreviewAnimation() {
+            const player = document.getElementById('renderedVideoPlayer');
+            if (player && !player.classList.contains('hidden')) return;
+            previewAnimTime = 0;
+            previewLastTs = null;
+            const bg = document.getElementById('stageBgPreview');
+            if (bg && bg.getAttribute('src')) {
+                try { bg.currentTime = 0; } catch {}
+            }
+            previewAnimPlaying = true;
+            updatePreviewPlayback();
+            renderPreviewFrame(0);
         }
 
         function updateTitleStyle() {
@@ -3916,16 +4255,19 @@ limitations under the License.
                 if (VIDEO_SETTING_IDS.includes(event.target.id)) saveVideoSettings();
             }));
             const stage = document.querySelector('.video-preview-stage');
-            const composite = document.getElementById('stageCompositeBox');
             new ResizeObserver(() => {
-                composite.style.transform = `scale(${stage.clientWidth / 1080})`;
+                renderPreviewFrame(previewAnimTime);
             }).observe(stage);
-            new ResizeObserver(fitStageMap).observe(document.getElementById('stageMapArea'));
+            new ResizeObserver(() => {
+                fitStageMap();
+                renderPreviewFrame(previewAnimTime);
+            }).observe(document.getElementById('stageMapArea'));
             new IntersectionObserver(([entry]) => {
                 previewVisible = entry.isIntersecting;
                 updatePreviewPlayback();
             }).observe(stage);
             document.addEventListener('visibilitychange', updatePreviewPlayback);
+            syncPreviewAnimationLoop();
             window.addEventListener('pagehide', (event) => {
                 // Keep blob URLs alive when the browser caches this page for Back.
                 if (event.persisted) return;

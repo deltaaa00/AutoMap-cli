@@ -767,13 +767,14 @@ def _build_reveal_map_clip(
             alpha_chan.filter(ImageFilter.GaussianBlur(10)).point(lambda p: round(p * 0.8))
         )
 
-    def _to_rgb_and_mask(frame_rgba) -> tuple[object, object]:
+    def _compose_rgba(frame_rgba) -> np.ndarray:
         if shadow_only is not None:
             canvas = shadow_only.copy()
             canvas.alpha_composite(Image.fromarray(frame_rgba), (24, 24))
-            composed = np.asarray(canvas, dtype=np.uint8)
-        else:
-            composed = frame_rgba
+            return np.asarray(canvas, dtype=np.uint8)
+        return np.ascontiguousarray(frame_rgba, dtype=np.uint8)
+
+    def _to_rgb_and_mask(composed: np.ndarray) -> tuple[object, object]:
         rgb = np.ascontiguousarray(composed[:, :, :3])
         mask = np.ascontiguousarray(composed[:, :, 3], dtype=np.float32) / 255.0
         return rgb, mask
@@ -799,11 +800,17 @@ def _build_reveal_map_clip(
             dot_cy = float(ys[best])
 
     dot_overlays = _render_reveal_dot_overlays(box_w, box_h, dot_cx, dot_cy)
-    dot_frames = {
-        count: _to_rgb_and_mask(_alpha_composite_patch(black_rgba, *dot_overlays[count]))
+    dot_rgba_frames = {
+        count: _compose_rgba(_alpha_composite_patch(black_rgba, *dot_overlays[count]))
         for count in (1, 2, 3)
     }
-    final_frame = _to_rgb_and_mask(base_rgba)
+    dot_frames = {
+        count: _to_rgb_and_mask(dot_rgba_frames[count])
+        for count in (1, 2, 3)
+    }
+    black_composed_rgba = _compose_rgba(black_rgba)
+    base_composed_rgba = _compose_rgba(base_rgba)
+    final_frame = _to_rgb_and_mask(base_composed_rgba)
 
     frame_cache: list[tuple[float, object, object] | None] = [None]
 
@@ -825,13 +832,27 @@ def _build_reveal_map_clip(
         else:
             fade_alpha = max(0.0, min(1.0, 1.0 - (t_key - r_time) / fade_dur))
             blended_rgba = np.clip(np.rint(base_f + fade_alpha * delta_f), 0, 255).astype(np.uint8)
-            rgb, mask = _to_rgb_and_mask(blended_rgba)
+            rgb, mask = _to_rgb_and_mask(_compose_rgba(blended_rgba))
         frame_cache[0] = (t_key, rgb, mask)
         return rgb, mask
 
     rgb_clip = VideoClip(lambda t: _get_cached_frame(t)[0], duration=bg_duration)
     mask_clip = VideoClip(lambda t: _get_cached_frame(t)[1], is_mask=True, duration=bg_duration)
-    return rgb_clip.with_mask(mask_clip)
+    reveal_clip = rgb_clip.with_mask(mask_clip)
+    spec_h, spec_w = base_composed_rgba.shape[:2]
+    reveal_clip.rust_reveal_spec = (
+        int(spec_w),
+        int(spec_h),
+        dot_rgba_frames[1].tobytes(),
+        dot_rgba_frames[2].tobytes(),
+        dot_rgba_frames[3].tobytes(),
+        black_composed_rgba.tobytes(),
+        base_composed_rgba.tobytes(),
+        float(r_time),
+        float(phase_end),
+        float(fade_dur),
+    )
+    return reveal_clip
 
 
 @app.route('/api/render_video', methods=['POST'])
@@ -1102,6 +1123,7 @@ def make_video() -> tuple[object, int]:
         )
         reveal_active = reveal_enabled and reveal_mask_f is not None
 
+        rust_reveal_spec = None
         if reveal_active:
             map_clip = _build_reveal_map_clip(
                 map_path,
@@ -1119,6 +1141,24 @@ def make_video() -> tuple[object, int]:
             )
             if effects:
                 map_y -= 24
+            raw_reveal = getattr(map_clip, "rust_reveal_spec", None)
+            if raw_reveal is not None:
+                spec_w, spec_h, f1, f2, f3, blk, base, rt, pe, fd = raw_reveal
+                rust_reveal_spec = (
+                    (canvas_w - spec_w) // 2,
+                    int(map_y),
+                    spec_w,
+                    spec_h,
+                    f1,
+                    f2,
+                    f3,
+                    blk,
+                    base,
+                    rt,
+                    pe,
+                    fd,
+                    True,
+                )
         elif effects:
             with Image.open(map_path) as raw_map:
                 map_image = raw_map.convert('RGBA').resize((box_w, box_h))
@@ -1217,13 +1257,11 @@ def make_video() -> tuple[object, int]:
             media_resources.append(audio_clip)
             render_duration = min(bg_duration, audio_clip.duration or bg_duration)
 
-        # Prefer the native Rust compositor when available; fall back to MoviePy for dynamic map zoom or reveal.
+        # Prefer the native Rust compositor when available; fall back to MoviePy on failure.
         used_rust = False
         rust_warning: str | None = None
         # ======== RUST ENGINE INJECTION =============
         try:  # pragma: no cover
-            if zoom_enabled or reveal_enabled:
-                raise ImportError("Camera zoom and country reveal use MoviePy compositor")
             automap_rs = _load_automap_rs()
 
             def _clip_to_rgba_bytes(clip_obj, sample_t: float = 0.0) -> bytes:
@@ -1246,6 +1284,8 @@ def make_video() -> tuple[object, int]:
 
             # Skip clips[0] (background_video); Rust decodes it directly from prepared_bg_path.
             for clip in clips[1:]:
+                if rust_reveal_spec is not None and clip is map_clip:
+                    continue
                 if not hasattr(clip, "img"):
                     continue
 
@@ -1295,6 +1335,8 @@ def make_video() -> tuple[object, int]:
                     codec,
                     _x264_preset() if codec == 'libx264' else None,
                     data.get('draft') is True,
+                    zoom_params=zoom_params,
+                    reveal_spec=rust_reveal_spec,
                 )
                 used_rust = True
         except Exception as exc:
