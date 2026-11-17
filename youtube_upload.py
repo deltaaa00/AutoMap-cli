@@ -104,6 +104,10 @@ class YouTubeUploads:
             raise ValueError('Saved YouTube credentials cannot be opened. Connect your account again.') from None
 
     def callback_uri(self):
+        # Local launches must return to their own host/port, even if a hosted
+        # callback was left in the environment from another deployment.
+        if not self.app.config.get('WEB_AUTH_ENABLED', False):
+            return url_for('youtube_callback', _external=True)
         return (self.app.config.get('YOUTUBE_REDIRECT_URI') or os.environ.get('YOUTUBE_REDIRECT_URI')
                 or url_for('youtube_callback', _external=True))
 

@@ -104,7 +104,7 @@ class _PooledRequests:
 
 requests = _PooledRequests()
 
-WORKER_URL = (os.environ.get("YTDLP_URL") or "http://yt-dlp-worker:8080").rstrip('/')
+WORKER_URL = (os.environ.get("YTDLP_URL") or "http://127.0.0.1:8080").rstrip('/')
 
 
 def _available_fonts():

@@ -255,3 +255,22 @@ def test_csrf_rejection_identifies_safe_to_retry_requests(web, tmp_path):
     response = client.post('/api/youtube/disconnect', headers={'X-YouTube-CSRF': 'stale'})
     assert response.status_code == 403 and response.json['code'] == 'youtube_csrf_invalid'
     assert client.post('/api/youtube/disconnect', headers=headers).status_code == 200
+
+
+@pytest.mark.parametrize('origin', ['http://localhost:3000', 'http://127.0.0.1:5000'])
+def test_local_mode_uses_local_callback_even_with_hosted_override(web, monkeypatch, origin):
+    web.app.config['WEB_AUTH_ENABLED'] = False
+    web.app.config['YOUTUBE_REDIRECT_URI'] = 'https://hosted.example/api/youtube/callback'
+    monkeypatch.setenv('YOUTUBE_REDIRECT_URI', 'https://old-host.example/api/youtube/callback')
+    with web.app.test_request_context(base_url=origin):
+        assert web.youtube_uploads.callback_uri() == origin + '/api/youtube/callback'
+
+
+def test_server_mode_keeps_external_callback_behind_reverse_proxy(web, monkeypatch):
+    web.app.config['WEB_AUTH_ENABLED'] = True
+    monkeypatch.setenv('YOUTUBE_REDIRECT_URI', 'https://auto-map.duckdns.org/api/youtube/callback')
+    with web.app.test_request_context(base_url='http://localhost:5000'):
+        assert web.youtube_uploads.callback_uri() == 'https://auto-map.duckdns.org/api/youtube/callback'
+    web.app.config['YOUTUBE_REDIRECT_URI'] = 'https://configured.example/api/youtube/callback'
+    with web.app.test_request_context(base_url='http://localhost:5000'):
+        assert web.youtube_uploads.callback_uri() == 'https://configured.example/api/youtube/callback'
