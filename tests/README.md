@@ -46,7 +46,7 @@ python -m pytest -m browser
 ```
 
 Coverage includes branch coverage and all project Python modules, including
-the two image preparation scripts under `resources`. The minimum is 90%.
+the two image preparation scripts under `resources`. The minimum is 85%.
 GitHub Actions runs the complete suite and uploads `coverage.xml`.
 
 ## Scope and isolation

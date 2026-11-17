@@ -148,7 +148,7 @@ def test_background_upload_metadata_progress_and_deduplication(web, tmp_path, mo
         if result.json['status'] != 'uploading':
             break
         time.sleep(.01)
-    assert result.json == {'status': 'complete', 'phase': 'Uploaded', 'progress': 100, 'url': 'https://www.youtube.com/watch?v=video_test'}
+    assert result.json == {'status': 'complete', 'phase': 'Uploaded', 'progress': 100, 'url': 'https://www.youtube.com/shorts/video_test'}
     body = youtube.videos.return_value.insert.call_args.kwargs['body']
     assert body['snippet']['description'] == 'My description' and body['snippet']['tags'] == ['maps', 'earth']
     assert body['status']['privacyStatus'] == 'private'

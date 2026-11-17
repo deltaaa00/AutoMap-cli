@@ -204,6 +204,11 @@ Worker files older than approximately **30 minutes** are cleaned up when relevan
 4. Set a YouTube title (or leave it empty to use the video headline), description, comma-separated tags, visibility, and the made-for-kids setting.
 5. Enable **Automatically upload after rendering**, then render. AutoMap uploads the resulting MP4 in the background and shows progress and a YouTube link. You can also click **Upload rendered video to YouTube** after rendering. Visibility defaults to **Private**; automatic upload must be enabled again on each visit.
 
+AutoMap renders vertical 9:16 videos lasting up to 30 seconds, which meet the
+[YouTube Shorts format requirements](https://support.google.com/youtube/answer/15424877?hl=en).
+YouTube classifies the upload after processing; the Data API has no separate
+Shorts switch. The completed upload links to the Shorts player.
+
 For `localhost`, either a **Desktop app** or **Web application** client works.
 For a hosted server, use a **Web application** client and register the exact
 redirect URI displayed in the panel under **Authorized redirect URIs** in Google
@@ -356,7 +361,7 @@ python -m pytest -m 'not browser'  # Python checks without launching a browser.
 python -m pytest -m browser        # Browser interaction checks only.
 ```
 
-The coverage configuration requires **90%** coverage. See [tests/README.md](tests/README.md) for isolation details and test setup. The GitHub Actions workflow runs on pushes and pull requests targeting `main`.
+The coverage configuration requires **85%** coverage. See [tests/README.md](tests/README.md) for isolation details and test setup. The GitHub Actions workflow runs on pushes and pull requests targeting `main`.
 
 ## Troubleshooting
 

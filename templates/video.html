@@ -1396,6 +1396,7 @@ limitations under the License.
                         <summary class="cursor-pointer text-sm font-semibold text-rose-300"><i class="fa-brands fa-youtube mr-2"></i>YouTube upload</summary>
                         <div class="space-y-3 mt-3 text-xs">
                             <p class="text-slate-400">Connect your channel once, then upload automatically after rendering. Credentials stay on the server.</p>
+                            <p class="text-slate-400">Rendered videos are vertical 9:16 and up to 30 seconds long, ready for Shorts. YouTube classifies them automatically after processing.</p>
                             <label class="block">Google OAuth client secret (.json)
                                 <input id="youtubeSecret" type="file" accept=".json,application/json" class="block w-full mt-1 text-slate-300">
                             </label>
@@ -1421,9 +1422,9 @@ limitations under the License.
                                 </select>
                             </label>
                             <label class="flex items-center gap-2"><input id="youtubeKids" type="checkbox">Made for kids</label>
-                            <button type="button" id="youtubeUpload" onclick="uploadToYouTube()" disabled class="px-3 py-2 rounded-lg bg-rose-700 disabled:opacity-50">Upload rendered video to YouTube</button>
+                            <button type="button" id="youtubeUpload" onclick="uploadToYouTube()" disabled class="px-3 py-2 rounded-lg bg-rose-700 disabled:opacity-50">Upload rendered Short to YouTube</button>
                             <p id="youtubeUploadStatus" role="status" aria-live="polite" class="text-slate-300"></p>
-                            <a id="youtubeVideoLink" class="hidden text-rose-300 underline" target="_blank" rel="noopener noreferrer">Open video on YouTube</a>
+                            <a id="youtubeVideoLink" class="hidden text-rose-300 underline" target="_blank" rel="noopener noreferrer">Open YouTube Short</a>
                         </div>
                     </details>
 
@@ -1598,7 +1599,7 @@ limitations under the License.
                     const file = isNewGeneratedMap ? await prepareGeneratedMap(map.file) : map.file;
                     if (materialVersions.mapFileInput === 0) {
                         acceptFile('mapFileInput', file, isNewGeneratedMap, map.topic);
-                        if (renderFiles.mapFileInput === file && (isNewGeneratedMap || !manualVideoTitle) && typeof map.topic === 'string' && map.topic.trim()) {
+                        if (renderFiles.mapFileInput === file && !manualVideoTitle && typeof map.topic === 'string' && map.topic.trim()) {
                             const title = document.getElementById('videoTitleInput');
                             title.value = map.topic.trim().slice(0, title.maxLength);
                             manualVideoTitle = false;

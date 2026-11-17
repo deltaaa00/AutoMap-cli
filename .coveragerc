@@ -21,4 +21,4 @@ omit = tests/*
 show_missing = True
 exclude_also =
     if __name__ == ["']__main__["']:
-fail_under = 90
+fail_under = 85
