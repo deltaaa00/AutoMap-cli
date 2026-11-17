@@ -60,3 +60,8 @@ docker-compose*.yml
 
 client_secret*.json
 client_secrets*.json
+
+# Server-only persistent data and recovery files.
+/backups/
+/storage/
+/operations/

@@ -159,6 +159,9 @@ def main():
 @app.route('/studio')
 def studio():
     """Serve the dedicated Video Studio page (music downloader)."""
+    # Establish identity before the page starts parallel API requests.
+    youtube_uploads.owner()
+    youtube_uploads.csrf()
     return render_template("video.html", title_fonts=_available_fonts())
 
 
@@ -1675,7 +1678,7 @@ def make_video() -> tuple[object, int]:
     youtube_body = None
     if data.get('youtube') is not None:
         if not youtube_uploads.valid_csrf():
-            return jsonify(error='Invalid YouTube request token. Reload the page.'), 403
+            return jsonify(code='youtube_csrf_invalid', error='Invalid YouTube request token. Reload the page.'), 403
         try:
             youtube_body = youtube_uploads.check_ready(data['youtube'])
         except ValueError as error:
