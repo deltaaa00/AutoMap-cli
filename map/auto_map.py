@@ -584,6 +584,97 @@ def _draw_legend_overlay(
     return layer
 
 
+_RESERVED_HIGHLIGHT_COLORS: tuple[tuple[int, int, int], ...] = (
+    (0, 229, 255),   # Electric cyan (highest)
+    (255, 45, 170),  # Neon magenta (lowest)
+)
+
+
+def _random_region_color() -> tuple[int, int, int, int]:
+    """Pick a random bright RGBA color that stays distinct from reserved highlight colors."""
+    for _ in range(16):
+        c = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255))
+        if all(sum((c[i] - r[i]) ** 2 for i in range(3)) >= 90 ** 2 for r in _RESERVED_HIGHLIGHT_COLORS):
+            return (*c, 255)
+    return (120, 180, 120, 255)
+
+
+def _build_extrema_highlight_layer(
+    size: tuple[int, int],
+    highest_idx: int | None,
+    lowest_idx: int | None,
+    map_type: str,
+    dict_: dict,
+    flat: np.ndarray | None,
+    ids: np.ndarray | None,
+    borders: Image.Image | None,
+    high_rgb: tuple[int, int, int] = _RESERVED_HIGHLIGHT_COLORS[0],
+    low_rgb: tuple[int, int, int] = _RESERVED_HIGHLIGHT_COLORS[1],
+) -> Image.Image | None:
+    """Create a soft tint + inner glow highlight layer for the highest and lowest regions."""
+    from PIL import ImageChops, ImageFilter
+
+    targets: list[tuple[int, tuple[int, int, int]]] = []
+    if highest_idx is not None:
+        targets.append((highest_idx, high_rgb))
+    if lowest_idx is not None and lowest_idx != highest_idx:
+        targets.append((lowest_idx, low_rgb))
+    if not targets:
+        return None
+
+    w, h = size
+    layer = Image.new("RGBA", size, (0, 0, 0, 0))
+    coords_list = list(dict_.values())
+
+    if map_type == "flag" and (flat is None or ids is None):
+        mask_path = Path(__file__).parent.parent / "resources" / "maps" / "default_map.png"
+        flat, ids = _region_index(mask_path, _load_rgba(mask_path), dict_)
+
+    inner_size = 37 if w >= 3000 else 21
+    outer_size = 25 if w >= 3000 else 15
+    border_work = borders.copy() if (map_type == "world_countries" and borders is not None) else None
+    border_orig_alpha = np.asarray(borders)[..., 3] if border_work is not None else None
+
+    for region_idx, rgb in targets:
+        mask: Image.Image | None = None
+        if flat is not None and ids is not None:
+            pix_mask = np.zeros(w * h, dtype=np.uint8)
+            pix_mask[flat[ids == region_idx]] = 255
+            if pix_mask.any():
+                mask = Image.fromarray(pix_mask.reshape((h, w)), mode="L")
+        elif border_work is not None and 1 <= region_idx <= len(coords_list):
+            work = border_work.copy()
+            for coord in coords_list[region_idx - 1]:
+                ImageDraw.floodfill(work, xy=tuple(coord), value=(255, 255, 255, 255), thresh=60)
+            work_arr = np.asarray(work)
+            filled = (work_arr[..., 3] == 255) & (border_orig_alpha < 60)
+            if filled.any():
+                mask = Image.fromarray((filled.astype(np.uint8) * 255), mode="L")
+
+        if mask is None:
+            continue
+
+        # Downscale the binary mask before morphological filters so MinFilter/MaxFilter
+        # run in milliseconds instead of O(k^2) over 16M full-res pixels.
+        ds = 4 if w >= 2400 else 2
+        small_size = (max(1, w // ds), max(1, h // ds))
+        small_mask = mask.resize(small_size, Image.Resampling.BILINEAR)
+        small_inner = small_mask.filter(ImageFilter.MinFilter(9))
+        small_outer = small_mask.filter(ImageFilter.MaxFilter(7))
+        inner_ring = ImageChops.subtract(small_mask, small_inner).filter(ImageFilter.GaussianBlur(2))
+        outer_halo = ImageChops.subtract(small_outer, small_mask).filter(ImageFilter.GaussianBlur(2.5))
+        glow_small = ImageChops.lighter(inner_ring, outer_halo.point(lambda p: min(255, int(p * 0.95))))
+        glow_alpha = glow_small.resize((w, h), Image.Resampling.BILINEAR)
+        tint_alpha = mask.point(lambda p: 75 if p else 0)
+        combined_alpha = ImageChops.lighter(tint_alpha, glow_alpha)
+
+        overlay = Image.new("RGBA", size, (*rgb, 255))
+        overlay.putalpha(combined_alpha)
+        layer = Image.alpha_composite(layer, overlay)
+
+    return layer
+
+
 def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
              optional_feature: str, model: str, font_name: str,
              show_result: bool = True, io_res = False, api_key: str | None = None,
@@ -598,6 +689,9 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
              web_search: bool = False,
              max_search_requests: int = 5,
              show_legend: bool = False,
+             highlight_extrema: bool = False,
+             highlight_high_color: str = "#00e5ff",
+             highlight_low_color: str = "#ff2daa",
              progress_callback=None):
     """Create a map from an AI query and save it as ``result.png``.
 
@@ -845,6 +939,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             raw_ai_answer_norm["australia"] = raw_ai_answer_norm["oceania"]
 
     region_colors: dict[int, tuple[int, int, int, int]] = {}
+    numeric_region_values: dict[int, float] = {}
 
     for index, (name, points) in enumerate(dict_.items(), start=1):
         name_key = (
@@ -856,13 +951,15 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         if mode == 'number':
             try:
                 info = ai_answer_norm[name_key]
-                color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
+                color = _random_region_color()
                 num_value = _parse_short_number(info)
                 raw_num_value = _parse_short_number(raw_ai_answer_norm.get(name_key))
                 if num_value is None:
                     log.warning(f"Non-numeric value for {name}: {info!r}; using random color")
 
                 if num_value is not None:
+                    if highlight_extrema:
+                        numeric_region_values[index] = float(raw_num_value if raw_num_value is not None else num_value)
                     # Pick the colour of the first matching range. Ranges are
                     # treated as (low < value <= high) per the docs.
                     matched_bounds = None
@@ -885,7 +982,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             except KeyError as e:
                 info = ""
                 log.warning(f"No data / color for {e}; using random color")
-                color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
+                color = _random_region_color()
                 random_colors[name] = color
 
         elif mode == 'text':
@@ -906,10 +1003,10 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
                     try:
                         color = random_colors[info]
                     except KeyError:
-                        color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
+                        color = _random_region_color()
                         random_colors[info] = color
                 else:
-                    color = (random.randint(80, 255), random.randint(80, 255), random.randint(80, 255), 255)
+                    color = _random_region_color()
             used_txt_rules.setdefault(info, color)
         else:
             showerror("Error", f"Unknown mode: {mode}")
@@ -1028,9 +1125,15 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         },
     }
 
+    flat = ids = None
     if map_type in constants._PAINTED_MAP_TYPES:
         flat, ids = _region_index(path, img, dict_)
         img = _paint_regions(img, flat, ids, region_colors)
+
+    highest_idx = lowest_idx = None
+    if highlight_extrema and mode == "number" and numeric_region_values:
+        highest_idx = max(numeric_region_values, key=numeric_region_values.get)
+        lowest_idx = min(numeric_region_values, key=numeric_region_values.get)
 
     # adding relief map
     _report(3, "Adding relief, borders & overlays...")
@@ -1051,6 +1154,15 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
         # Restore borders above the relief, then put readable labels on top.
         borders = _load_rgba(maps_dir / borders_name)
+        if highest_idx is not None:
+            high_rgb = _hex_to_rgba(highlight_high_color, (*_RESERVED_HIGHLIGHT_COLORS[0], 255))[:3]
+            low_rgb = _hex_to_rgba(highlight_low_color, (*_RESERVED_HIGHLIGHT_COLORS[1], 255))[:3]
+            hl_layer = _build_extrema_highlight_layer(
+                img.size, highest_idx, lowest_idx, map_type, dict_, flat, ids, borders,
+                high_rgb=high_rgb, low_rgb=low_rgb,
+            )
+            if hl_layer is not None:
+                result = Image.alpha_composite(result, hl_layer)
         result = Image.alpha_composite(result, borders)
         result = Image.alpha_composite(result, text_layer)
 

@@ -623,14 +623,25 @@ def generate():
         command += f" --temperature {temperature_options['temperature']:g}"
 
     show_legend = bool(data.get("show_legend", False))
+    highlight_extrema = bool(data.get("highlight_extrema", False))
     if show_legend:
         command += " --legend"
+    if highlight_extrema:
+        command += " --highlight-extrema"
 
     progress_id = str(data.get("progress_id") or "").strip()[:64]
     if progress_id:
         _set_map_progress(progress_id, 1, "Querying AI model...")
 
-    style_kwargs: dict[str, object] = {"show_legend": show_legend}
+    style_kwargs: dict[str, object] = {
+        "show_legend": show_legend,
+        "highlight_extrema": highlight_extrema,
+    }
+    if highlight_extrema:
+        if "highlight_high_color" in data:
+            style_kwargs["highlight_high_color"] = str(data.get("highlight_high_color") or "#00e5ff")
+        if "highlight_low_color" in data:
+            style_kwargs["highlight_low_color"] = str(data.get("highlight_low_color") or "#ff2daa")
     if progress_id:
         style_kwargs["progress_callback"] = lambda stage, label: _set_map_progress(progress_id, stage, label)
     for style_key, kw_name in (
@@ -1056,6 +1067,9 @@ def api_restyle_map():
             palette_theme=palette_theme,
             ai_answer_override=map_values,
             show_legend=bool(data.get("show_legend", False)),
+            highlight_extrema=bool(data.get("highlight_extrema", False)),
+            highlight_high_color=str(data.get("highlight_high_color") or "#00e5ff"),
+            highlight_low_color=str(data.get("highlight_low_color") or "#ff2daa"),
         )
     except Exception as e:  # noqa: BLE001
         return jsonify({"status": "error", "error": str(e)}), 500

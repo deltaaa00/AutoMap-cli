@@ -653,6 +653,29 @@ limitations under the License.
                             <input type="checkbox" id="showLegendToggle" onchange="updateCommandPreview()"
                                 class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500">
                         </label>
+                        <label class="mt-2 flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-slate-700 transition cursor-pointer">
+                            <div>
+                                <div class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-highlighter text-amber-400 text-[11px]"></i>
+                                    Highlight Min / Max Countries
+                                </div>
+                                <div class="text-[10px] text-slate-400 mt-0.5">Soft glow on highest &amp; lowest values (number mode)</div>
+                            </div>
+                            <input type="checkbox" id="highlightExtremaToggle" onchange="updateCommandPreview()"
+                                class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500">
+                        </label>
+                        <div id="highlightColorsRow" class="hidden mt-2 grid grid-cols-2 gap-2 px-3 py-2 rounded-xl border border-slate-800/80 bg-slate-950/50">
+                            <label class="flex items-center justify-between gap-2 text-[11px] text-slate-300 cursor-pointer">
+                                <span>Highest color</span>
+                                <input type="color" id="highlightHighColor" value="#00e5ff" onchange="updateCommandPreview()"
+                                    class="h-6 w-9 rounded border border-slate-700 bg-slate-900 cursor-pointer">
+                            </label>
+                            <label class="flex items-center justify-between gap-2 text-[11px] text-slate-300 cursor-pointer">
+                                <span>Lowest color</span>
+                                <input type="color" id="highlightLowColor" value="#ff2daa" onchange="updateCommandPreview()"
+                                    class="h-6 w-9 rounded border border-slate-700 bg-slate-900 cursor-pointer">
+                            </label>
+                        </div>
                     </div>
 
                     <!-- 5. Flag: --model & 6. Flag: --font in a responsive 2-col or stacked layout -->
@@ -2119,6 +2142,9 @@ limitations under the License.
                 gsm,
                 extra_option: extraOption,
                 show_legend: !!document.getElementById('showLegendToggle')?.checked,
+                highlight_extrema: !!document.getElementById('highlightExtremaToggle')?.checked,
+                highlight_high_color: document.getElementById('highlightHighColor')?.value || '#00e5ff',
+                highlight_low_color: document.getElementById('highlightLowColor')?.value || '#ff2daa',
                 model,
                 font,
                 topic,
@@ -2189,8 +2215,11 @@ limitations under the License.
             const escapedTopic = (state.topic || '').replace(/"/g, '\\"');
             let cmd = `python cli.py make "${escapedTopic}" -m ${state.mode} -mp ${state.map_type} -gsm ${state.gsm} -eop ${state.extra_option} --model ${state.model} --font "${state.font}" --temperature ${state.temperature}`;
             if (state.show_legend) cmd += ' --legend';
+            if (state.highlight_extrema) cmd += ' --highlight-extrema';
 
             document.getElementById('cliCommandDisplay').textContent = cmd;
+            const hlColorsRow = document.getElementById('highlightColorsRow');
+            if (hlColorsRow) hlColorsRow.classList.toggle('hidden', !state.highlight_extrema);
             updateActiveBadges(state);
             updateCompatibilityHint(state);
             updateHudCoords(state);
@@ -2200,8 +2229,8 @@ limitations under the License.
             const hint = document.getElementById('extraOptionHint');
             if (!hint) return;
             const hasMostLeast = String(state.extra_option || '').includes('show_most_least');
-            if (hasMostLeast && state.mode === 'text') {
-                hint.textContent = 'Note: show_most_least is designed for numeric mode (-m number).';
+            if ((hasMostLeast || state.highlight_extrema) && state.mode === 'text') {
+                hint.textContent = 'Note: Most/Least and Min/Max highlighting only apply in numeric mode.';
                 hint.className = 'text-[11px] text-amber-400/90 mt-1.5 block';
             } else if (hasMostLeast && state.map_type === 'world') {
                 hint.textContent = 'Note: show_most_least overlay is supported on default, flag, and world_countries maps.';
@@ -2233,6 +2262,7 @@ limitations under the License.
                 { label: `gsm: ${state.gsm}`, color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
                 { label: `eop: ${state.extra_option}`, color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
                 ...(state.show_legend ? [{ label: 'legend', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' }] : []),
+                ...(state.highlight_extrema ? [{ label: 'highlight min/max', color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' }] : []),
                 { label: state.model, color: 'bg-sky-500/20 text-sky-300 border-sky-500/30' },
                 { label: state.font, color: 'bg-slate-900/90 text-slate-300 border-slate-700' }
             ];
@@ -3246,6 +3276,12 @@ limitations under the License.
             setSelectedExtraOption(s.extra_option);
             const legendToggle = document.getElementById('showLegendToggle');
             if (legendToggle) legendToggle.checked = !!s.show_legend;
+            const hlToggle = document.getElementById('highlightExtremaToggle');
+            if (hlToggle) hlToggle.checked = !!s.highlight_extrema;
+            const hlHigh = document.getElementById('highlightHighColor');
+            if (hlHigh && s.highlight_high_color) hlHigh.value = s.highlight_high_color;
+            const hlLow = document.getElementById('highlightLowColor');
+            if (hlLow && s.highlight_low_color) hlLow.value = s.highlight_low_color;
             document.getElementById('modelSelect').value = s.model;
             document.getElementById('fontSelect').value = s.font;
             document.getElementById('topicInput').value = s.topic || '';
@@ -3309,6 +3345,12 @@ limitations under the License.
             setSelectedExtraOption('none');
             const legendToggle = document.getElementById('showLegendToggle');
             if (legendToggle) legendToggle.checked = false;
+            const hlToggle = document.getElementById('highlightExtremaToggle');
+            if (hlToggle) hlToggle.checked = false;
+            const hlHigh = document.getElementById('highlightHighColor');
+            if (hlHigh) hlHigh.value = '#00e5ff';
+            const hlLow = document.getElementById('highlightLowColor');
+            if (hlLow) hlLow.value = '#ff2daa';
             changeAiProvider('gemini', fallbackModels.find(model => modelProvider(model) === 'gemini'));
             document.getElementById('fontSelect').selectedIndex = 0;
             document.getElementById('topicInput').value = '';
