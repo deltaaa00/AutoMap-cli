@@ -55,12 +55,12 @@ from map.auto_map import (
     _resolve_theme_name,
     _to_rgba_tuple,
 )
-from map.constants import europe_coords, world_coords
+from map.constants import europe_coords, world_coords, _PALETTE_THEMES
 from cli import AVAILABLE_MODELS
 from map.functions import (
-    _ALLOWED_MAP_TYPES, AIServiceError, configured_api_key, list_deepseek_models,
-    parse_ideas_content, provider_for_model, provider_key_name, slugify_prompt,
-    validate_temperature,
+    _ALLOWED_MAP_TYPES, AIServiceError, configured_api_key, generate_map_idea,
+    list_deepseek_models, parse_ideas_content, provider_for_model,
+    provider_key_name, slugify_prompt, validate_temperature,
 )
 
 from flask import Flask, request, jsonify, send_file, render_template, Response, session
@@ -722,6 +722,46 @@ def generate():
         )
 
     return jsonify(resp_payload)
+
+
+@app.route('/api/generate_idea', methods=['POST'])
+def api_generate_idea():
+    """Generate a map topic idea (and optionally matching parameters) using the selected AI model."""
+    data = request.get_json(silent=True) or {}
+    try:
+        provider = _request_provider(data)
+        api_key = _request_api_key(data, provider)
+    except ValueError as error:
+        return jsonify(status='error', error=str(error)), 400
+
+    model = str(data.get("model") or ('deepseek-flash' if provider == 'deepseek' else AVAILABLE_MODELS[0])).strip()
+    if provider_for_model(model) != provider:
+        return jsonify(status='error', error=f"Model '{model}' does not match provider '{provider}'."), 400
+
+    with_params = str(data.get("with_params") or "").strip().lower() in ("1", "true", "yes", "on") or data.get("with_params") is True
+
+    temperature = None
+    if "temperature" in data and str(data["temperature"]).strip() != "":
+        try:
+            temperature = validate_temperature(data["temperature"])
+        except ValueError as err:
+            return jsonify(status='error', error=str(err)), 400
+
+    try:
+        result = generate_map_idea(
+            model,
+            api_key=api_key,
+            with_params=with_params,
+            available_themes=list(_PALETTE_THEMES.keys()),
+            available_fonts=_available_fonts(),
+            temperature=temperature,
+        )
+    except AIServiceError as error:
+        return jsonify(status='error', error=str(error)), error.status_code
+    except Exception as exc:  # noqa: BLE001
+        return jsonify(status='error', error=str(exc)), 500
+
+    return jsonify({"status": "success", **result}), 200
 
 
 @app.route('/api/models', methods=['POST'])

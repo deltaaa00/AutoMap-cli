@@ -397,11 +397,23 @@ limitations under the License.
 
                     <!-- Topic / Prompt Input + Interactive Quick Prompt Presets -->
                     <div>
-                        <div class="flex justify-between items-center mb-1.5">
+                        <div class="flex flex-wrap justify-between items-center gap-2 mb-1.5">
                             <label for="topicInput" class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
                                 <i class="fa-solid fa-wand-magic-sparkles text-indigo-400"></i>
                                 Map Topic or AI Query
                             </label>
+                            <div class="flex items-center gap-1.5">
+                                <select id="ideaModeSelect" title="Idea generation mode"
+                                    class="px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-300 focus:outline-none focus:border-amber-500/60">
+                                    <option value="idea_only">Idea only</option>
+                                    <option value="idea_and_params">Idea + Params</option>
+                                </select>
+                                <button type="button" id="generateIdeaBtn" onclick="generateIdea()"
+                                    class="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border border-amber-500/35 text-[11px] font-medium transition flex items-center gap-1.5">
+                                    <i id="generateIdeaIcon" class="fa-solid fa-lightbulb text-[10px]"></i>
+                                    <span id="generateIdeaText">Generate idea</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="relative group">
                             <input type="text" id="topicInput" placeholder="e.g., Population of European countries" 
@@ -1627,6 +1639,84 @@ limitations under the License.
             topicInput.value = '';
             topicInput.focus();
             updateCommandPreview();
+        }
+
+        async function generateIdea() {
+            const btn = document.getElementById('generateIdeaBtn');
+            const icon = document.getElementById('generateIdeaIcon');
+            const textEl = document.getElementById('generateIdeaText');
+            const withParams = document.getElementById('ideaModeSelect')?.value === 'idea_and_params';
+            const state = collectCurrentState();
+
+            if (btn) btn.disabled = true;
+            if (icon) icon.className = 'fa-solid fa-spinner fa-spin text-[10px]';
+            if (textEl) textEl.textContent = 'Thinking...';
+
+            try {
+                const response = await fetch('/api/generate_idea', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        provider: state.provider,
+                        model: state.model,
+                        api_key: state.api_key,
+                        with_params: withParams,
+                        temperature: state.temperature,
+                    }),
+                });
+                let result;
+                try {
+                    result = await response.json();
+                } catch {
+                    throw new Error(`Server returned ${response.status} ${response.statusText}`);
+                }
+                if (!response.ok || result.status !== 'success' || !result.idea) {
+                    throw new Error(result.error || 'Failed to generate idea');
+                }
+
+                const topicInput = document.getElementById('topicInput');
+                if (topicInput) {
+                    topicInput.value = result.idea;
+                    scheduleTopicPreview();
+                    flushTopicPreview();
+                }
+
+                if (withParams && result.params) {
+                    const p = result.params;
+                    const modeRadio = document.querySelector(`input[name="mode"][value="${p.mode}"]`);
+                    if (modeRadio) modeRadio.checked = true;
+                    const mapRadio = document.querySelector(`input[name="map_type"][value="${p.map_type}"]`);
+                    if (mapRadio) mapRadio.checked = true;
+                    const paletteEl = document.getElementById('fillingPaletteTheme');
+                    if (paletteEl && p.palette_theme && Array.from(paletteEl.options).some(o => o.value === p.palette_theme)) {
+                        paletteEl.value = p.palette_theme;
+                    }
+                    const fontEl = document.getElementById('fontSelect');
+                    if (fontEl && p.font && Array.from(fontEl.options).some(o => o.value === p.font)) {
+                        fontEl.value = p.font;
+                    }
+                    if (typeof setSelectedExtraOption === 'function') {
+                        setSelectedExtraOption(p.extra_option || 'none');
+                    }
+                    const legendEl = document.getElementById('showLegendToggle');
+                    if (legendEl) legendEl.checked = !!p.show_legend;
+
+                    updateCommandPreview();
+                    logToConsole(`[Idea] "${result.idea}" (${p.mode}, ${p.map_type}, theme=${p.palette_theme}, font=${p.font})`, 'info');
+                    showToast(`Generated idea + params (${p.palette_theme}, ${p.map_type})`, 'success');
+                } else {
+                    updateCommandPreview();
+                    logToConsole(`[Idea] "${result.idea}"`, 'info');
+                    showToast('Generated new map idea!', 'success');
+                }
+            } catch (error) {
+                logToConsole(`[Idea Error] ${error.message}`, 'error');
+                showToast(error.message || 'Failed to generate idea', 'error');
+            } finally {
+                if (btn) btn.disabled = false;
+                if (icon) icon.className = 'fa-solid fa-lightbulb text-[10px]';
+                if (textEl) textEl.textContent = 'Generate idea';
+            }
         }
 
         let loadedIdeasFile = { filename: '', text: '' };
