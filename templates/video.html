@@ -870,6 +870,74 @@ limitations under the License.
                                 <input id="introFadeToggle" type="checkbox" onchange="saveVideoSettings()" class="accent-emerald-400">
                                 Smooth intro fade-in from black (0.0s &rarr; 0.8s)
                             </label>
+                            <label class="flex items-center gap-2 text-xs text-slate-300">
+                                <input id="mapZoomToggle" type="checkbox" onchange="updateMapZoomUI(); saveVideoSettings()" class="accent-emerald-400">
+                                Camera zoom to point on map (e.g. Russia)
+                            </label>
+                            <div id="mapZoomPanel" class="hidden rounded-xl border border-slate-800 bg-slate-950/70 p-3 space-y-2.5">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-[11px] font-medium text-slate-300">Click country <span class="text-slate-500">(Ctrl = free point)</span></span>
+                                    <span id="zoomTargetCountry" class="text-[11px] font-mono text-cyan-300">Russia (81%, 36%)</span>
+                                </div>
+                                <div id="zoomPickerWrap"
+                                    onclick="pickZoomPoint(event)"
+                                    onpointermove="hoverZoomPoint(event)"
+                                    onpointerleave="clearZoomHover()"
+                                    class="relative mx-auto w-full max-w-[340px] rounded-lg overflow-hidden border border-slate-700/80 bg-slate-900 cursor-pointer select-none">
+                                    <img id="zoomPickerImg" draggable="false" alt="Zoom target picker" class="w-full h-auto block hidden pointer-events-none select-none">
+                                    <img id="zoomHoverOutline" draggable="false" alt="" class="hidden pointer-events-none absolute inset-0 w-full h-full object-fill select-none">
+                                    <div id="zoomPickerPlaceholder" class="py-6 text-center text-[11px] text-slate-500">Upload or load a map first</div>
+                                    <div id="zoomHoverPin" class="hidden pointer-events-none absolute w-7 h-7 -ml-3.5 -mt-3.5 rounded-full border-2 border-amber-300 bg-amber-400/25 shadow-[0_0_14px_rgba(252,211,77,0.95)]"></div>
+                                    <div id="zoomHoverLabel" class="hidden pointer-events-none absolute px-2 py-0.5 rounded-md bg-slate-950/90 border border-amber-400/60 text-[10px] font-semibold text-amber-200 whitespace-nowrap shadow-lg -translate-x-1/2 -translate-y-full -mt-4"></div>
+                                    <div id="zoomPickerPin" class="pointer-events-none absolute w-5 h-5 -ml-2.5 -mt-2.5 rounded-full border-2 border-cyan-300 bg-rose-500/80 shadow-[0_0_10px_rgba(34,211,238,0.9)]" style="left:80.7%;top:35.8%;"></div>
+                                </div>
+                                <input id="mapZoomX" type="hidden" value="0.807">
+                                <input id="mapZoomY" type="hidden" value="0.358">
+                                <input id="mapZoomCountry" type="hidden" value="Russia">
+                                <input id="mapZoomCountryKey" type="hidden" value="russia">
+                                <div class="grid grid-cols-3 gap-2">
+                                    <label class="text-[11px] text-slate-400">
+                                        <span>Zoom (x)</span>
+                                        <input id="mapZoomScale" type="number" min="1.2" max="3.5" step="0.1" value="2.0" onchange="saveVideoSettings()"
+                                            class="mt-1 w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                    </label>
+                                    <label class="text-[11px] text-slate-400">
+                                        <span>Start (s)</span>
+                                        <input id="mapZoomStart" type="number" min="0" max="15" step="0.5" value="1.5" onchange="saveVideoSettings()"
+                                            class="mt-1 w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                    </label>
+                                    <label class="text-[11px] text-slate-400">
+                                        <span>Duration (s)</span>
+                                        <input id="mapZoomDuration" type="number" min="0.5" max="10" step="0.5" value="2.5" onchange="saveVideoSettings()"
+                                            class="mt-1 w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                    </label>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2 items-end pt-1">
+                                    <label class="flex items-center gap-2 text-xs text-slate-300 pb-1.5">
+                                        <input id="mapZoomOutToggle" type="checkbox" checked onchange="updateZoomOutUI(); saveVideoSettings()" class="accent-cyan-400">
+                                        <span>Zoom out at end</span>
+                                    </label>
+                                    <label id="mapZoomOutDurationWrap" class="text-[11px] text-slate-400">
+                                        <span>Zoom out (s)</span>
+                                        <input id="mapZoomOutDuration" type="number" min="0.5" max="10" step="0.5" value="2.0" onchange="saveVideoSettings()"
+                                            class="mt-1 w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                    </label>
+                                </div>
+                                <div class="pt-1.5 border-t border-slate-800/80 space-y-2">
+                                    <label class="flex items-center gap-2 text-xs text-slate-300">
+                                        <input id="revealCountryToggle" type="checkbox" onchange="updateRevealUI(); saveVideoSettings()" class="accent-emerald-400">
+                                        <span>Country reveal animation (black + &quot;...&quot; &rarr; reveal color &amp; value)</span>
+                                    </label>
+                                    <div id="revealControlsPanel" class="hidden pl-5 space-y-1.5">
+                                        <label class="block text-[11px] text-slate-400">
+                                            <span>Reveal at (s)</span>
+                                            <input id="revealTimeInput" type="number" min="0.5" max="20" step="0.1" value="5.5" onchange="saveVideoSettings()"
+                                                class="mt-1 w-32 block px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                        </label>
+                                        <p class="text-[10px] text-slate-500">Timeline: 3 dots appear &rarr; camera zooms while country &amp; dots stay visible &rarr; after zoom, dots vanish &amp; country reveals.</p>
+                                    </div>
+                                </div>
+                            </div>
 
                             <!-- Shorts Auto-Montage Overlays (Top Stickers + Animated Subscribe Pill) -->
                             <div class="mt-2 pt-3 border-t border-slate-800/80 flex flex-col gap-2.5">
@@ -1363,6 +1431,8 @@ limitations under the License.
         const VIDEO_SETTING_IDS = ['musicUrlInput', 'musicCookiesInput', 'cutStartInput', 'cutDurationInput',
             'videoTitleInput', 'titleFontSelect', 'titleFontSize', 'titleFirstLineColor',
             'titleOtherLinesColor', 'titleUppercase', 'visualEffects', 'introFadeToggle',
+            'mapZoomToggle', 'mapZoomX', 'mapZoomY', 'mapZoomCountry', 'mapZoomCountryKey',
+            'mapZoomScale', 'mapZoomStart', 'mapZoomDuration', 'mapZoomOutToggle', 'mapZoomOutDuration', 'revealCountryToggle', 'revealTimeInput',
             'topLeftStickerSelect', 'topRightStickerSelect', 'subscribeBadgeToggle',
             'subscribeTextInput', 'subscribeDelayInput', 'watermarkTextInput',
             'watermarkFontSelect', 'watermarkColor', 'watermarkStarsToggle', 'codecSelect'];
@@ -1414,6 +1484,17 @@ limitations under the License.
                             input.value = input.maxLength > 0 ? normalized.slice(0, input.maxLength) : normalized;
                         }
                     });
+                    if (typeof saved.mapZoomCountryKey !== 'string') {
+                        const savedCountry = (document.getElementById('mapZoomCountry')?.value || '').trim();
+                        const keyEl = document.getElementById('mapZoomCountryKey');
+                        if (keyEl) {
+                            keyEl.value = (!savedCountry || savedCountry.toLowerCase() === 'custom point')
+                                ? ''
+                                : savedCountry.toLowerCase().replace(/\s+/g, '_');
+                        }
+                    }
+                    updateMapZoomUI();
+                    updateRevealUI();
                 }
             } catch (error) {
                 // Invalid or unavailable saved settings should not prevent opening the studio.
@@ -1444,13 +1525,15 @@ limitations under the License.
                 // A newer generated map wins. A manually selected or removed map
                 // remains the user's choice until another map is generated.
                 const map = latest && (!selected || latest.updatedAt > selected.updatedAt) ? latest : selected;
+                const isNewGeneratedMap = !!(map && map === latest);
                 if (map?.file && materialVersions.mapFileInput === 0) {
-                    const file = map === latest ? await prepareGeneratedMap(map.file) : map.file;
+                    const file = isNewGeneratedMap ? await prepareGeneratedMap(map.file) : map.file;
                     if (materialVersions.mapFileInput === 0) {
-                        acceptFile('mapFileInput', file, map === latest, map.topic);
-                        if (renderFiles.mapFileInput === file && !manualVideoTitle && typeof map.topic === 'string' && map.topic.trim()) {
+                        acceptFile('mapFileInput', file, isNewGeneratedMap, map.topic);
+                        if (renderFiles.mapFileInput === file && (isNewGeneratedMap || !manualVideoTitle) && typeof map.topic === 'string' && map.topic.trim()) {
                             const title = document.getElementById('videoTitleInput');
                             title.value = map.topic.trim().slice(0, title.maxLength);
+                            manualVideoTitle = false;
                             updateStageTitlePreview(title.value);
                             saveVideoSettings();
                         }
@@ -2157,12 +2240,193 @@ limitations under the License.
                 title_uppercase: document.getElementById('titleUppercase').checked,
                 visual_effects: document.getElementById('visualEffects').checked,
                 intro_fade: document.getElementById('introFadeToggle').checked,
+                zoom_enabled: document.getElementById('mapZoomToggle').checked,
+                zoom_x: Number(document.getElementById('mapZoomX').value || 0.80),
+                zoom_y: Number(document.getElementById('mapZoomY').value || 0.35),
+                zoom_country_key: (document.getElementById('mapZoomCountryKey')?.value || '').trim(),
+                zoom_scale: Number(document.getElementById('mapZoomScale').value || 2.0),
+                zoom_start: Number(document.getElementById('mapZoomStart').value || 1.5),
+                zoom_duration: Number(document.getElementById('mapZoomDuration').value || 2.5),
+                zoom_out_enabled: !!document.getElementById('mapZoomOutToggle')?.checked,
+                zoom_out_duration: Number(document.getElementById('mapZoomOutDuration')?.value || 2.0),
+                reveal_enabled: !!document.getElementById('revealCountryToggle')?.checked,
+                reveal_time: Number(document.getElementById('revealTimeInput')?.value || 5.5),
                 top_left_sticker: document.getElementById('topLeftStickerSelect').value,
                 top_right_sticker: document.getElementById('topRightStickerSelect').value,
                 subscribe_badge: document.getElementById('subscribeBadgeToggle').checked,
                 subscribe_text: document.getElementById('subscribeTextInput').value.trim() || 'Subscribe!',
                 subscribe_delay: Number(document.getElementById('subscribeDelayInput').value || 2.5),
             };
+        }
+
+        let zoomCountriesCache = null;
+
+        async function loadZoomCountries() {
+            if (zoomCountriesCache) return zoomCountriesCache;
+            try {
+                const resp = await fetch('/api/zoom_countries');
+                if (resp.ok) zoomCountriesCache = await resp.json();
+            } catch {
+                // Fall back to direct click coordinates if country index fails to load.
+            }
+            return zoomCountriesCache;
+        }
+
+        function updateZoomOutUI() {
+            const enabled = !!document.getElementById('mapZoomOutToggle')?.checked;
+            const input = document.getElementById('mapZoomOutDuration');
+            const wrap = document.getElementById('mapZoomOutDurationWrap');
+            if (input) input.disabled = !enabled;
+            if (wrap) wrap.classList.toggle('opacity-50', !enabled);
+        }
+
+        function updateRevealUI() {
+            const enabled = !!document.getElementById('revealCountryToggle')?.checked;
+            const panel = document.getElementById('revealControlsPanel');
+            if (panel) panel.classList.toggle('hidden', !enabled);
+        }
+
+        function updateMapZoomUI() {
+            const enabled = !!document.getElementById('mapZoomToggle')?.checked;
+            const panel = document.getElementById('mapZoomPanel');
+            if (panel) panel.classList.toggle('hidden', !enabled);
+            if (enabled) loadZoomCountries();
+            updateZoomOutUI();
+            updateRevealUI();
+            const pin = document.getElementById('zoomPickerPin');
+            const rawX = parseFloat(document.getElementById('mapZoomX')?.value);
+            const rawY = parseFloat(document.getElementById('mapZoomY')?.value);
+            const zx = Math.max(0, Math.min(1, Number.isFinite(rawX) ? rawX : 0.807));
+            const zy = Math.max(0, Math.min(1, Number.isFinite(rawY) ? rawY : 0.358));
+            if (pin) {
+                pin.style.left = `${(zx * 100).toFixed(1)}%`;
+                pin.style.top = `${(zy * 100).toFixed(1)}%`;
+            }
+            const countryName = (document.getElementById('mapZoomCountry')?.value || '').trim();
+            const labelEl = document.getElementById('zoomTargetCountry');
+            if (labelEl) {
+                const coordsText = `(${Math.round(zx * 100)}%, ${Math.round(zy * 100)}%)`;
+                labelEl.textContent = countryName ? `${countryName} ${coordsText}` : coordsText;
+            }
+        }
+
+        function setZoomTarget(x, y, countryName = '', countryKey = '') {
+            document.getElementById('mapZoomX').value = Number(x).toFixed(4);
+            document.getElementById('mapZoomY').value = Number(y).toFixed(4);
+            const countryEl = document.getElementById('mapZoomCountry');
+            if (countryEl) countryEl.value = countryName;
+            const keyEl = document.getElementById('mapZoomCountryKey');
+            if (keyEl) {
+                const normalizedName = (countryName || '').trim().toLowerCase();
+                keyEl.value = countryKey || (normalizedName === 'russia' ? 'russia' : '');
+            }
+            updateMapZoomUI();
+            saveVideoSettings();
+        }
+
+        let lastZoomPointerPos = null;
+
+        function resolveZoomTargetFromEvent(event) {
+            const img = document.getElementById('zoomPickerImg');
+            if (!img || img.classList.contains('hidden')) return null;
+            const rect = img.getBoundingClientRect();
+            if (!rect.width || !rect.height) return null;
+            const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+            const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+            const aspect = (img.naturalWidth && img.naturalHeight) ? (img.naturalWidth / img.naturalHeight) : 1.0;
+            const mapKind = aspect < 1.25 ? 'europe' : 'world';
+
+            if (event.ctrlKey) {
+                return { x, y, name: 'Custom point', key: '', mapKind };
+            }
+
+            const data = zoomCountriesCache;
+            const list = data ? data[mapKind] : null;
+            if (Array.isArray(list) && list.length) {
+                let best = null;
+                let bestDist = Infinity;
+                for (const c of list) {
+                    const dx = c.x - x;
+                    const dy = c.y - y;
+                    const dist = dx * dx + dy * dy;
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        best = c;
+                    }
+                }
+                if (best && bestDist <= 0.18 * 0.18) {
+                    const resolvedKey = best.key || ((best.name || '').trim().toLowerCase() === 'russia' ? 'russia' : '');
+                    return { x: best.x, y: best.y, name: best.name, key: resolvedKey, mapKind };
+                }
+            }
+            return { x, y, name: '', key: '', mapKind };
+        }
+
+        let lastHoverOutlineKey = '';
+        function hoverZoomPoint(event) {
+            lastZoomPointerPos = { clientX: event.clientX, clientY: event.clientY };
+            if (!zoomCountriesCache) {
+                loadZoomCountries().then(data => {
+                    if (data && lastZoomPointerPos) hoverZoomPoint({ ...lastZoomPointerPos, ctrlKey: !!event.ctrlKey });
+                });
+            }
+            const target = resolveZoomTargetFromEvent(event);
+            const hoverPin = document.getElementById('zoomHoverPin');
+            const hoverLabel = document.getElementById('zoomHoverLabel');
+            const hoverOutline = document.getElementById('zoomHoverOutline');
+            if (!target || !hoverPin || !hoverLabel) return;
+            const leftPct = `${(target.x * 100).toFixed(1)}%`;
+            const topPct = `${(target.y * 100).toFixed(1)}%`;
+            hoverPin.classList.toggle('transition-all', !event.ctrlKey);
+            hoverPin.classList.toggle('duration-75', !event.ctrlKey);
+            hoverPin.style.left = leftPct;
+            hoverPin.style.top = topPct;
+            hoverPin.classList.remove('hidden');
+
+            if (hoverOutline) {
+                if (target.key) {
+                    const outlineKey = `${target.mapKind}:${target.key}`;
+                    if (outlineKey !== lastHoverOutlineKey) {
+                        lastHoverOutlineKey = outlineKey;
+                        hoverOutline.src = `/api/zoom_country_outline?map=${encodeURIComponent(target.mapKind)}&key=${encodeURIComponent(target.key)}`;
+                    }
+                    hoverOutline.classList.remove('hidden');
+                } else {
+                    lastHoverOutlineKey = '';
+                    hoverOutline.classList.add('hidden');
+                }
+            }
+
+            if (target.name) {
+                hoverLabel.textContent = target.name;
+                hoverLabel.style.left = `${Math.max(14, Math.min(86, target.x * 100)).toFixed(1)}%`;
+                hoverLabel.style.top = `${Math.max(14, target.y * 100).toFixed(1)}%`;
+                hoverLabel.classList.remove('hidden');
+            } else {
+                hoverLabel.classList.add('hidden');
+            }
+        }
+
+        function clearZoomHover() {
+            lastZoomPointerPos = null;
+            lastHoverOutlineKey = '';
+            document.getElementById('zoomHoverPin')?.classList.add('hidden');
+            document.getElementById('zoomHoverLabel')?.classList.add('hidden');
+            document.getElementById('zoomHoverOutline')?.classList.add('hidden');
+        }
+
+        function pickZoomPoint(event) {
+            const target = resolveZoomTargetFromEvent(event);
+            if (!target) return;
+            setZoomTarget(target.x, target.y, target.name, target.key || '');
+        }
+
+        for (const evtName of ['keydown', 'keyup']) {
+            window.addEventListener(evtName, e => {
+                if (e.key === 'Control' && lastZoomPointerPos) {
+                    hoverZoomPoint({ ...lastZoomPointerPos, ctrlKey: e.ctrlKey });
+                }
+            });
         }
 
         function fitStageMap() {
@@ -3367,8 +3631,15 @@ limitations under the License.
             materialPreviewUrls[inputId] = file ? URL.createObjectURL(file) : null;
 
             if (inputId === 'mapFileInput') {
+                const zoomImg = document.getElementById('zoomPickerImg');
+                const zoomPlaceholder = document.getElementById('zoomPickerPlaceholder');
                 if (file) {
                     const url = materialPreviewUrls[inputId];
+                    if (zoomImg) {
+                        zoomImg.src = url;
+                        zoomImg.classList.remove('hidden');
+                    }
+                    if (zoomPlaceholder) zoomPlaceholder.classList.add('hidden');
                     if (stageMap) {
                         stageMap.onload = fitStageMap;
                         stageMap.src = url;
@@ -3380,6 +3651,11 @@ limitations under the License.
                         mapThumbIcon.classList.add('hidden');
                     }
                 } else {
+                    if (zoomImg) {
+                        zoomImg.removeAttribute('src');
+                        zoomImg.classList.add('hidden');
+                    }
+                    if (zoomPlaceholder) zoomPlaceholder.classList.remove('hidden');
                     if (stageMap) {
                         stageMap.src = '';
                         stageMap.classList.add('hidden');

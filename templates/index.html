@@ -3194,6 +3194,33 @@ limitations under the License.
             showToast("Run history cleared", "info");
         }
 
+        function createHistoryThumbnail(dataUrl, size = 96) {
+            return new Promise(resolve => {
+                if (!dataUrl || !dataUrl.startsWith('data:image/')) {
+                    resolve(null);
+                    return;
+                }
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = size;
+                        canvas.height = size;
+                        const ctx = canvas.getContext('2d');
+                        const scale = Math.max(size / img.naturalWidth, size / img.naturalHeight);
+                        const drawW = img.naturalWidth * scale;
+                        const drawH = img.naturalHeight * scale;
+                        ctx.drawImage(img, (size - drawW) / 2, (size - drawH) / 2, drawW, drawH);
+                        resolve(canvas.toDataURL('image/jpeg', 0.82));
+                    } catch {
+                        resolve(null);
+                    }
+                };
+                img.onerror = () => resolve(null);
+                img.src = dataUrl;
+            });
+        }
+
         function addToHistory(state, cmd, extra = {}) {
             const {api_key, ...savedState} = state;
             const createdAt = Date.now();
@@ -3204,12 +3231,44 @@ limitations under the License.
                 state: savedState,
                 cmd,
                 image_url: extra.image_url || null,
+                thumb_url: null,
                 analysis: extra.analysis || null,
                 map_values: extra.map_values || null
             };
             runHistory = [entry, ...runHistory.filter(item => createdAt - item.createdAt <= HISTORY_RETENTION_MS)];
             renderRunHistory();
-            queueHistoryWrite(() => StudioStorage.addHistory(entry));
+            if (entry.image_url) {
+                createHistoryThumbnail(entry.image_url).then(thumb => {
+                    if (!thumb) return;
+                    entry.thumb_url = thumb;
+                    const imgEl = document.querySelector(`[data-history-id="${entry.id}"] img`);
+                    if (imgEl) imgEl.src = thumb;
+                    queueHistoryWrite(() => StudioStorage.addHistory(entry));
+                });
+            } else {
+                queueHistoryWrite(() => StudioStorage.addHistory(entry));
+            }
+        }
+
+        let thumbBackfillRunning = false;
+        function backfillMissingThumbnails() {
+            if (thumbBackfillRunning) return;
+            const missing = runHistory.filter(item => item.image_url && !item.thumb_url);
+            if (!missing.length) return;
+            thumbBackfillRunning = true;
+            (async () => {
+                for (const item of missing) {
+                    const thumb = await createHistoryThumbnail(item.image_url);
+                    if (thumb) {
+                        item.thumb_url = thumb;
+                        const imgEl = document.querySelector(`[data-history-id="${item.id}"] img`);
+                        if (imgEl) imgEl.src = thumb;
+                        queueHistoryWrite(() => StudioStorage.addHistory(item));
+                    }
+                    await new Promise(r => setTimeout(r, 20));
+                }
+                thumbBackfillRunning = false;
+            })();
         }
 
         function renderRunHistory() {
@@ -3224,12 +3283,18 @@ limitations under the License.
             }
             runHistory.forEach((item, idx) => {
                 const row = document.createElement('div');
+                row.dataset.historyId = item.id || '';
+                row.style.contain = 'layout style paint';
                 row.className = 'p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/60 cursor-pointer transition flex items-center gap-2.5';
                 row.addEventListener('click', () => restoreHistoryItem(idx));
 
-                if (item.image_url) {
+                if (item.image_url || item.thumb_url) {
                     const preview = document.createElement('img');
-                    preview.src = item.image_url;
+                    preview.decoding = 'async';
+                    preview.loading = 'lazy';
+                    preview.width = 44;
+                    preview.height = 44;
+                    preview.src = item.thumb_url || item.image_url;
                     preview.alt = 'Map preview';
                     preview.className = 'w-11 h-11 rounded-lg object-cover border border-slate-700/80 shrink-0 bg-slate-950';
                     row.appendChild(preview);
@@ -3238,22 +3303,24 @@ limitations under the License.
                 const details = document.createElement('div');
                 details.className = 'min-w-0 flex-1 flex flex-col justify-between gap-1';
                 const metadata = document.createElement('div');
-                metadata.className = 'flex items-center justify-between text-[11px]';
-                const mode = document.createElement('span');
-                mode.className = 'font-mono text-indigo-400 font-semibold';
-                mode.textContent = `${item.state.map_type} / ${item.state.mode}`;
+                metadata.className = 'flex items-center justify-between gap-2 text-[11px]';
+                const topicEl = document.createElement('span');
+                topicEl.className = 'text-indigo-300 font-semibold truncate';
+                topicEl.textContent = (item.state?.topic || '').trim() || 'Untitled map';
                 const time = document.createElement('span');
-                time.className = 'text-slate-500';
+                time.className = 'text-slate-500 shrink-0';
                 time.textContent = item.time;
-                metadata.append(mode, time);
+                metadata.append(topicEl, time);
 
-                const command = document.createElement('div');
-                command.className = 'text-[11px] font-mono text-slate-400 truncate';
-                command.textContent = item.cmd;
-                details.append(metadata, command);
+                const modeLine = document.createElement('div');
+                modeLine.className = 'text-[11px] font-mono text-slate-400 truncate';
+                const mapLabel = String(item.state?.map_type || 'default').replace(/_/g, ' ');
+                modeLine.textContent = `${mapLabel} / ${item.state?.mode || 'text'}`;
+                details.append(metadata, modeLine);
                 row.appendChild(details);
                 list.appendChild(row);
             });
+            backfillMissingThumbnails();
         }
 
         function restoreHistoryItem(index) {
