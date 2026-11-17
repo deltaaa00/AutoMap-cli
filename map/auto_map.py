@@ -212,28 +212,36 @@ def _region_index(map_path: Path, base: Image.Image, coords: dict) -> tuple[np.n
 
 
 _RUST_WARNED = False
+_LAST_RUST_WARNING: str | None = None
+
+
+def _record_rust_warning(msg: str) -> None:
+    global _RUST_WARNED, _LAST_RUST_WARNING
+    _LAST_RUST_WARNING = msg
+    if not _RUST_WARNED:
+        _RUST_WARNED = True
+        log.warning(msg)
+        logging.warning(msg)
 
 
 def _get_automap_rs():
     """Return the native ``automap_rs`` module when available, else ``None``."""
-    global _RUST_WARNED
+    global _LAST_RUST_WARNING
     try:
         import automap_rs
         if hasattr(automap_rs, "paint_regions_rs") and hasattr(automap_rs, "alpha_composite_rs"):
+            _LAST_RUST_WARNING = None
             return automap_rs
         raise ImportError("automap_rs map functions not built")
     except Exception as exc:
-        if not _RUST_WARNED:
-            _RUST_WARNED = True
-            msg = f"Rust map acceleration unavailable ({type(exc).__name__}: {exc}); falling back to Python/PIL."
-            log.warning(msg)
-            logging.warning(msg)
+        _record_rust_warning(
+            f"Rust map acceleration unavailable ({type(exc).__name__}: {exc}); falling back to Python/PIL."
+        )
         return None
 
 
 def _alpha_composite(base: Image.Image, overlay: Image.Image) -> Image.Image:
     """Alpha-composite ``overlay`` over ``base`` using Rust when available."""
-    global _RUST_WARNED
     rs = _get_automap_rs()
     if rs is not None and base.size == overlay.size:
         try:
@@ -242,18 +250,15 @@ def _alpha_composite(base: Image.Image, overlay: Image.Image) -> Image.Image:
             out_bytes = rs.alpha_composite_rs(base_rgba.tobytes(), overlay_rgba.tobytes())
             return Image.frombytes("RGBA", base.size, out_bytes)
         except Exception as exc:
-            if not _RUST_WARNED:
-                _RUST_WARNED = True
-                msg = f"Rust alpha_composite_rs failed ({type(exc).__name__}: {exc}); falling back to PIL."
-                log.warning(msg)
-                logging.warning(msg)
+            _record_rust_warning(
+                f"Rust alpha_composite_rs failed ({type(exc).__name__}: {exc}); falling back to PIL."
+            )
     return Image.alpha_composite(base, overlay)
 
 
 def _paint_regions(img: Image.Image, flat: np.ndarray, ids: np.ndarray,
                    colors: dict[int, tuple[int, int, int, int]]) -> Image.Image:
     """Return a copy of ``img`` with region ``i`` painted ``colors[i]``."""
-    global _RUST_WARNED
     if not colors:
         return img.copy()
     n = int(max(colors)) + 1
@@ -277,11 +282,9 @@ def _paint_regions(img: Image.Image, flat: np.ndarray, ids: np.ndarray,
             )
             return Image.frombytes("RGBA", img.size, out_bytes)
         except Exception as exc:
-            if not _RUST_WARNED:
-                _RUST_WARNED = True
-                msg = f"Rust paint_regions_rs failed ({type(exc).__name__}: {exc}); falling back to NumPy."
-                log.warning(msg)
-                logging.warning(msg)
+            _record_rust_warning(
+                f"Rust paint_regions_rs failed ({type(exc).__name__}: {exc}); falling back to NumPy."
+            )
     arr = np.array(img, dtype=np.uint8)
     pix = arr.reshape(-1, 4)
     sel = use.astype(bool, copy=False)[ids]
@@ -1319,6 +1322,8 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
 
     _report(4, "Encoding final PNG...")
+    if _LAST_RUST_WARNING:
+        render_meta["rust_warning"] = _LAST_RUST_WARNING
     if io_res:
         # Return an in-memory PNG for the web API instead of writing result.png.
 

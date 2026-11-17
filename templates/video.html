@@ -3863,8 +3863,13 @@ limitations under the License.
                 }
 
                 logToConsole(`[Success] Video rendered: ${filePath}`, 'success');
+                if (result.warning) {
+                    logToConsole(`[Warning] ${result.warning}`, 'warn');
+                    showToast(result.warning, 'warn');
+                } else {
+                    showToast(result.has_audio ? 'Video rendered with music! Click Download video.' : 'Video rendered without music.', 'success');
+                }
                 metaBadge.textContent = `Done (${new Date().toLocaleTimeString()})`;
-                showToast(result.has_audio ? 'Video rendered with music! Click Download video.' : 'Video rendered without music.', 'success');
             } catch (error) {
                 logToConsole(`[API Error] ${error.message}`, 'error');
                 showToast(error.message || "Video render failed. Check console logs.", 'error');

@@ -2477,6 +2477,10 @@ limitations under the License.
 
                 if (response.ok && result.status === 'success') {
                     if (result.command) logToConsole(`[Server] ${result.command}`, 'info');
+                    if (result.warning) {
+                        logToConsole(`[Warning] ${result.warning}`, 'warn');
+                        showToast(result.warning, 'warn');
+                    }
                     logToConsole(`[Success] Map generated and loaded (${describeDataUrl(result.image_url)})`, 'success');
 
                     if (result.map_values) {

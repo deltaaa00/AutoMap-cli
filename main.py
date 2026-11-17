@@ -708,6 +708,8 @@ def generate():
         "ai_cached": ai_cache_hit,
     }
     render_meta = getattr(buffer, "map_meta", None)
+    if isinstance(render_meta, dict) and render_meta.get("rust_warning"):
+        resp_payload["warning"] = render_meta["rust_warning"]
     ai_vals = render_meta.get("ai_answer") if isinstance(render_meta, dict) else None
     if isinstance(ai_vals, dict) and ai_vals:
         resp_payload["map_values"] = render_meta.get("raw_ai_answer", ai_vals)

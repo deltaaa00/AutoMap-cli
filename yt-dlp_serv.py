@@ -1219,6 +1219,7 @@ def make_video() -> tuple[object, int]:
 
         # Prefer the native Rust compositor when available; fall back to MoviePy for dynamic map zoom or reveal.
         used_rust = False
+        rust_warning: str | None = None
         # ======== RUST ENGINE INJECTION =============
         try:  # pragma: no cover
             if zoom_enabled or reveal_enabled:
@@ -1297,11 +1298,11 @@ def make_video() -> tuple[object, int]:
                 )
                 used_rust = True
         except Exception as exc:
-            logging.warning(
-                "Rust video render unavailable or failed (%s: %s); falling back to MoviePy.",
-                type(exc).__name__,
-                exc,
+            rust_warning = (
+                f"Rust video render unavailable or failed ({type(exc).__name__}: {exc}); "
+                "falling back to MoviePy."
             )
+            logging.warning(rust_warning)
 
         if not used_rust:  # pragma: no branch
             final_clip = CompositeVideoClip(clips, size=(canvas_w, canvas_h))
@@ -1379,12 +1380,16 @@ def make_video() -> tuple[object, int]:
                 **encode_options,
             )
 
-        return jsonify({
+        payload = {
             "status": "success",
             "file_path": output_path,
             "download_url": "/api/download_video?" + urlencode({'path': output_path}),
             "has_audio": has_audio,
-        }), 200
+            "render_engine": "rust" if used_rust else "moviepy",
+        }
+        if rust_warning:
+            payload["warning"] = rust_warning
+        return jsonify(payload), 200
     
     except Exception as e:
         return jsonify({"status": "error", "error": f"Error processing video: {str(e)}"}), 500
