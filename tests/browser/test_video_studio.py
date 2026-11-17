@@ -786,3 +786,24 @@ def test_youtube_auto_upload_uses_metadata_and_shows_video_link(studio):
     assert page.locator('#youtubeDescription').input_value() == 'Опис відео\n🌍'
     assert not page.locator('#youtubeAuto').is_checked()
     assert page.locator('#youtubeSecret').input_value() == ''
+
+
+def test_youtube_refreshes_stale_request_token_and_retries_once(studio):
+    page, _ = studio
+    status_count = []
+    requests = []
+    def status(route):
+        status_count.append(1)
+        route.fulfill(json={'connected': True, 'csrf_token': f'token-{len(status_count)}',
+                            'redirect_uri': 'https://automap.test/api/youtube/callback'})
+    def disconnect(route):
+        requests.append(route.request.headers['x-youtube-csrf'])
+        if len(requests) == 1:
+            route.fulfill(status=403, json={'code': 'youtube_csrf_invalid', 'error': 'Stale token'})
+        else:
+            route.fulfill(json={'connected': False})
+    page.route('**/api/youtube/status', status)
+    page.route('**/api/youtube/disconnect', disconnect)
+    page.evaluate("youtubeCsrf = 'old-tab-token'; youtubeRequest('/api/youtube/disconnect', {method:'POST'})")
+    assert requests == ['token-1', 'token-2']
+    assert len(status_count) == 2
