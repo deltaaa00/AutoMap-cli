@@ -25,3 +25,9 @@ yt-dlp>=2024.12.0
 pydub>=0.25.1
 moviepy>=2.0.0
 proglog>=0.1.10,<1.0.0
+
+# YouTube Data API uploads and OAuth authorization.
+google-api-python-client>=2.150.0,<3.0.0
+google-auth-oauthlib>=1.2.0,<2.0.0
+google-auth-httplib2>=0.2.0,<1.0.0
+cryptography>=43.0.0

@@ -129,6 +129,10 @@ from web_auth import init_web_auth
 
 init_web_auth(app, dotenv_values(env) if env.is_file() else {})
 
+from youtube_upload import YouTubeUploads
+
+youtube_uploads = YouTubeUploads(app, WORKER_URL, requests)
+
 
 @app.before_request
 def validate_api_json_body():
@@ -1668,6 +1672,15 @@ def make_video() -> tuple[object, int]:
     if data is None:
         return jsonify(status='error', error='Invalid multipart payload field.'), 400
 
+    youtube_body = None
+    if data.get('youtube') is not None:
+        if not youtube_uploads.valid_csrf():
+            return jsonify(error='Invalid YouTube request token. Reload the page.'), 403
+        try:
+            youtube_body = youtube_uploads.check_ready(data['youtube'])
+        except ValueError as error:
+            return jsonify(status='error', error=str(error)), 400
+
     # The frontend sends base64 strings; keep them as-is (default to empty string).
     map_b64 = data.get('map_file') or ''
     background_b64 = data.get('background_video') or ''
@@ -1764,7 +1777,15 @@ def make_video() -> tuple[object, int]:
         return jsonify({"status": "error",
                         "error": "Video service returned a non-JSON response."}), 502
 
-    # Pass the downstream payload/status straight through.
+    if response.ok and isinstance(payload, dict) and payload.get('status') == 'success':
+        path = payload.get('file_path') or payload.get('path') or payload.get('file')
+        if isinstance(path, str) and path:
+            payload['upload_token'] = youtube_uploads.render_token(path)
+            if youtube_body is not None:
+                try:
+                    payload['youtube_job_id'] = youtube_uploads.start(payload['upload_token'], youtube_body)
+                except (ValueError, ImportError):
+                    payload['youtube_error'] = 'Video rendered, but YouTube upload could not start. Check your connection and try Upload to YouTube.'
     return jsonify(payload), response.status_code
 
 

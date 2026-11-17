@@ -57,3 +57,6 @@ result.png
 Dockerfile*
 docker-compose*.yml
 .dockerignore
+
+client_secret*.json
+client_secrets*.json

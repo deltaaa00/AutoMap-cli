@@ -66,3 +66,7 @@ instance/
 *.so
 *.dylib
 *.pyd
+
+# Google OAuth client downloads must never be committed.
+client_secret*.json
+client_secrets*.json

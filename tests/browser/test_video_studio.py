@@ -747,3 +747,42 @@ def test_clear_all_data_requires_confirmation_and_clears_both_studios(studio):
     page.goto('http://automap.test/')
     assert page.locator('#clearAllDataBtn').is_visible()
     assert page.locator('#topicInput').input_value() == ''
+
+
+def test_youtube_auto_upload_uses_metadata_and_shows_video_link(studio):
+    page, _ = studio
+    page.route('**/api/youtube/status', lambda route: route.fulfill(json={
+        'connected': True, 'csrf_token': 'csrf-test', 'redirect_uri': 'https://automap.test/api/youtube/callback'}))
+    page.evaluate('loadYouTubeConnection()')
+    page.locator('#youtubePanel summary').click()
+    page.locator('#youtubeTitle').fill('Заголовок YouTube')
+    page.locator('#youtubeDescription').fill('Опис відео\n🌍')
+    page.locator('#youtubeTags').fill('географія, maps')
+    page.locator('#youtubePrivacy').select_option('unlisted')
+    page.locator('#youtubeAuto').check()
+    page.locator('#videoTitleInput').fill('Title in video')
+    page.evaluate('''() => {
+        renderFiles.mapFileInput = new File(['map'], 'map.png', {type:'image/png'});
+        renderFiles.bgFileInput = new File(['video'], 'background.mp4', {type:'video/mp4'});
+    }''')
+    payloads = []
+    def render(route):
+        payloads.append(render_payload(route.request))
+        assert route.request.headers['x-youtube-csrf'] == 'csrf-test'
+        route.fulfill(json={'status': 'success', 'file_path': '/render/test.mp4',
+                            'upload_token': 'signed-test', 'youtube_job_id': 'job-test'})
+    page.route('**/api/render_video', render)
+    page.route('**/api/youtube/jobs/job-test', lambda route: route.fulfill(json={
+        'status': 'complete', 'progress': 100, 'phase': 'Uploaded', 'url': 'https://www.youtube.com/watch?v=test'}))
+    page.evaluate('handleRenderVideo({preventDefault(){}})')
+    page.wait_for_function("!document.getElementById('youtubeVideoLink').classList.contains('hidden')")
+    assert payloads[0]['youtube'] == {'title': 'Заголовок YouTube', 'description': 'Опис відео\n🌍',
+                                    'tags': 'географія, maps', 'privacy': 'unlisted', 'made_for_kids': False}
+    assert page.locator('#youtubeVideoLink').get_attribute('href') == 'https://www.youtube.com/watch?v=test'
+    assert page.locator('#downloadVideoBtn').is_visible()
+    reopen_studio(page)
+    page.locator('#youtubePanel summary').click()
+    assert page.locator('#youtubeTitle').input_value() == 'Заголовок YouTube'
+    assert page.locator('#youtubeDescription').input_value() == 'Опис відео\n🌍'
+    assert not page.locator('#youtubeAuto').is_checked()
+    assert page.locator('#youtubeSecret').input_value() == ''

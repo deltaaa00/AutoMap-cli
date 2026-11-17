@@ -196,6 +196,45 @@ Maps, background footage, audio, and custom overlay materials have a **10 MiB pe
 
 Worker files older than approximately **30 minutes** are cleaned up when relevant operations run. Download completed videos promptly. Browser-restored inline audio can keep a selected track usable after worker files have expired, subject to browser storage availability.
 
+### Upload rendered videos to YouTube
+
+1. Install the updated `requirements.txt` (or rebuild the Docker containers).
+2. In Google Cloud Console, enable **YouTube Data API v3**, configure the OAuth consent screen and, while the app is in testing, add your Google account as a test user. Download an **OAuth client secret JSON** file.
+3. Open **Video Studio → YouTube upload**, choose the JSON file, and click **Connect Google / YouTube**. Approve access to the desired channel.
+4. Set a YouTube title (or leave it empty to use the video headline), description, comma-separated tags, visibility, and the made-for-kids setting.
+5. Enable **Automatically upload after rendering**, then render. AutoMap uploads the resulting MP4 in the background and shows progress and a YouTube link. You can also click **Upload rendered video to YouTube** after rendering. Visibility defaults to **Private**; automatic upload must be enabled again on each visit.
+
+For `localhost`, either a **Desktop app** or **Web application** client works.
+For a hosted server, use a **Web application** client and register the exact
+redirect URI displayed in the panel under **Authorized redirect URIs** in Google
+Cloud Console. The hosted URL must use HTTPS. Behind a reverse proxy, set
+`YOUTUBE_REDIRECT_URI=https://your-host/api/youtube/callback` in the server
+environment (or Docker Compose `.env`) to match the public URL. Google setup and
+upload behavior are described in the [official upload guide](https://developers.google.com/youtube/data/guides/uploading_a_video).
+
+Each browser profile has its own YouTube connection. Two people using separate
+browsers or profiles can supply different client files, authorize different
+channels, and upload concurrently. Credentials and pending OAuth secrets are
+stored **encrypted** in `instance/youtube/`, with private file permissions;
+Google tokens and client secrets are never sent back to the browser, saved in
+localStorage, or forwarded to the media worker. A signed browser session selects
+its own credentials and upload jobs. Sharing a browser profile shares this
+connection; clearing cookies, logging out, or changing the web login requires
+connecting again. **Disconnect** deletes that browser's saved credentials; it
+does not cancel an upload already started or revoke the grant in Google Account.
+
+For persistent server storage, retain the `automap-session` Docker volume (it
+already mounts `/app/instance`). For native deployment, back up `instance/` and
+retain its session secret, or configure a stable `WEB_SECRET_KEY`. Encryption
+uses a separate key derived from that secret; replacing it makes existing
+credentials unreadable. Run a single web process, as in the supplied Waitress
+configuration. Up to two background uploads run at once. Upload status and
+in-progress transfers live in that process; a server restart preserves the saved
+Google connection but interrupts active transfers. Check YouTube Studio before
+starting a new upload after an interruption. Upload errors leave the rendered
+MP4 available for download. The same render cannot be uploaded twice in the
+running process, and worker file expiry still applies.
+
 ## Command-line usage
 
 Run commands from the repository root:

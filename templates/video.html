@@ -1392,6 +1392,41 @@ limitations under the License.
                         </div>
                     </div>
 
+                    <details class="p-4 rounded-xl bg-slate-950/80 border border-slate-700 space-y-3" id="youtubePanel">
+                        <summary class="cursor-pointer text-sm font-semibold text-rose-300"><i class="fa-brands fa-youtube mr-2"></i>YouTube upload</summary>
+                        <div class="space-y-3 mt-3 text-xs">
+                            <p class="text-slate-400">Connect your channel once, then upload automatically after rendering. Credentials stay on the server.</p>
+                            <label class="block">Google OAuth client secret (.json)
+                                <input id="youtubeSecret" type="file" accept=".json,application/json" class="block w-full mt-1 text-slate-300">
+                            </label>
+                            <p class="text-slate-400 break-all">Web application redirect URI: <code id="youtubeRedirect">Loading…</code>. Desktop app files work on localhost.</p>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" id="youtubeConnect" onclick="connectYouTube()" class="px-3 py-2 rounded-lg bg-rose-700 hover:bg-rose-600">Connect Google / YouTube</button>
+                                <button type="button" onclick="disconnectYouTube()" class="px-3 py-2 rounded-lg bg-slate-700">Disconnect</button>
+                            </div>
+                            <p id="youtubeConnection" role="status" class="text-slate-300">Checking connection…</p>
+                            <label class="flex items-center gap-2"><input id="youtubeAuto" type="checkbox">Automatically upload after rendering</label>
+                            <label class="block">YouTube title <span class="text-slate-400">(empty = video title)</span>
+                                <input id="youtubeTitle" maxlength="100" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700" placeholder="Title on YouTube">
+                            </label>
+                            <label class="block">Description
+                                <textarea id="youtubeDescription" rows="3" maxlength="5000" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700"></textarea>
+                            </label>
+                            <label class="block">Tags <span class="text-slate-400">(separated by commas)</span>
+                                <input id="youtubeTags" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700" placeholder="maps, geography, shorts">
+                            </label>
+                            <label class="block">Visibility
+                                <select id="youtubePrivacy" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700">
+                                    <option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option>
+                                </select>
+                            </label>
+                            <label class="flex items-center gap-2"><input id="youtubeKids" type="checkbox">Made for kids</label>
+                            <button type="button" id="youtubeUpload" onclick="uploadToYouTube()" disabled class="px-3 py-2 rounded-lg bg-rose-700 disabled:opacity-50">Upload rendered video to YouTube</button>
+                            <p id="youtubeUploadStatus" role="status" aria-live="polite" class="text-slate-300"></p>
+                            <a id="youtubeVideoLink" class="hidden text-rose-300 underline" target="_blank" rel="noopener noreferrer">Open video on YouTube</a>
+                        </div>
+                    </details>
+
                     <!-- Render button & Master Action Bar -->
                     <div class="mt-auto pt-1 flex flex-col gap-3">
                         <button type="submit" id="renderBtn" class="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:via-purple-500 hover:to-indigo-500 text-white font-display font-semibold text-sm shadow-xl shadow-indigo-600/25 hover:shadow-indigo-600/40 transition-all flex items-center justify-center gap-2.5 group">
@@ -4200,7 +4235,15 @@ limitations under the License.
                 return;
             }
 
+            let youtube = null;
+            if (document.getElementById('youtubeAuto').checked) {
+                try {
+                    if (!youtubeConnected) throw new Error('Connect your YouTube account first.');
+                    youtube = youtubeSettings();
+                } catch (error) { showToast(error.message, 'error'); return; }
+            }
             renderResultData = null;
+            document.getElementById('youtubeUpload').disabled = true;
             btn.disabled = true;
             btn.classList.add('opacity-70');
             btnText.textContent = "Rendering...";
@@ -4229,6 +4272,7 @@ limitations under the License.
                     duration: parseInt(durationSecs, 10),
                     ...overlaySettings,
                     render_id: renderId,
+                    ...(youtube ? {youtube} : {}),
                 };
                 const audioSource = includeAudio ? (cutAudioFile || musicAudioFile) : null;
                 const formData = new FormData();
@@ -4251,6 +4295,7 @@ limitations under the License.
                 stopProgress = startRenderProgress(renderId);
                 const response = await fetch('/api/render_video', {
                     method: 'POST',
+                    headers: youtube ? {'X-YouTube-CSRF': youtubeCsrf} : {},
                     body: formData,
                 });
 
@@ -4269,6 +4314,12 @@ limitations under the License.
                 stopProgress();
                 setRenderProgress(100, 'Complete');
                 renderResultData = result;
+                document.getElementById('youtubeUpload').disabled = !result.upload_token;
+                if (result.youtube_job_id) watchYouTubeUpload(result.youtube_job_id);
+                if (result.youtube_error) {
+                    document.getElementById('youtubeUploadStatus').textContent = result.youtube_error;
+                    showToast(result.youtube_error, 'warn');
+                }
                 const filePath = result.file_path || result.path || result.file || '(unknown path)';
 
                 const resultBox = document.getElementById('renderResult');
@@ -4399,5 +4450,6 @@ limitations under the License.
             }, 3000);
         }
     </script>
+    <script src="{{ url_for('static', filename='youtube-upload.js') }}"></script>
 </body>
 </html>
