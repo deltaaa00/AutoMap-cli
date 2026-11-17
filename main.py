@@ -1537,6 +1537,8 @@ def _extract_country_reveal_mask(
         mask = mask.resize((map_w, map_h), Image.Resampling.BILINEAR)
     if mask.mode != "L":
         mask = mask.convert("L")
+    from PIL import ImageFilter
+    mask = mask.filter(ImageFilter.MaxFilter(5)).point(lambda p: 255 if p > 64 else 0)
     if mask.getbbox() is None:
         return ""
 
@@ -1601,10 +1603,11 @@ def api_zoom_country_outline():
 
     map_kind = str(request.args.get('map') or 'europe').strip().lower()
     key = str(request.args.get('key') or '').strip().lower()
+    solid = str(request.args.get('solid') or '').strip() in ('1', 'true', 'yes')
     if not key or map_kind not in ('europe', 'world'):
         return ('', 404)
 
-    cache_key = (map_kind, key)
+    cache_key = (map_kind, key, solid)
     with _ZOOM_CACHE_LOCK:
         cached = _ZOOM_OUTLINE_CACHE.get(cache_key)
     if cached is not None:
@@ -1619,14 +1622,17 @@ def api_zoom_country_outline():
         return ('', 404)
 
     w, h = mask.size
-    pw = 360
+    pw = 720 if solid else 360
     ph = max(1, int(round(h * (pw / w))))
     small_mask = mask.resize((pw, ph), Image.Resampling.BILINEAR)
-    edge = ImageChops.subtract(small_mask.filter(ImageFilter.MaxFilter(5)), small_mask.filter(ImageFilter.MinFilter(3)))
-    fill_alpha = small_mask.point(lambda p: 45 if p > 128 else 0)
-    alpha = ImageChops.lighter(fill_alpha, edge.point(lambda p: min(255, int(p * 1.2))))
-
-    out = Image.new('RGBA', (pw, ph), (252, 211, 77, 255))
+    if solid:
+        alpha = small_mask.filter(ImageFilter.MaxFilter(5)).point(lambda p: 255 if p > 64 else 0)
+        out = Image.new('RGBA', (pw, ph), (0, 0, 0, 255))
+    else:
+        edge = ImageChops.subtract(small_mask.filter(ImageFilter.MaxFilter(5)), small_mask.filter(ImageFilter.MinFilter(3)))
+        fill_alpha = small_mask.point(lambda p: 45 if p > 128 else 0)
+        alpha = ImageChops.lighter(fill_alpha, edge.point(lambda p: min(255, int(p * 1.2))))
+        out = Image.new('RGBA', (pw, ph), (252, 211, 77, 255))
     out.putalpha(alpha)
     buf = io.BytesIO()
     out.save(buf, format='PNG')
@@ -1737,6 +1743,7 @@ def make_video() -> tuple[object, int]:
                 "zoom_country_key": zoom_country_key,
                 "reveal_enabled": reveal_enabled,
                 "reveal_time": reveal_time,
+                "reveal_color": str(data.get('reveal_color') or '#000000').strip(),
                 "reveal_mask": reveal_mask,
                 **({'render_id': data['render_id']} if data.get('render_id') is not None else {}),
             },

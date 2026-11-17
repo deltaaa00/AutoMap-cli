@@ -927,15 +927,25 @@ limitations under the License.
                                 </div>
                                 <div class="pt-1.5 border-t border-slate-800/80 space-y-2">
                                     <label class="flex items-center gap-2 text-xs text-slate-300">
-                                        <input id="revealCountryToggle" type="checkbox" onchange="updateRevealUI(); saveVideoSettings()" class="accent-emerald-400">
-                                        <span>Country reveal animation (black + &quot;...&quot; &rarr; reveal color &amp; value)</span>
+                                        <input id="revealCountryToggle" type="checkbox" checked onchange="updateRevealUI(); saveVideoSettings()" class="accent-emerald-400">
+                                        <span>Country reveal animation (cover + &quot;...&quot; &rarr; reveal color &amp; value)</span>
                                     </label>
                                     <div id="revealControlsPanel" class="hidden pl-5 space-y-1.5">
-                                        <label class="block text-[11px] text-slate-400">
-                                            <span>Reveal at (s)</span>
-                                            <input id="revealTimeInput" type="number" min="0.5" max="20" step="0.1" value="5.5" onchange="saveVideoSettings()"
-                                                class="mt-1 w-32 block px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
-                                        </label>
+                                        <div class="flex flex-wrap items-end gap-3">
+                                            <label class="block text-[11px] text-slate-400">
+                                                <span>Reveal at (s)</span>
+                                                <input id="revealTimeInput" type="number" min="0.5" max="20" step="0.1" value="5.5" onchange="updateRevealUI(); saveVideoSettings()"
+                                                    class="mt-1 w-28 block px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                            </label>
+                                            <label class="block text-[11px] text-slate-400">
+                                                <span>Cover color</span>
+                                                <span class="mt-1 flex items-center gap-1.5">
+                                                    <input id="revealColorInput" type="color" value="#000000" onchange="onRevealColorChange()"
+                                                        class="w-9 h-8 rounded-lg bg-slate-900 border border-slate-700 cursor-pointer p-0.5">
+                                                    <span id="revealColorHex" class="text-[11px] font-mono text-slate-300">#000000</span>
+                                                </span>
+                                            </label>
+                                        </div>
                                         <p class="text-[10px] text-slate-500">Timeline: 3 dots appear &rarr; camera zooms while country &amp; dots stay visible &rarr; after zoom, dots vanish &amp; country reveals.</p>
                                     </div>
                                 </div>
@@ -1455,7 +1465,7 @@ limitations under the License.
             'videoTitleInput', 'titleFontSelect', 'titleFontSize', 'titleFirstLineColor',
             'titleOtherLinesColor', 'titleUppercase', 'visualEffects', 'introFadeToggle',
             'mapZoomToggle', 'mapZoomX', 'mapZoomY', 'mapZoomCountry', 'mapZoomCountryKey',
-            'mapZoomScale', 'mapZoomStart', 'mapZoomDuration', 'mapZoomOutToggle', 'mapZoomOutDuration', 'revealCountryToggle', 'revealTimeInput',
+            'mapZoomScale', 'mapZoomStart', 'mapZoomDuration', 'mapZoomOutToggle', 'mapZoomOutDuration', 'revealCountryToggle', 'revealTimeInput', 'revealColorInput',
             'topLeftStickerSelect', 'topRightStickerSelect', 'subscribeBadgeToggle',
             'subscribeTextInput', 'subscribeDelayInput', 'watermarkTextInput',
             'watermarkFontSelect', 'watermarkColor', 'watermarkStarsToggle', 'codecSelect'];
@@ -2274,6 +2284,7 @@ limitations under the License.
                 zoom_out_duration: Number(document.getElementById('mapZoomOutDuration')?.value || 2.0),
                 reveal_enabled: !!document.getElementById('revealCountryToggle')?.checked,
                 reveal_time: Number(document.getElementById('revealTimeInput')?.value || 5.5),
+                reveal_color: document.getElementById('revealColorInput')?.value || '#000000',
                 top_left_sticker: document.getElementById('topLeftStickerSelect').value,
                 top_right_sticker: document.getElementById('topRightStickerSelect').value,
                 subscribe_badge: document.getElementById('subscribeBadgeToggle').checked,
@@ -2304,10 +2315,15 @@ limitations under the License.
         }
 
         function updateRevealUI() {
-            const enabled = !!document.getElementById('revealCountryToggle')?.checked;
+            const zoomEnabled = !!document.getElementById('mapZoomToggle')?.checked;
+            const enabled = zoomEnabled && !!document.getElementById('revealCountryToggle')?.checked;
             const panel = document.getElementById('revealControlsPanel');
             if (panel) panel.classList.toggle('hidden', !enabled);
-            if (typeof renderPreviewFrame === 'function') renderPreviewFrame(previewAnimTime);
+            if (typeof syncPreviewAnimationLoop === 'function') {
+                syncPreviewAnimationLoop();
+            } else if (typeof renderPreviewFrame === 'function') {
+                renderPreviewFrame(previewAnimTime);
+            }
         }
 
         function updateMapZoomUI() {
@@ -2501,23 +2517,73 @@ limitations under the License.
             return `${String(mins).padStart(2, '0')}:${rem}`;
         }
 
+        function parseHexRgb(hexStr) {
+            const s = String(hexStr || '#000000').trim().replace(/^#/, '');
+            if (/^[0-9a-fA-F]{6}$/.test(s)) {
+                return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)];
+            }
+            if (/^[0-9a-fA-F]{3}$/.test(s)) {
+                return [parseInt(s[0] + s[0], 16), parseInt(s[1] + s[1], 16), parseInt(s[2] + s[2], 16)];
+            }
+            return [0, 0, 0];
+        }
+
+        function onRevealColorChange() {
+            const colorVal = document.getElementById('revealColorInput')?.value || '#000000';
+            const hexLabel = document.getElementById('revealColorHex');
+            if (hexLabel) hexLabel.textContent = colorVal.toLowerCase();
+            revealMaskCache.key = '';
+            revealMaskCache.loadingKey = '';
+            updateRevealUI();
+            saveVideoSettings();
+        }
+
         function ensureRevealMaskLoaded() {
             const map = document.getElementById('stageMapPreview');
             if (!map || map.classList.contains('hidden') || !map.naturalWidth || !map.naturalHeight) return null;
+
+            const colorHex = (document.getElementById('revealColorInput')?.value || '#000000').toLowerCase();
+            const hexLabel = document.getElementById('revealColorHex');
+            if (hexLabel && hexLabel.textContent !== colorHex) hexLabel.textContent = colorHex;
 
             const customDataUrl = (typeof window.revealMaskDataUrl === 'string' && window.revealMaskDataUrl) ? window.revealMaskDataUrl : '';
             let maskKey = '';
             let maskSrc = '';
             if (customDataUrl) {
-                maskKey = `custom:${customDataUrl.slice(0, 64)}`;
+                maskKey = `custom:${customDataUrl.slice(0, 64)}:${colorHex}`;
                 maskSrc = customDataUrl;
             } else {
-                const countryKey = (document.getElementById('mapZoomCountryKey')?.value || '').trim();
-                if (!countryKey) return null;
                 const aspect = map.naturalWidth / map.naturalHeight;
                 const mapKind = aspect < 1.25 ? 'europe' : 'world';
-                maskKey = `${mapKind}:${countryKey}`;
-                maskSrc = `/api/zoom_country_outline?map=${encodeURIComponent(mapKind)}&key=${encodeURIComponent(countryKey)}`;
+                let countryKey = (document.getElementById('mapZoomCountryKey')?.value || '').trim();
+                if (!countryKey) {
+                    if (!zoomCountriesCache) {
+                        loadZoomCountries().then(() => renderPreviewFrame(previewAnimTime));
+                        return null;
+                    }
+                    const list = zoomCountriesCache[mapKind];
+                    const zx = parseFloat(document.getElementById('mapZoomX')?.value || '0.807');
+                    const zy = parseFloat(document.getElementById('mapZoomY')?.value || '0.358');
+                    if (Array.isArray(list) && list.length) {
+                        let best = null;
+                        let bestDist = Infinity;
+                        for (const c of list) {
+                            const d = (c.x - zx) ** 2 + (c.y - zy) ** 2;
+                            if (d < bestDist) {
+                                bestDist = d;
+                                best = c;
+                            }
+                        }
+                        if (best && bestDist <= 0.18 * 0.18) {
+                            countryKey = best.key || '';
+                            const keyEl = document.getElementById('mapZoomCountryKey');
+                            if (keyEl && countryKey) keyEl.value = countryKey;
+                        }
+                    }
+                }
+                if (!countryKey) return null;
+                maskKey = `${mapKind}:${countryKey}:${colorHex}`;
+                maskSrc = `/api/zoom_country_outline?map=${encodeURIComponent(mapKind)}&key=${encodeURIComponent(countryKey)}&solid=1`;
             }
 
             if (revealMaskCache.key === maskKey && revealMaskCache.silhouette) {
@@ -2527,6 +2593,7 @@ limitations under the License.
                 return null;
             }
 
+            const [cr, cg, cb] = parseHexRgb(colorHex);
             revealMaskCache.loadingKey = maskKey;
             const img = new Image();
             img.crossOrigin = 'anonymous';
@@ -2549,10 +2616,10 @@ limitations under the License.
                         const idx = (y * w + x) * 4;
                         const a = data[idx + 3];
                         if (a > 20) {
-                            data[idx] = 14;
-                            data[idx + 1] = 14;
-                            data[idx + 2] = 22;
-                            data[idx + 3] = Math.round(a * 0.95);
+                            data[idx] = cr;
+                            data[idx + 1] = cg;
+                            data[idx + 2] = cb;
+                            data[idx + 3] = 255;
                             sumX += x;
                             sumY += y;
                             count++;
@@ -2632,8 +2699,11 @@ limitations under the License.
             }
 
             const zoomEnabled = !!document.getElementById('mapZoomToggle')?.checked;
-            const revealEnabled = !!document.getElementById('revealCountryToggle')?.checked;
-            const rTime = Number(document.getElementById('revealTimeInput')?.value || 5.5);
+            const revealEnabled = zoomEnabled && !!document.getElementById('revealCountryToggle')?.checked;
+            const zStartVal = Number(document.getElementById('mapZoomStart')?.value || 1.5);
+            const zDurVal = Math.max(0.1, Number(document.getElementById('mapZoomDuration')?.value || 2.5));
+            const rawRTime = Number(document.getElementById('revealTimeInput')?.value || 5.5);
+            const rTime = zoomEnabled ? Math.max(zStartVal + zDurVal + 0.5, rawRTime) : Math.max(0.2, rawRTime);
             const map = document.getElementById('stageMapPreview');
             const area = document.getElementById('stageMapArea');
 
@@ -2709,17 +2779,19 @@ limitations under the License.
                     const r = Math.max(5, Math.min(11, mw * 0.011));
                     const gap = r * 2.8;
                     const startX = cx - ((dotCount - 1) * gap) / 2;
+                    const [cr, cg, cb] = parseHexRgb(document.getElementById('revealColorInput')?.value || '#000000');
+                    const isLightCover = (0.299 * cr + 0.587 * cg + 0.114 * cb) > 175;
                     for (let i = 0; i < dotCount; i++) {
                         const dx = startX + i * gap;
                         ctx.beginPath();
                         ctx.arc(dx, cy, r, 0, Math.PI * 2);
-                        ctx.fillStyle = '#ffffff';
-                        ctx.shadowColor = 'rgba(0,0,0,0.75)';
+                        ctx.fillStyle = isLightCover ? '#0f172a' : '#ffffff';
+                        ctx.shadowColor = isLightCover ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.75)';
                         ctx.shadowBlur = 8;
                         ctx.fill();
                         ctx.shadowBlur = 0;
                         ctx.lineWidth = 2;
-                        ctx.strokeStyle = 'rgba(15,23,42,0.85)';
+                        ctx.strokeStyle = isLightCover ? 'rgba(255,255,255,0.85)' : 'rgba(15,23,42,0.85)';
                         ctx.stroke();
                     }
                 }
@@ -2758,10 +2830,21 @@ limitations under the License.
             previewRafId = requestAnimationFrame(stepPreviewAnimation);
         }
 
+        function hasActivePreviewAnimations() {
+            const zoomEnabled = !!document.getElementById('mapZoomToggle')?.checked;
+            return !!(
+                document.getElementById('introFadeToggle')?.checked
+                || document.getElementById('subscribeBadgeToggle')?.checked
+                || document.getElementById('watermarkStarsToggle')?.checked
+                || zoomEnabled
+            );
+        }
+
         function syncPreviewAnimationLoop() {
             syncPreviewTransportUI();
             const player = document.getElementById('renderedVideoPlayer');
-            const shouldRun = previewAnimPlaying && previewVisible && !document.hidden && player && player.classList.contains('hidden');
+            const hasAnims = hasActivePreviewAnimations();
+            const shouldRun = hasAnims && previewAnimPlaying && previewVisible && !document.hidden && player && player.classList.contains('hidden');
             if (shouldRun && previewRafId === null) {
                 previewLastTs = null;
                 previewRafId = requestAnimationFrame(stepPreviewAnimation);
@@ -2771,6 +2854,7 @@ limitations under the License.
                     previewRafId = null;
                 }
                 previewLastTs = null;
+                if (!hasAnims) previewAnimTime = 0;
                 renderPreviewFrame(previewAnimTime);
             }
         }

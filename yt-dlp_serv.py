@@ -579,11 +579,24 @@ def _decode_reveal_mask(raw_mask: object, box_w: int, box_h: int):
     return mask_arr[..., None]
 
 
+def _parse_reveal_color(raw_color: object) -> tuple[int, int, int]:
+    """Parse a hex color string (e.g. ``#000000``) into an RGB tuple, defaulting to black."""
+    if not isinstance(raw_color, str):
+        return (0, 0, 0)
+    s = raw_color.strip().lstrip('#')
+    if len(s) == 3 and all(c in '0123456789abcdefABCDEF' for c in s):
+        s = ''.join(c * 2 for c in s)
+    if len(s) == 6 and all(c in '0123456789abcdefABCDEF' for c in s):
+        return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16))
+    return (0, 0, 0)
+
+
 def _render_reveal_dot_overlays(
     box_w: int,
     box_h: int,
     cx: float,
     cy: float,
+    cover_rgb: tuple[int, int, int] = (0, 0, 0),
 ) -> dict[int, tuple[int, int, int, int, object]]:
     """Pre-render 1-, 2-, and 3-dot RGBA overlays centered at ``(cx, cy)`` using 4x supersampling."""
     import numpy as np
@@ -603,6 +616,10 @@ def _render_reveal_dot_overlays(
     patch_w = max(1, x1 - x0)
     patch_h = max(1, y1 - y0)
 
+    lum = 0.299 * cover_rgb[0] + 0.587 * cover_rgb[1] + 0.114 * cover_rgb[2]
+    dot_fill = (15, 23, 42, 255) if lum > 175 else (255, 255, 255, 255)
+    ring_fill = (255, 255, 255, 255) if lum > 175 else (10, 12, 20, 255)
+
     ss = 4
     overlays: dict[int, tuple[int, int, int, int, object]] = {}
     for count in (1, 2, 3):
@@ -615,11 +632,11 @@ def _render_reveal_dot_overlays(
             ri = dot_r * ss
             draw.ellipse(
                 (dot_x - ro, dot_y - ro, dot_x + ro, dot_y + ro),
-                fill=(10, 12, 20, 255),
+                fill=ring_fill,
             )
             draw.ellipse(
                 (dot_x - ri, dot_y - ri, dot_x + ri, dot_y + ri),
-                fill=(255, 255, 255, 255),
+                fill=dot_fill,
             )
         patch = hi_img.resize((patch_w, patch_h), Image.Resampling.LANCZOS)
         overlays[count] = (y0, y1, x0, x1, np.array(patch, dtype=np.uint8))
@@ -740,6 +757,7 @@ def _build_reveal_map_clip(
     zoom_start: float,
     zoom_duration: float,
     reveal_time_raw: object,
+    reveal_color: object = "#000000",
 ):
     """Build a dynamic RGB + mask ``VideoClip`` for the country reveal animation."""
     import numpy as np
@@ -750,9 +768,10 @@ def _build_reveal_map_clip(
         base_pil = raw_map.convert('RGBA').resize((box_w, box_h), Image.Resampling.LANCZOS)
     base_rgba = np.array(base_pil, dtype=np.uint8)
 
+    cover_r, cover_g, cover_b = _parse_reveal_color(reveal_color)
     map_visible = (base_rgba[:, :, 3:4] > 0).astype(np.float32)
     eff_mask = mask_f * map_visible
-    black_pixel = np.array([14.0, 14.0, 22.0, 255.0], dtype=np.float32).reshape(1, 1, 4)
+    black_pixel = np.array([float(cover_r), float(cover_g), float(cover_b), 255.0], dtype=np.float32).reshape(1, 1, 4)
     base_f = base_rgba.astype(np.float32)
     black_f = base_f * (1.0 - eff_mask) + black_pixel * eff_mask
     delta_f = black_f - base_f
@@ -799,7 +818,7 @@ def _build_reveal_map_clip(
             dot_cx = float(xs[best])
             dot_cy = float(ys[best])
 
-    dot_overlays = _render_reveal_dot_overlays(box_w, box_h, dot_cx, dot_cy)
+    dot_overlays = _render_reveal_dot_overlays(box_w, box_h, dot_cx, dot_cy, (cover_r, cover_g, cover_b))
     dot_rgba_frames = {
         count: _compose_rgba(_alpha_composite_patch(black_rgba, *dot_overlays[count]))
         for count in (1, 2, 3)
@@ -1138,6 +1157,7 @@ def make_video() -> tuple[object, int]:
                 zoom_start,
                 zoom_duration,
                 data.get('reveal_time'),
+                data.get('reveal_color', '#000000'),
             )
             if effects:
                 map_y -= 24
