@@ -251,7 +251,7 @@ class YouTubeUploads:
                 if urlsplit(callback).scheme != 'https' and urlsplit(callback).hostname not in ('localhost', '127.0.0.1', '::1'):
                     raise ValueError('Hosted Google authorization requires HTTPS.')
                 flow = Flow.from_client_config(config, scopes=[SCOPE], redirect_uri=callback, autogenerate_code_verifier=True)
-                auth_url, state = flow.authorization_url(access_type='offline', prompt='consent')
+                auth_url, state = flow.authorization_url(access_type='offline', prompt='consent select_account')
                 owner = self.owner()
                 pending = {'config': config, 'state': state, 'verifier': flow.code_verifier, 'redirect': callback, 'created': time.time()}
                 self.save_secret(self.token_path(owner).with_suffix('.pending'), pending)

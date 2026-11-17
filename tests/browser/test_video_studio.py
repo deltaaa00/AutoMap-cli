@@ -755,6 +755,7 @@ def test_youtube_auto_upload_uses_metadata_and_shows_video_link(studio):
         'connected': True, 'csrf_token': 'csrf-test', 'redirect_uri': 'https://automap.test/api/youtube/callback'}))
     page.evaluate('loadYouTubeConnection()')
     page.locator('#youtubePanel summary').click()
+    page.locator('#youtubeUseTopic').uncheck()
     page.locator('#youtubeTitle').fill('Заголовок YouTube')
     page.locator('#youtubeDescription').fill('Опис відео\n🌍')
     page.locator('#youtubeTags').fill('географія, maps')
@@ -784,7 +785,10 @@ def test_youtube_auto_upload_uses_metadata_and_shows_video_link(studio):
     page.locator('#youtubePanel summary').click()
     assert page.locator('#youtubeTitle').input_value() == 'Заголовок YouTube'
     assert page.locator('#youtubeDescription').input_value() == 'Опис відео\n🌍'
-    assert not page.locator('#youtubeAuto').is_checked()
+    assert page.locator('#youtubeAuto').is_checked()
+    assert not page.locator('#youtubeUseTopic').is_checked()
+    assert page.locator('#youtubeTags').input_value() == 'географія, maps'
+    assert page.locator('#youtubePrivacy').input_value() == 'unlisted'
     assert page.locator('#youtubeSecret').input_value() == ''
 
 
@@ -807,3 +811,54 @@ def test_youtube_refreshes_stale_request_token_and_retries_once(studio):
     page.evaluate("youtubeCsrf = 'old-tab-token'; youtubeRequest('/api/youtube/disconnect', {method:'POST'})")
     assert requests == ['token-1', 'token-2']
     assert len(status_count) == 2
+
+
+def test_youtube_title_follows_video_topic_and_remembers_title_mode(studio):
+    page, _ = studio
+    page.evaluate('async () => { await window.videoStudioReady; }')
+    page.locator('#youtubePanel summary').click()
+    assert page.locator('#youtubeUseTopic').is_checked()
+    page.locator('#videoTitleInput').fill('Населення країн Європи')
+    assert page.locator('#youtubeTitle').input_value() == 'Населення країн Європи'
+    assert page.locator('#youtubeTitle').get_attribute('readonly') is not None
+    page.evaluate("document.getElementById('videoTitleInput').value = 'Нова тема'; updateStageTitlePreview('Нова тема'); saveVideoSettings()")
+    assert page.evaluate('youtubeSettings().title') == 'Нова тема'
+    page.locator('#youtubeUseTopic').uncheck()
+    page.locator('#youtubeTitle').fill('Custom title')
+    page.locator('#youtubeUseTopic').check()
+    assert page.locator('#youtubeTitle').input_value() == 'Нова тема'
+    reopen_studio(page)
+    page.locator('#youtubePanel summary').click()
+    assert page.locator('#youtubeUseTopic').is_checked()
+    assert page.locator('#youtubeTitle').input_value() == 'Нова тема'
+    page.locator('#videoTitleInput').fill('Another\ntopic')
+    assert page.evaluate('youtubeSettings().title') == 'Another topic'
+    page.locator('#youtubeUseTopic').uncheck()
+    assert page.locator('#youtubeTitle').input_value() == 'Custom title'
+    page.locator('#youtubeUseTopic').check()
+    page.locator('#videoTitleInput').fill('A' * 110)
+    assert page.evaluate('youtubeSettings().title') == 'A' * 100
+
+
+def test_youtube_sign_in_status_is_visible_when_panel_is_closed(studio):
+    page, _ = studio
+    assert not page.locator('#youtubePanel').evaluate('el => el.open')
+    page.route('**/api/youtube/status', lambda route: route.fulfill(json={
+        'connected': False, 'csrf_token': 'test-token', 'redirect_uri': 'https://automap.test/api/youtube/callback'}))
+    page.evaluate('loadYouTubeConnection()')
+    assert page.locator('#youtubeConnectionBadge').is_visible()
+    assert page.locator('#youtubeConnectionBadge').inner_text() == 'Not signed in to YouTube'
+    page.route('**/api/youtube/status', lambda route: route.fulfill(json={
+        'connected': True, 'csrf_token': 'test-token', 'redirect_uri': 'https://automap.test/api/youtube/callback'}))
+    page.evaluate('loadYouTubeConnection()')
+    assert page.locator('#youtubeConnectionBadge').inner_text() == 'Signed in to YouTube'
+    page.route('**/api/youtube/disconnect', lambda route: route.fulfill(json={'connected': False}))
+    page.route('**/api/youtube/status', lambda route: route.fulfill(json={
+        'connected': False, 'csrf_token': 'test-token', 'redirect_uri': 'https://automap.test/api/youtube/callback'}))
+    page.locator('#youtubePanel summary').click()
+    page.locator('#youtubeAuto').check()
+    page.locator('#youtubeSignOut').click()
+    page.wait_for_function("document.getElementById('youtubeConnectionBadge').textContent === 'Not signed in to YouTube'")
+    assert page.locator('#youtubeSignOut').is_disabled()
+    assert not page.locator('#youtubeAuto').is_checked()
+    assert page.evaluate("JSON.parse(localStorage.getItem('automap-youtube-settings')).youtubeAuto") is False

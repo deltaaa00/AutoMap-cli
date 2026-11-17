@@ -2,10 +2,27 @@
 let youtubeCsrf = '';
 let youtubeConnected = false;
 let youtubePolling = 0;
-const youtubeFields = ['youtubeTitle', 'youtubeDescription', 'youtubeTags', 'youtubePrivacy', 'youtubeKids'];
+const youtubeFields = ['youtubeTitle', 'youtubeDescription', 'youtubeTags', 'youtubePrivacy', 'youtubeKids', 'youtubeAuto', 'youtubeUseTopic'];
+let youtubeCustomTitle = '';
 const ytElement = id => document.getElementById(id);
 
+function syncYouTubeTitle() {
+    const input = ytElement('youtubeTitle');
+    const useTopic = ytElement('youtubeUseTopic').checked;
+    input.readOnly = useTopic;
+    input.value = useTopic ? ytElement('videoTitleInput').value.replace(/\s+/g, ' ').trim().slice(0, 100) : youtubeCustomTitle;
+}
+
+function saveYouTubeSettings() {
+    const settings = Object.fromEntries(youtubeFields.map(id => {
+        const input = ytElement(id);
+        return [id, id === 'youtubeTitle' ? youtubeCustomTitle : input.type === 'checkbox' ? input.checked : input.value];
+    }));
+    try { localStorage.setItem('automap-youtube-settings', JSON.stringify(settings)); } catch {}
+}
+
 function youtubeSettings() {
+    syncYouTubeTitle();
     const settings = {
         title: ytElement('youtubeTitle').value.trim() || ytElement('videoTitleInput').value.trim(),
         description: ytElement('youtubeDescription').value,
@@ -29,13 +46,20 @@ async function loadYouTubeConnection() {
         if (!response.ok) throw new Error(result.error || 'Could not check YouTube connection.');
         youtubeCsrf = result.csrf_token;
         youtubeConnected = result.connected;
-        ytElement('youtubeConnection').textContent = result.connected ? 'YouTube account connected.' : 'YouTube account not connected.';
+        ytElement('youtubeSignOut').disabled = !result.connected;
+        const label = result.connected ? 'Signed in to YouTube' : 'Not signed in to YouTube';
+        ytElement('youtubeConnection').textContent = label;
+        const badge = ytElement('youtubeConnectionBadge');
+        badge.textContent = label;
+        badge.className = `ml-2 text-xs font-normal ${result.connected ? 'text-emerald-400' : 'text-amber-300'}`;
         ytElement('youtubeRedirect').textContent = result.redirect_uri;
         return result;
     })();
     try { return await youtubeConnectionRequest; }
     catch (error) {
         ytElement('youtubeConnection').textContent = error.message;
+        ytElement('youtubeConnectionBadge').textContent = 'YouTube sign-in status unavailable';
+        ytElement('youtubeConnectionBadge').className = 'ml-2 text-xs font-normal text-slate-400';
         throw error;
     } finally { youtubeConnectionRequest = null; }
 }
@@ -83,7 +107,9 @@ async function disconnectYouTube() {
     try {
         await youtubeRequest('/api/youtube/disconnect', {method: 'POST'});
         ytElement('youtubeAuto').checked = false;
+        saveYouTubeSettings();
         await loadYouTubeConnection();
+        showToast('Signed out of YouTube. Sign in again to choose another Google account.', 'info');
     } catch (error) { showToast(error.message, 'error'); }
 }
 
@@ -135,17 +161,24 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         const saved = JSON.parse(localStorage.getItem('automap-youtube-settings') || '{}');
         for (const id of youtubeFields) {
-            if (id === 'youtubeKids') ytElement(id).checked = saved[id] === true;
-            else if (typeof saved[id] === 'string') ytElement(id).value = saved[id];
+            const input = ytElement(id);
+            if (input.type === 'checkbox') {
+                if (typeof saved[id] === 'boolean') input.checked = saved[id];
+            } else if (typeof saved[id] === 'string') input.value = saved[id];
         }
         const job = sessionStorage.getItem('automap-youtube-job');
         if (job) watchYouTubeUpload(job);
     } catch {}
-    for (const id of youtubeFields) ytElement(id).addEventListener('input', () => {
-        const settings = Object.fromEntries(youtubeFields.map(key => [key, key === 'youtubeKids' ? ytElement(key).checked : ytElement(key).value]));
-        try { localStorage.setItem('automap-youtube-settings', JSON.stringify(settings)); } catch {}
-    });
-    // Automatic upload is an explicit choice for each visit.
+    youtubeCustomTitle = ytElement('youtubeTitle').value;
+    syncYouTubeTitle();
+    document.addEventListener('automap:video-topic-changed', syncYouTubeTitle);
+    for (const id of youtubeFields) {
+        for (const event of ['input', 'change']) ytElement(id).addEventListener(event, () => {
+            if (id === 'youtubeTitle') youtubeCustomTitle = ytElement(id).value;
+            if (id === 'youtubeUseTopic') syncYouTubeTitle();
+            saveYouTubeSettings();
+        });
+    }
     const outcome = new URLSearchParams(location.search).get('youtube');
     if (outcome) {
         ytElement('youtubePanel').open = true;

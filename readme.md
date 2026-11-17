@@ -201,8 +201,8 @@ Worker files older than approximately **30 minutes** are cleaned up when relevan
 1. Install the updated `requirements.txt` (or rebuild the Docker containers).
 2. In Google Cloud Console, enable **YouTube Data API v3**, configure the OAuth consent screen and, while the app is in testing, add your Google account as a test user. Download an **OAuth client secret JSON** file.
 3. Open **Video Studio → YouTube upload**, choose the JSON file, and click **Connect Google / YouTube**. Approve access to the desired channel.
-4. Set a YouTube title (or leave it empty to use the video headline), description, comma-separated tags, visibility, and the made-for-kids setting.
-5. Enable **Automatically upload after rendering**, then render. AutoMap uploads the resulting MP4 in the background and shows progress and a YouTube link. You can also click **Upload rendered video to YouTube** after rendering. Visibility defaults to **Private**; automatic upload must be enabled again on each visit.
+4. The YouTube title follows the video topic by default (up to 100 characters). Disable **Use the video topic as the YouTube title** to enter a custom title. Set the description, comma-separated tags, visibility, and the made-for-kids setting.
+5. Enable **Automatically upload after rendering**, then render. AutoMap uploads the resulting MP4 in the background and shows progress and a YouTube link. You can also click **Upload rendered video to YouTube** after rendering. Visibility defaults to **Private**. Metadata, custom title, title mode, and the automatic upload setting are saved in this browser and restored when you return.
 
 AutoMap renders vertical 9:16 videos lasting up to 30 seconds, which meet the
 [YouTube Shorts format requirements](https://support.google.com/youtube/answer/15424877?hl=en).
@@ -225,8 +225,9 @@ Google tokens and client secrets are never sent back to the browser, saved in
 localStorage, or forwarded to the media worker. A signed browser session selects
 its own credentials and upload jobs. Sharing a browser profile shares this
 connection; clearing cookies, logging out, or changing the web login requires
-connecting again. **Disconnect** deletes that browser's saved credentials; it
+connecting again. **Sign out of YouTube** deletes that browser's saved credentials; it
 does not cancel an upload already started or revoke the grant in Google Account.
+Sign in again to choose a different Google account.
 
 For persistent server storage, retain the `automap-session` Docker volume (it
 already mounts `/app/instance`). For native deployment, back up `instance/` and

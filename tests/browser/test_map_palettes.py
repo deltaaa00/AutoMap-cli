@@ -666,3 +666,25 @@ def test_clear_history_is_persistent_and_late_restore_cannot_resurrect_it(map_pa
     }''')
     assert page.locator('#historyCountBadge').inner_text() == '1'
     assert 'Kept for this visit only' in page.locator('#historyStorageStatus').inner_text()
+
+
+def test_topic_is_saved_immediately_and_idea_generation_requires_a_click(map_page):
+    page = map_page
+    idea_requests = []
+    def generate(route):
+        idea_requests.append(route.request.post_data_json)
+        route.fulfill(json={'status':'success', 'idea':'Explicitly generated idea'})
+    page.route('**/api/generate_idea', generate)
+    page.evaluate('closeFillingStudio()')
+    # Save while still typing, before the preview debounce or a blur event.
+    page.locator('#topicInput').fill('Моя остання тема')
+    assert page.evaluate("localStorage.getItem('automap-map-topic')") == 'Моя остання тема'
+    page.reload()
+    assert page.locator('#topicInput').input_value() == 'Моя остання тема'
+    assert idea_requests == []
+    page.locator('#generateIdeaBtn').click()
+    page.wait_for_function("document.getElementById('topicInput').value === 'Explicitly generated idea'")
+    assert len(idea_requests) == 1
+    page.reload()
+    assert page.locator('#topicInput').input_value() == 'Explicitly generated idea'
+    assert len(idea_requests) == 1
