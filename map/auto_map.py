@@ -599,6 +599,53 @@ def _random_region_color() -> tuple[int, int, int, int]:
     return (120, 180, 120, 255)
 
 
+def _floodfill_bool_mask(interior: np.ndarray, seeds: list, max_pixels: int) -> np.ndarray | None:
+    """4-connected BFS flood fill on a boolean ``(H, W)`` interior mask, aborting if it exceeds ``max_pixels``."""
+    from collections import deque
+
+    h, w = interior.shape
+    visited = np.zeros((h, w), dtype=bool)
+    q: deque[tuple[int, int]] = deque()
+    for coord in seeds:
+        cx, cy = int(round(coord[0])), int(round(coord[1]))
+        seed = None
+        for dy in (0, -2, 2, -4, 4, -8, 8):
+            for dx in (0, -2, 2, -4, 4, -8, 8):
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < w and 0 <= ny < h and interior[ny, nx]:
+                    seed = (nx, ny)
+                    break
+            if seed is not None:
+                break
+        if seed is not None and not visited[seed[1], seed[0]]:
+            visited[seed[1], seed[0]] = True
+            q.append(seed)
+
+    if not q:
+        return None
+
+    count = 0
+    while q:
+        x, y = q.popleft()
+        count += 1
+        if count > max_pixels:
+            return None
+        if x > 0 and interior[y, x - 1] and not visited[y, x - 1]:
+            visited[y, x - 1] = True
+            q.append((x - 1, y))
+        if x + 1 < w and interior[y, x + 1] and not visited[y, x + 1]:
+            visited[y, x + 1] = True
+            q.append((x + 1, y))
+        if y > 0 and interior[y - 1, x] and not visited[y - 1, x]:
+            visited[y - 1, x] = True
+            q.append((x, y - 1))
+        if y + 1 < h and interior[y + 1, x] and not visited[y + 1, x]:
+            visited[y + 1, x] = True
+            q.append((x, y + 1))
+
+    return visited
+
+
 def _build_extrema_highlight_layer(
     size: tuple[int, int],
     highest_idx: int | None,
@@ -608,6 +655,7 @@ def _build_extrema_highlight_layer(
     flat: np.ndarray | None,
     ids: np.ndarray | None,
     borders: Image.Image | None,
+    base_map: Image.Image | None = None,
     high_rgb: tuple[int, int, int] = _RESERVED_HIGHLIGHT_COLORS[0],
     low_rgb: tuple[int, int, int] = _RESERVED_HIGHLIGHT_COLORS[1],
 ) -> Image.Image | None:
@@ -632,8 +680,16 @@ def _build_extrema_highlight_layer(
 
     inner_size = 37 if w >= 3000 else 21
     outer_size = 25 if w >= 3000 else 15
-    border_work = borders.copy() if (map_type == "world_countries" and borders is not None) else None
-    border_orig_alpha = np.asarray(borders)[..., 3] if border_work is not None else None
+    wc_interior_crisp: np.ndarray | None = None
+    wc_base_alpha: np.ndarray | None = None
+    wc_border_alpha: np.ndarray | None = None
+    if map_type == "world_countries" and base_map is not None:
+        base_arr = np.asarray(base_map)
+        wc_base_alpha = base_arr[..., 3]
+        # Crisp dark country borders on world_countries_map.png cleanly separate adjacent nations.
+        wc_interior_crisp = (wc_base_alpha >= 128) & (base_arr[..., :3].max(axis=2) > 12)
+        if borders is not None:
+            wc_border_alpha = np.asarray(borders)[..., 3]
 
     for region_idx, rgb in targets:
         mask: Image.Image | None = None
@@ -642,13 +698,16 @@ def _build_extrema_highlight_layer(
             pix_mask[flat[ids == region_idx]] = 255
             if pix_mask.any():
                 mask = Image.fromarray(pix_mask.reshape((h, w)), mode="L")
-        elif border_work is not None and 1 <= region_idx <= len(coords_list):
-            work = border_work.copy()
-            for coord in coords_list[region_idx - 1]:
-                ImageDraw.floodfill(work, xy=tuple(coord), value=(255, 255, 255, 255), thresh=60)
-            work_arr = np.asarray(work)
-            filled = (work_arr[..., 3] == 255) & (border_orig_alpha < 60)
-            if filled.any():
+        elif wc_interior_crisp is not None and 1 <= region_idx <= len(coords_list):
+            max_px = int(0.08 * w * h)
+            filled = _floodfill_bool_mask(wc_interior_crisp, coords_list[region_idx - 1], max_px)
+            if (filled is None or not filled.any()) and wc_base_alpha is not None and wc_border_alpha is not None:
+                for thr in (45, 65):
+                    interior = (wc_base_alpha >= 128) & (wc_border_alpha < thr)
+                    filled = _floodfill_bool_mask(interior, coords_list[region_idx - 1], max_px)
+                    if filled is not None and filled.any():
+                        break
+            if filled is not None and filled.any():
                 mask = Image.fromarray((filled.astype(np.uint8) * 255), mode="L")
 
         if mask is None:
@@ -665,7 +724,7 @@ def _build_extrema_highlight_layer(
         outer_halo = ImageChops.subtract(small_outer, small_mask).filter(ImageFilter.GaussianBlur(2.5))
         glow_small = ImageChops.lighter(inner_ring, outer_halo.point(lambda p: min(255, int(p * 0.95))))
         glow_alpha = glow_small.resize((w, h), Image.Resampling.BILINEAR)
-        tint_alpha = mask.point(lambda p: 75 if p else 0)
+        tint_alpha = mask.point(lambda p: 95 if p else 0)
         combined_alpha = ImageChops.lighter(tint_alpha, glow_alpha)
 
         overlay = Image.new("RGBA", size, (*rgb, 255))
@@ -1159,7 +1218,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             low_rgb = _hex_to_rgba(highlight_low_color, (*_RESERVED_HIGHLIGHT_COLORS[1], 255))[:3]
             hl_layer = _build_extrema_highlight_layer(
                 img.size, highest_idx, lowest_idx, map_type, dict_, flat, ids, borders,
-                high_rgb=high_rgb, low_rgb=low_rgb,
+                base_map=img, high_rgb=high_rgb, low_rgb=low_rgb,
             )
             if hl_layer is not None:
                 result = Image.alpha_composite(result, hl_layer)
