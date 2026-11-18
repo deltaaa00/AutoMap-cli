@@ -537,6 +537,12 @@ def _numeric_extrema(values):
     return max(numeric, key=numeric.get), min(numeric, key=numeric.get)
 
 
+def _format_text_label(value: object) -> str:
+    """Uppercase the first character while preserving acronyms and other casing."""
+    label = "" if value is None else str(value).strip()
+    return label[:1].upper() + label[1:]
+
+
 def _format_legend_bound(val: float) -> str:
     """Format a numeric legend bound compactly so ranges fit in open sea space."""
     abs_val = abs(val)
@@ -1109,7 +1115,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         elif mode == 'text':
             '''Text mode'''
             raw_info = ai_answer_norm.get(name_key)
-            info = "" if raw_info is None else str(raw_info).strip()
+            info = _format_text_label(raw_info)
             if not info:
                 log.info(f"No information for {name}, skipping")
                 continue
@@ -1302,7 +1308,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         else:
             legend_src = used_txt_rules or effective_txt
             legend_entries = [
-                (tuple(c), str(label).strip())
+                (tuple(c), _format_text_label(label))
                 for label, c in legend_src.items()
                 if str(label).strip()
             ]
