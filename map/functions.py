@@ -17,6 +17,7 @@ import io
 import json
 import math
 import os
+import random
 import re
 import sys
 import requests
@@ -486,6 +487,26 @@ def _call_model_text(
     return text.strip()
 
 
+IDEA_CATEGORIES = (
+    "food, drinks, and dining habits",
+    "driving, traffic, and public transport",
+    "work, salaries, holidays, and retirement",
+    "language, slang, names, and alphabets",
+    "housing, everyday prices, and cost of living",
+    "climate, weather, nature, and wildlife",
+    "school, education, and university life",
+    "sports, hobbies, and pop culture",
+    "internet, technology, and gaming",
+    "health, sleep, and daily routines",
+    "unusual laws, rules, and traditions",
+    "cities, borders, and surprising geography",
+)
+
+
+def _normalize_idea_key(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).strip()
+
+
 def generate_map_idea(
     ai_model: str,
     api_key: str | None = None,
@@ -494,25 +515,49 @@ def generate_map_idea(
     available_themes: list[str] | tuple[str, ...] | None = None,
     available_fonts: list[str] | tuple[str, ...] | None = None,
     temperature: float | None = None,
+    avoid_ideas: list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, object]:
     """Generate a single map idea (and optionally matching map parameters) via the selected AI model."""
-    examples_block = "\n".join(f'- "{ex}"' for ex in IDEA_EXAMPLES)
+    sampled_examples = random.sample(IDEA_EXAMPLES, min(6, len(IDEA_EXAMPLES)))
+    examples_block = "\n".join(f'- "{ex}"' for ex in sampled_examples)
+    cleaned_avoid = [str(item).strip() for item in (avoid_ideas or ()) if str(item).strip()][:30]
+    avoid_keys = {_normalize_idea_key(item) for item in cleaned_avoid}
+    avoid_block = ""
+    if cleaned_avoid:
+        avoid_lines = "\n".join(f'- "{item}"' for item in cleaned_avoid[-20:])
+        avoid_block = (
+            "\n\nIMPORTANT — Do NOT repeat or closely rephrase any of these already-used ideas:\n"
+            f"{avoid_lines}"
+        )
+    idea_temp = 1.0 if temperature is None else validate_temperature(temperature)
 
     if not with_params:
         system_msg = (
             "You generate short, engaging, curiosity-sparking map topic questions in English. "
+            "Always pick a fresh, surprising angle and never repeat recent topics. "
             "Return ONLY the idea itself as a single plain-text sentence/question, with no quotes, "
             "no numbering, no markdown, and no explanation."
         )
-        user_prompt = (
-            "Generate 1 new creative map topic idea in the exact same style and format as these examples:\n"
-            f"{examples_block}\n\n"
-            "Return only the idea text."
-        )
-        raw = _call_model_text(system_msg, user_prompt, ai_model, api_key, temperature=temperature, json_mode=False)
-        idea = raw.strip().splitlines()[0].strip().strip('"\'` ')
-        if not idea:
-            raise AIServiceError('The AI model returned an empty idea. Please try again.', 502)
+        idea = ""
+        for attempt in range(2):
+            focus_category = random.choice(IDEA_CATEGORIES)
+            nonce = random.randint(1000, 9999)
+            retry_note = "\nPrevious candidate was a duplicate — choose a completely different subject." if attempt else ""
+            user_prompt = (
+                f"Generate 1 fresh, creative map topic idea focused on: {focus_category} (variation #{nonce}).\n"
+                "Match the concise style of these examples without copying them:\n"
+                f"{examples_block}"
+                f"{avoid_block}"
+                f"{retry_note}\n\n"
+                "Return only the idea text."
+            )
+            raw = _call_model_text(system_msg, user_prompt, ai_model, api_key, temperature=idea_temp, json_mode=False)
+            candidate = next(iter(raw.strip().splitlines()), '').strip().strip('"\'` ')
+            if not candidate:
+                raise AIServiceError('The AI model returned an empty idea. Please try again.', 502)
+            idea = candidate
+            if _normalize_idea_key(candidate) not in avoid_keys:
+                break
         return {"idea": idea}
 
     raw_themes = [str(t) for t in (available_themes or list(constants._PALETTE_THEMES.keys()))]
@@ -524,34 +569,47 @@ def generate_map_idea(
 
     system_msg = (
         "You generate short, engaging map topic questions in English along with the best map rendering parameters. "
+        "Always pick a fresh, surprising angle and never repeat recent topics. "
         "Return ONLY a valid JSON object (no markdown fences, no commentary)."
     )
-    user_prompt = (
-        "Generate 1 new creative map topic idea in the same style as these examples:\n"
-        f"{examples_block}\n\n"
-        "Return a JSON object with these exact keys:\n"
-        '- "idea": string (the single map question/topic, no surrounding quotes)\n'
-        f'- "mode": one of {list(allowed_modes)} ("number" for numeric counts/amounts/years, "text" for names/words/categories)\n'
-        f'- "map_type": one of {list(allowed_map_types)} ("default" = Europe painted, "flag" = Europe flags, "world" = continents, "world_countries" = all world countries)\n'
-        f'- "palette_theme": one of {themes}\n'
-        f'- "font": one of {fonts}\n'
-        f'- "extra_option": one of {list(allowed_extras)} ("show_most_least" or "show_short_form" only when mode is "number" and map_type is not "world", otherwise "none")\n'
-        '- "show_legend": boolean (true if a legend helps explain the map, false otherwise)'
-    )
-    raw = _call_model_text(system_msg, user_prompt, ai_model, api_key, temperature=temperature, json_mode=True)
-    cleaned = raw.strip()
-    if cleaned.startswith("```"):
-        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE | re.DOTALL).strip()
-    try:
-        parsed = json.loads(cleaned)
-    except json.JSONDecodeError as error:
-        raise AIServiceError('AI returned invalid JSON for the map idea. Please try again.', 502) from error
-    if not isinstance(parsed, dict):
-        raise AIServiceError('AI returned an unexpected format for the map idea.', 502)
-
-    idea = str(parsed.get("idea") or "").strip().strip('"\'` ')
-    if not idea:
-        raise AIServiceError('The AI model returned an empty idea. Please try again.', 502)
+    parsed = None
+    idea = ""
+    for attempt in range(2):
+        focus_category = random.choice(IDEA_CATEGORIES)
+        nonce = random.randint(1000, 9999)
+        retry_note = "\nPrevious candidate was a duplicate — choose a completely different subject." if attempt else ""
+        user_prompt = (
+            f"Generate 1 fresh, creative map topic idea focused on: {focus_category} (variation #{nonce}).\n"
+            "Match the concise style of these examples without copying them:\n"
+            f"{examples_block}"
+            f"{avoid_block}"
+            f"{retry_note}\n\n"
+            "Return a JSON object with these exact keys:\n"
+            '- "idea": string (the single map question/topic, no surrounding quotes)\n'
+            f'- "mode": one of {list(allowed_modes)} ("number" for numeric counts/amounts/years, "text" for names/words/categories)\n'
+            f'- "map_type": one of {list(allowed_map_types)} ("default" = Europe painted, "flag" = Europe flags, "world" = continents, "world_countries" = all world countries)\n'
+            f'- "palette_theme": one of {themes}\n'
+            f'- "font": one of {fonts}\n'
+            f'- "extra_option": one of {list(allowed_extras)} ("show_most_least" or "show_short_form" only when mode is "number" and map_type is not "world", otherwise "none")\n'
+            '- "show_legend": boolean (true if a legend helps explain the map, false otherwise)'
+        )
+        raw = _call_model_text(system_msg, user_prompt, ai_model, api_key, temperature=idea_temp, json_mode=True)
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE | re.DOTALL).strip()
+        try:
+            candidate_obj = json.loads(cleaned)
+        except json.JSONDecodeError as error:
+            raise AIServiceError('AI returned invalid JSON for the map idea. Please try again.', 502) from error
+        if not isinstance(candidate_obj, dict):
+            raise AIServiceError('AI returned an unexpected format for the map idea.', 502)
+        candidate_idea = str(candidate_obj.get("idea") or "").strip().strip('"\'` ')
+        if not candidate_idea:
+            raise AIServiceError('The AI model returned an empty idea. Please try again.', 502)
+        parsed = candidate_obj
+        idea = candidate_idea
+        if _normalize_idea_key(candidate_idea) not in avoid_keys:
+            break
 
     mode = str(parsed.get("mode") or "text").strip().lower()
     if mode not in allowed_modes:

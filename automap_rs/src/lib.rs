@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
 use std::io::{Read, Write};
@@ -189,12 +189,19 @@ fn render_video_rs(
         }
         enc_args.extend(["-pix_fmt".into(), "yuv420p".into(), output_path.into()]);
 
-        let mut encoder = Command::new(&ffmpeg_bin)
+        let mut encoder = match Command::new(&ffmpeg_bin)
             .args(&enc_args)
             .stdin(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
-            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("ffmpeg encoder spawn failed: {e}")))?;
+        {
+            Ok(child) => child,
+            Err(error) => {
+                let _ = decoder.kill();
+                let _ = decoder.wait();
+                return Err(PyRuntimeError::new_err(format!("ffmpeg encoder spawn failed: {error}")));
+            }
+        };
 
         let mut enc_in = encoder
             .stdin
@@ -213,12 +220,22 @@ fn render_video_rs(
         let mut ca_row_buf = if impact_fx_enabled { vec![0u8; width * 4] } else { Vec::new() };
         let mut x_resample_lut = if need_zoom_buf { Vec::with_capacity(width) } else { Vec::new() };
 
+        let mut frame_read_error = None;
+        let mut frame_write_error = None;
+        let mut decoder_finished = false;
         for frame_idx in 0..total_frames {
-            if dec_out.read_exact(&mut bg_buf).is_err() {
-                if frame_idx == 0 {
-                    break;
+            if !decoder_finished {
+                // Keep a complete previous frame when the decoder ends early.
+                match dec_out.read_exact(&mut frame_buf) {
+                    Ok(()) => std::mem::swap(&mut bg_buf, &mut frame_buf),
+                    Err(error) if frame_idx > 0 && error.kind() == std::io::ErrorKind::UnexpectedEof => {
+                        decoder_finished = true;
+                    }
+                    Err(error) => {
+                        frame_read_error = Some(error);
+                        break;
+                    }
                 }
-                // Hold the last decoded background frame if the source ended slightly early.
             }
             frame_buf.copy_from_slice(&bg_buf);
 
@@ -350,17 +367,25 @@ fn render_video_rs(
             };
 
             // Stream the composited frame into ffmpeg's stdin.
-            enc_in
-                .write_all(out_buf)
-                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("encoder write failed: {e}")))?;
+            if let Err(error) = enc_in.write_all(out_buf) {
+                frame_write_error = Some(error);
+                break;
+            }
         }
 
-        // Close stdin so ffmpeg flushes and finalizes the MP4 container.
+        // Close the decoder pipe before waiting. FFmpeg may still be writing frames
+        // past the requested count and would block on a full pipe.
         drop(enc_in);
-        let status = encoder
-            .wait()
-            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("encoder wait failed: {e}")))?;
+        drop(dec_out);
         let _ = decoder.wait();
+        let status = encoder.wait();
+        if let Some(error) = frame_read_error {
+            return Err(PyRuntimeError::new_err(format!("decoder read failed: {error}")));
+        }
+        if let Some(error) = frame_write_error {
+            return Err(PyRuntimeError::new_err(format!("encoder write failed: {error}")));
+        }
+        let status = status.map_err(|e| PyRuntimeError::new_err(format!("encoder wait failed: {e}")))?;
 
         if !status.success() {
             return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(

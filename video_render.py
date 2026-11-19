@@ -124,9 +124,7 @@ def _flatten_static_layers(clips, size, dynamic, duration):
         pos = compute_position(layer.size, size, clip.pos(0), clip.relative_pos)
         if canvas is None:
             canvas = Image.new('RGBA', size, (0, 0, 0, 0))
-        placed = Image.new('RGBA', size, (0, 0, 0, 0))
-        placed.paste(layer, tuple(int(v) for v in pos))
-        canvas = Image.alpha_composite(canvas, placed)
+        canvas.alpha_composite(layer, tuple(int(v) for v in pos))
     flush()
     return out
 

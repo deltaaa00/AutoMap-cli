@@ -143,7 +143,7 @@ def test_portrait_render_with_centered_title_and_right_aligned_map(worker, tmp_p
         frame = result.get_frame(.1)
     green = (frame[:, :, 1] > 220) & (frame[:, :, 0] < 30)
     ys, xs = np.where(green)
-    assert abs((xs.min() + xs.max()) / 2 - 540) < 3
+    assert xs.max() >= 1078
     assert ys.max() <= 1865
     if map_size[1] > map_size[0]:
         assert (xs.max() - xs.min()) / (ys.max() - ys.min()) == pytest.approx(map_size[0] / map_size[1], abs=.03)

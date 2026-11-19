@@ -558,7 +558,8 @@ def test_history_uses_model_provider_and_its_saved_key(map_page):
 def test_label_shift_and_repaint_are_accessible_next_to_generate_without_ai(map_page):
     page = map_page
     page.evaluate('closeFillingStudio()')
-    assert page.locator('#cliForm #restyleCurrentMapBtn').count() == 1
+    assert page.locator('#mapControls .workspace-actions #restyleCurrentMapBtn').count() == 1
+    assert page.locator('#generateBtn').evaluate('button => button.form.id') == 'cliForm'
     assert page.locator('#fillingStudioModal #restyleCurrentMapBtn').count() == 0
     assert page.locator('#restyleCurrentMapBtn').is_visible()
     payloads = []

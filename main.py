@@ -123,7 +123,7 @@ def _available_fonts():
 
 app = Flask(__name__)
 # Three 10 MiB materials (map, background and music) grow by 4/3 in JSON.
-app.config["MAX_CONTENT_LENGTH"] = 48 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024
 
 from web_auth import init_web_auth
 
@@ -754,6 +754,9 @@ def api_generate_idea():
         except ValueError as err:
             return jsonify(status='error', error=str(err)), 400
 
+    raw_avoid = data.get("avoid_ideas")
+    avoid_ideas = [str(item).strip() for item in raw_avoid if str(item).strip()][:30] if isinstance(raw_avoid, list) else []
+
     try:
         result = generate_map_idea(
             model,
@@ -762,6 +765,7 @@ def api_generate_idea():
             available_themes=list(_PALETTE_THEMES.keys()),
             available_fonts=_available_fonts(),
             temperature=temperature,
+            avoid_ideas=avoid_ideas,
         )
     except AIServiceError as error:
         return jsonify(status='error', error=str(error)), error.status_code

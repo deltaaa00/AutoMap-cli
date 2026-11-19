@@ -61,6 +61,28 @@ def test_worker_records_validation_failures_and_rejects_bad_ids(worker):
     assert client.post('/api/render_video', json={'render_id': 'invalid'}).status_code == 400
 
 
+def test_completed_records_do_not_block_new_renders_at_capacity():
+    app = Flask(__name__)
+    tracker = RenderProgress()
+    active_id, oldest_finished_id = str(uuid4()), str(uuid4())
+    tracker.records[active_id] = dict(status='rendering', progress=0, updated_at=0)
+
+    @app.post('/render')
+    @tracker.track
+    def render():
+        return jsonify(status='success')
+
+    with app.test_client() as client:
+        assert client.post('/render', json={'render_id': oldest_finished_id}).status_code == 200
+        for _ in range(255):
+            assert client.post('/render', json={'render_id': str(uuid4())}).status_code == 200
+        assert client.post('/render', json={'render_id': active_id}).status_code == 409
+
+    assert tracker.snapshot(oldest_finished_id) is None
+    assert tracker.snapshot(active_id)['status'] == 'rendering'
+    assert len(tracker.records) == 256
+
+
 def test_failed_render_does_not_claim_completion():
     app = Flask(__name__)
     tracker = RenderProgress()

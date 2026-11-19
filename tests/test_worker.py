@@ -177,7 +177,7 @@ def test_render_material_limit(worker, monkeypatch, field):
     data = dict(map_file='eA==', background_video='eA==', video_title='test')
     data[field] = base64.b64encode(b'1234').decode()
     response = worker.app.test_client().post('/api/render_video', json=data)
-    assert response.status_code == 400 and '10 MB' in response.json['error']
+    assert response.status_code == 400 and '15 MB' in response.json['error']
 
 
 @pytest.mark.parametrize('settings', [

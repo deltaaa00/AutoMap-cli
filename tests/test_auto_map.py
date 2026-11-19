@@ -104,6 +104,21 @@ def test_label_offset_for_short_and_long_text(scene, monkeypatch, map_type, labe
     assert draw_text.call_args.args[1] == label
 
 
+@pytest.mark.parametrize('label,expected', [
+    (' dog ', 'Dog'), ('dog breed', 'Dog breed'),
+    ('iPhone', 'IPhone'), ('USA', 'USA'), ('кіт', 'Кіт'),
+])
+def test_text_labels_start_uppercase_on_countries_and_legend(scene, monkeypatch, label, expected):
+    scene[0].return_value = {'one': label}
+    draw_text = Mock()
+    legend = Mock(return_value=None)
+    monkeypatch.setattr(ImageDraw.ImageDraw, 'text', draw_text)
+    monkeypatch.setattr(renderer, '_draw_legend_overlay', legend)
+    render(show_legend=True)
+    assert draw_text.call_args.args[1] == expected
+    assert [entry[1] for entry in legend.call_args.args[1]] == [expected]
+
+
 def test_unknown_text_reuses_color(scene):
     answer, random, real_open = scene
     answer.return_value = {'one': 'unknown', 'two': 'unknown'}

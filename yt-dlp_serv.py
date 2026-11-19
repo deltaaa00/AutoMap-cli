@@ -53,8 +53,8 @@ os.makedirs(DOWNLOADS, exist_ok=True)
 os.makedirs(CUT_DIR, exist_ok=True)
 os.makedirs(RENDER_DIR, exist_ok=True)
 
-# Incoming materials (map image, background video) must be <= 10 MB each.
-MAX_MATERIAL_BYTES = 10 * 1024 * 1024
+# Incoming materials (map image, background video, audio) must be <= 15 MB each.
+MAX_MATERIAL_BYTES = 15 * 1024 * 1024
 
 # Allowed ffmpeg codec names (see the UI dropdown).
 #   libx264            - universal software encoder
@@ -82,7 +82,7 @@ def _decode_audio_payload(value):
         if not separator or not header.endswith(';base64'):
             raise ValueError('Audio file must be base64 encoded.')
     if len(value) > 4 * ((MAX_MATERIAL_BYTES + 2) // 3):
-        raise ValueError('Audio file exceeds the 10 MB limit.')
+        raise ValueError('Audio file exceeds the 15 MB limit.')
     try:
         raw = base64.b64decode(value, validate=True)
     except (ValueError, TypeError):
@@ -90,7 +90,7 @@ def _decode_audio_payload(value):
     if not raw:
         raise ValueError('Audio file is empty.')
     if len(raw) > MAX_MATERIAL_BYTES:
-        raise ValueError('Audio file exceeds the 10 MB limit.')
+        raise ValueError('Audio file exceeds the 15 MB limit.')
     return raw
 
 
@@ -121,7 +121,7 @@ def _convert_uploaded_audio(raw, start=None, duration=None):
         if not normalized:
             raise ValueError('Audio contains no playable samples at the selected start time.')
         if len(normalized) > MAX_MATERIAL_BYTES:
-            raise ValueError('Converted audio exceeds the 10 MB limit. Choose a shorter track.')
+            raise ValueError('Converted audio exceeds the 15 MB limit. Choose a shorter track.')
         return normalized
 
 
@@ -288,11 +288,11 @@ def music_download():
                             "error": "yt-dlp ERROR: No mp3 file produced."}), 500
 
         if os.path.getsize(mp3_path) > MAX_MATERIAL_BYTES:
-            return jsonify(status='error', error='Downloaded audio exceeds the 10 MB limit. Choose a shorter track.'), 400
+            return jsonify(status='error', error='Downloaded audio exceeds the 15 MB limit. Choose a shorter track.'), 400
         with open(mp3_path, "rb") as fh:
             audio = fh.read(MAX_MATERIAL_BYTES + 1)
         if len(audio) > MAX_MATERIAL_BYTES:
-            return jsonify(status='error', error='Downloaded audio exceeds the 10 MB limit. Choose a shorter track.'), 400
+            return jsonify(status='error', error='Downloaded audio exceeds the 15 MB limit. Choose a shorter track.'), 400
 
         # Page titles are display labels, not unique track identifiers. Keep each
         # download independent from previous tracks and their saved cuts.
@@ -925,7 +925,7 @@ def make_video() -> tuple[object, int]:
             raise ValueError(f"{label} is empty after decoding.")
         # Apply the upload limit to decoded bytes, excluding base64 overhead.
         if len(raw) > MAX_MATERIAL_BYTES:
-            raise ValueError(f"{label} exceeds the 10 MB limit ({len(raw) // (1024 * 1024)} MB).")
+            raise ValueError(f"{label} exceeds the 15 MB limit ({len(raw) // (1024 * 1024)} MB).")
         return raw
 
     try:
@@ -1123,7 +1123,8 @@ def make_video() -> tuple[object, int]:
         map_clip = map_clip.resized(scale)
         box_w, box_h = int(map_clip.w), int(map_clip.h)
         map_y = map_top + (map_area_height - box_h) / 2
-        map_x = (canvas_w - box_w) / 2.0
+        map_x = float(canvas_w - box_w) if box_w < canvas_w else (canvas_w - box_w) / 2.0
+        map_clip_x = map_x - (24 if effects else 0)
 
         zoom_enabled = bool(data.get('zoom_enabled', False))
         zoom_x = max(0.0, min(1.0, _parse_finite_float(data.get('zoom_x'), 0.80)))
@@ -1165,7 +1166,7 @@ def make_video() -> tuple[object, int]:
             if raw_reveal is not None:
                 spec_w, spec_h, f1, f2, f3, blk, base, rt, pe, fd = raw_reveal
                 rust_reveal_spec = (
-                    (canvas_w - spec_w) // 2,
+                    int(map_clip_x),
                     int(map_y),
                     spec_w,
                     spec_h,
@@ -1186,7 +1187,7 @@ def make_video() -> tuple[object, int]:
             map_y -= 24
 
         title_clip = title_clip.with_position(("center", title_top))
-        map_clip = map_clip.with_position(("center", map_y))
+        map_clip = map_clip.with_position((map_clip_x, map_y))
         if reveal_active:
             dynamic_layers.add(id(map_clip))
 
