@@ -2338,15 +2338,23 @@ limitations under the License.
             // Match cli.py's signature: `cli.py make "<prompt>" -m ... -mp ... -gsm ... -eop ... --model ... --font ...`
             const escapedTopic = (state.topic || '').replace(/"/g, '\\"');
             let cmd = `python cli.py make "${escapedTopic}" -m ${state.mode} -mp ${state.map_type} -gsm ${state.gsm} -eop ${state.extra_option} --model ${state.model} --font "${state.font}" --temperature ${state.temperature}`;
-            if (state.show_legend) cmd += ' --legend';
+            const isFlagMap = state.map_type === 'flag' || state.map_type === 'world_countries';
+            if (state.show_legend && !isFlagMap) cmd += ' --legend';
             if (state.highlight_extrema) cmd += ' --highlight-extrema';
 
             document.getElementById('cliCommandDisplay').textContent = cmd;
             const hlColorsRow = document.getElementById('highlightColorsRow');
             if (hlColorsRow) hlColorsRow.classList.toggle('hidden', !state.highlight_extrema);
+            const legendEl = document.getElementById('showLegendToggle');
+            if (legendEl) {
+                legendEl.disabled = isFlagMap;
+                const legendLabel = legendEl.closest('label');
+                if (legendLabel) legendLabel.classList.toggle('opacity-50', isFlagMap);
+            }
             updateActiveBadges(state);
             updateCompatibilityHint(state);
             updateHudCoords(state);
+            if (typeof renderFillingStudio === 'function') renderFillingStudio();
         }
 
         function updateCompatibilityHint(state) {
@@ -3160,18 +3168,26 @@ limitations under the License.
                 jsonPreview.textContent = JSON.stringify(fillingObj, null, 2);
             }
 
+            const currentMapType = document.querySelector('input[name="map_type"]:checked')?.value || 'default';
+            const isFlagMap = currentMapType === 'flag' || currentMapType === 'world_countries';
             const allColors = [...fillingTxtRules.map(r => r.hex), ...fillingNumRules.map(r => r.hex)].slice(0, 6);
             if (miniSwatches) {
-                miniSwatches.innerHTML = allColors.map(hex =>
+                miniSwatches.innerHTML = isFlagMap ? '' : allColors.map(hex =>
                     `<span class="w-4 h-4 rounded-full border border-slate-950 shadow" style="background:${hex}"></span>`
                 ).join('');
             }
             const totalRules = fillingTxtRules.length + fillingNumRules.length;
             if (summaryBadge) {
-                summaryBadge.textContent = isAuto ? `Auto • ${totalRules} rules` : `Custom • ${totalRules} rules`;
+                summaryBadge.textContent = isFlagMap
+                    ? 'Flags (no fill)'
+                    : (isAuto ? `Auto • ${totalRules} rules` : `Custom • ${totalRules} rules`);
             }
-            if (sidebarSub && lastMapAnalysis) {
-                sidebarSub.textContent = `Detected ${lastMapAnalysis.detected_type} (${lastMapAnalysis.resolved_theme}) • Font: ${labelStyleConfig.recommended_font}`;
+            if (sidebarSub) {
+                if (isFlagMap) {
+                    sidebarSub.textContent = `Flag artwork active • Font: ${labelStyleConfig.recommended_font}`;
+                } else if (lastMapAnalysis) {
+                    sidebarSub.textContent = `Detected ${lastMapAnalysis.detected_type} (${lastMapAnalysis.resolved_theme}) • Font: ${labelStyleConfig.recommended_font}`;
+                }
             }
         }
 

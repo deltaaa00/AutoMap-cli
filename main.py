@@ -123,7 +123,7 @@ def _available_fonts():
 
 app = Flask(__name__)
 # Three 10 MiB materials (map, background and music) grow by 4/3 in JSON.
-app.config["MAX_CONTENT_LENGTH"] = 48 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024
 
 from web_auth import init_web_auth
 

@@ -967,16 +967,24 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
     log.success(f"Got information from AI ({len(ai_answer)} entries)")
 
-    resolved_theme = _resolve_theme_name(palette_theme, prompt=prompt, mode=mode)
-    auto_txt, auto_num = _auto_fill_from_ai(
-        ai_answer,
-        mode,
-        palette_theme=palette_theme,
-        prompt=prompt,
-    )
+    is_painted_map = map_type in constants._PAINTED_MAP_TYPES
+    if is_painted_map:
+        resolved_theme = _resolve_theme_name(palette_theme, prompt=prompt, mode=mode)
+        auto_txt, auto_num = _auto_fill_from_ai(
+            ai_answer,
+            mode,
+            palette_theme=palette_theme,
+            prompt=prompt,
+        )
+    else:
+        resolved_theme = "flags"
+        auto_txt, auto_num = {}, {}
+        filling_txt = {}
+        filling_txt_ci = {}
+        filling_num = {}
     theme_requested = (palette_theme or "auto").strip().lower() != "auto"
 
-    if auto_style is True:
+    if is_painted_map and auto_style is True:
         if mode == "text":
             merged_txt = dict(auto_txt)
             req_keys_low = {k.strip().lower() for k in req_txt}
@@ -1078,39 +1086,43 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         if mode == 'number':
             try:
                 info = ai_answer_norm[name_key]
-                color = _random_region_color()
+                color = _random_region_color() if is_painted_map else (0, 0, 0, 0)
                 num_value = _parse_short_number(info)
                 raw_num_value = _parse_short_number(raw_ai_answer_norm.get(name_key))
-                if num_value is None:
+                if num_value is None and is_painted_map:
                     log.warning(f"Non-numeric value for {name}: {info!r}; using random color")
 
                 if num_value is not None:
                     if highlight_extrema:
                         numeric_region_values[index] = float(raw_num_value if raw_num_value is not None else num_value)
-                    # Pick the colour of the first matching range. Ranges are
-                    # treated as (low < value <= high) per the docs.
-                    matched_bounds = None
-                    for candidate in (num_value, raw_num_value):
-                        if candidate is None or matched_bounds is not None:
-                            continue
-                        for (low_lim, high_lim), color_tup in filling_num.items():
-                            if low_lim < candidate <= high_lim:
-                                color = color_tup
-                                matched_bounds = (low_lim, high_lim)
-                                break
-                    if matched_bounds is None and auto_style is True and auto_num:
-                        for (low_lim, high_lim), color_tup in auto_num.items():
-                            if low_lim < num_value <= high_lim:
-                                color = color_tup
-                                matched_bounds = (low_lim, high_lim)
-                                break
-                    if matched_bounds is not None:
-                        used_num_rules[matched_bounds] = color
+                    if is_painted_map:
+                        # Pick the colour of the first matching range. Ranges are
+                        # treated as (low < value <= high) per the docs.
+                        matched_bounds = None
+                        for candidate in (num_value, raw_num_value):
+                            if candidate is None or matched_bounds is not None:
+                                continue
+                            for (low_lim, high_lim), color_tup in filling_num.items():
+                                if low_lim < candidate <= high_lim:
+                                    color = color_tup
+                                    matched_bounds = (low_lim, high_lim)
+                                    break
+                        if matched_bounds is None and auto_style is True and auto_num:
+                            for (low_lim, high_lim), color_tup in auto_num.items():
+                                if low_lim < num_value <= high_lim:
+                                    color = color_tup
+                                    matched_bounds = (low_lim, high_lim)
+                                    break
+                        if matched_bounds is not None:
+                            used_num_rules[matched_bounds] = color
             except KeyError as e:
                 info = ""
-                log.warning(f"No data / color for {e}; using random color")
-                color = _random_region_color()
-                random_colors[name] = color
+                if is_painted_map:
+                    log.warning(f"No data / color for {e}; using random color")
+                    color = _random_region_color()
+                    random_colors[name] = color
+                else:
+                    color = (0, 0, 0, 0)
 
         elif mode == 'text':
             '''Text mode'''
@@ -1119,12 +1131,12 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             if not info:
                 log.info(f"No information for {name}, skipping")
                 continue
-            try:
-                # Match filling colours case-insensitively and ignoring whitespace,
-                # so "Yes", "yes" and " yes " all find the same colour.
-                color = filling_txt_ci[info.lower()]
-            except KeyError:
-                if map_type in constants._PAINTED_MAP_TYPES:
+            if is_painted_map:
+                try:
+                    # Match filling colours case-insensitively and ignoring whitespace,
+                    # so "Yes", "yes" and " yes " all find the same colour.
+                    color = filling_txt_ci[info.lower()]
+                except KeyError:
                     log.info(f"No filling color for '{info}'; using random")
                     # Repeated answers share a color so categories remain recognizable.
                     try:
@@ -1132,9 +1144,9 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
                     except KeyError:
                         color = _random_region_color()
                         random_colors[info] = color
-                else:
-                    color = _random_region_color()
-            used_txt_rules.setdefault(info, color)
+                used_txt_rules.setdefault(info, color)
+            else:
+                color = (0, 0, 0, 0)
         else:
             showerror("Error", f"Unknown mode: {mode}")
             return
@@ -1298,7 +1310,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
     else:
         result = _alpha_composite(img, text_layer)
 
-    if show_legend:
+    if show_legend and is_painted_map:
         if mode == "number":
             legend_src = used_num_rules or effective_num
             legend_entries = [

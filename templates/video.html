@@ -505,7 +505,7 @@ limitations under the License.
                     <input type="file" id="musicFileInput" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.webm"
                         onchange="handleMusicUpload(this.files[0])"
                         class="block w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-rose-600 file:px-3 file:py-2 file:text-white">
-                    <p id="musicUploadStatus" role="status" class="text-[11px] text-slate-400">MP3, WAV, M4A, AAC, OGG or FLAC · up to 10 MB. Upload a track to preview, cut or use it in your video.</p>
+                    <p id="musicUploadStatus" role="status" class="text-[11px] text-slate-400">MP3, WAV, M4A, AAC, OGG or FLAC · up to 15 MB. Upload a track to preview, cut or use it in your video.</p>
                 </div>
 
                 <!-- Download status / result -->
@@ -755,7 +755,7 @@ limitations under the License.
                                         <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
                                     </div>
                                     <p class="text-xs text-slate-300"><span class="text-indigo-400 font-semibold">Drop map image</span> or click to browse</p>
-                                    <p class="text-[10px] text-slate-500 font-mono">PNG / JPG &middot; max 10 MB</p>
+                                    <p class="text-[10px] text-slate-500 font-mono">PNG / JPG &middot; max 15 MB</p>
                                 </div>
                                 <div class="dropzone-filled hidden items-center justify-between gap-3 text-left w-full">
                                     <div class="flex items-center gap-2.5 min-w-0">
@@ -794,7 +794,7 @@ limitations under the License.
                                         <i class="fa-solid fa-film text-lg"></i>
                                     </div>
                                     <p class="text-xs text-slate-300"><span class="text-purple-400 font-semibold">Drop background video</span> or click to browse</p>
-                                    <p class="text-[10px] text-slate-500 font-mono">MP4 / MOV / WEBM &middot; max 10 MB</p>
+                                    <p class="text-[10px] text-slate-500 font-mono">MP4 / MOV / WEBM &middot; max 15 MB</p>
                                 </div>
                                 <div class="dropzone-filled hidden items-center justify-between gap-3 text-left w-full">
                                     <div class="flex items-center gap-2.5 min-w-0">
@@ -1229,7 +1229,7 @@ limitations under the License.
                                 <div id="watermarkDropzone" role="button" tabindex="0" aria-label="Upload watermark image" aria-describedby="watermarkUploadHint">
                                     <img id="watermarkThumbPreview" alt="Selected watermark logo" class="hidden">
                                     <p id="watermarkUploadPrompt" class="text-xs text-slate-200">Drop your watermark image here, or click to browse</p>
-                                    <p id="watermarkUploadHint" class="mt-1 text-[10px] text-slate-500">PNG, JPEG or WebP · up to 10 MB</p>
+                                    <p id="watermarkUploadHint" class="mt-1 text-[10px] text-slate-500">PNG, JPEG or WebP · up to 15 MB</p>
                                 </div>
                                 <input id="watermarkFileInput" type="file" accept="image/png,image/jpeg,image/webp" onchange="selectWatermark(this.files[0])" class="hidden">
                                 <div class="flex items-center justify-between gap-2 text-[11px]">
@@ -1718,7 +1718,7 @@ limitations under the License.
                 return;
             }
             if (!file.size || file.size > MAX_MATERIAL_BYTES) {
-                status.textContent = 'Choose a non-empty audio file up to 10 MB.';
+                status.textContent = 'Choose a non-empty audio file up to 15 MB.';
                 input.value = '';
                 showToast(status.textContent, 'warn');
                 return;
@@ -3341,7 +3341,7 @@ limitations under the License.
         async function validateOverlayImageFile(file, inputEl, label) {
             if (!file) return null;
             if (!OVERLAY_IMAGE_TYPES.includes(file.type) || file.size > MAX_MATERIAL_BYTES) {
-                showToast(`Choose a PNG, JPEG, WebP or GIF ${label} up to 10 MB.`, 'error');
+                showToast(`Choose a PNG, JPEG, WebP or GIF ${label} up to 15 MB.`, 'error');
                 if (inputEl) inputEl.value = '';
                 return null;
             }
@@ -3713,7 +3713,7 @@ limitations under the License.
             const version = ++watermarkUploadVersion;
             if (!file) return;
             if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > MAX_MATERIAL_BYTES) {
-                showToast('Choose a PNG, JPEG or WebP logo up to 10 MB.', 'error');
+                showToast('Choose a PNG, JPEG or WebP logo up to 15 MB.', 'error');
                 input.value = '';
                 return;
             }
@@ -3935,7 +3935,7 @@ limitations under the License.
         }
 
         // --- Render Video ---
-        const MAX_MATERIAL_BYTES = 10 * 1024 * 1024;  // 10 MB per input file
+        const MAX_MATERIAL_BYTES = 15 * 1024 * 1024;  // 15 MB per input file
         const ALLOWED_CODECS = ['libx264', 'h264_nvenc', 'h264_videotoolbox'];
         let availableCodecs = ['libx264'];
 
@@ -4040,10 +4040,10 @@ limitations under the License.
 
         function acceptFile(inputId, file, persist = true, topic = '') {
             materialVersions[inputId]++;
-            // Size guard: reject material files larger than 10 MB.
+            // Size guard: reject material files larger than 15 MB.
             if (file.size > MAX_MATERIAL_BYTES) {
-                showToast(`${file.name} is ${humanSize(file.size)} — max allowed is 10 MB.`, 'error');
-                logToConsole(`[Reject] ${file.name} (${humanSize(file.size)}) exceeds 10 MB limit.`, 'error');
+                showToast(`${file.name} is ${humanSize(file.size)} — max allowed is 15 MB.`, 'error');
+                logToConsole(`[Reject] ${file.name} (${humanSize(file.size)}) exceeds 15 MB limit.`, 'error');
                 resetDropzone(inputId);
                 return;
             }
@@ -4235,7 +4235,7 @@ limitations under the License.
             }
             // Final size double-check before uploading.
             if (mapFile.size > MAX_MATERIAL_BYTES || bgFile.size > MAX_MATERIAL_BYTES) {
-                showToast("A file exceeds the 10 MB limit.", 'error');
+                showToast("A file exceeds the 15 MB limit.", 'error');
                 return;
             }
 

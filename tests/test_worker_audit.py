@@ -139,7 +139,7 @@ def test_download_size_limit_matches_audio_upload_and_releases_temporary_files(w
     else:
         assert response.status_code == 400, response.json
         assert response.json['status'] == 'error'
-        assert '10 MB limit' in response.json['error']
+        assert '15 MB limit' in response.json['error']
         assert 'shorter track' in response.json['error']
         assert 'file' not in response.json
         assert not list(Path(worker.DOWNLOADS).iterdir())

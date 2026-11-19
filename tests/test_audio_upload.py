@@ -80,7 +80,7 @@ def test_upload_rejects_oversize_audio_before_conversion(worker, monkeypatch):
     monkeypatch.setattr(worker, '_convert_uploaded_audio', convert)
     response = worker.app.test_client().post('/api/music_upload', json=payload(b'1234'))
     assert response.status_code == 400
-    assert '10 MB' in response.json['error']
+    assert '15 MB' in response.json['error']
     convert.assert_not_called()
 
 
@@ -153,7 +153,7 @@ def test_inline_cut_rejects_oversize_source(worker, monkeypatch):
         'title': 'restored', 'audio_file': base64.b64encode(b'1234').decode(), 'start_time': '00:00',
     })
     assert response.status_code == 400
-    assert '10 MB' in response.json['error']
+    assert '15 MB' in response.json['error']
 
 
 def test_inline_cut_timeout_returns_actionable_error(worker, monkeypatch):
