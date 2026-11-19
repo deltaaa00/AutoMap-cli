@@ -272,7 +272,7 @@ def test_map_fit_replacement_and_removal_release_blob_urls(studio, tmp_path):
     assert page.locator('#stageMapPreview').evaluate('''el => {
         const m = el.getBoundingClientRect();
         const s = el.closest('.video-preview-stage').getBoundingClientRect();
-        return Math.abs((m.left + m.right) / 2 - (s.left + s.right) / 2);
+        return Math.abs(m.right - s.right);
     }''') <= 2
     page.locator('#videoTitleInput').fill('Найкрасивіші країни Європи')
     wait_for_title(page)
@@ -551,13 +551,15 @@ def test_large_generated_map_is_prepared_for_video_without_changing_original(stu
     encoded = base64.b64encode(output.getvalue()).decode()
     page.evaluate('''async encoded => {
         const bytes = Uint8Array.from(atob(encoded), char => char.charCodeAt(0));
-        const original = new File([bytes, new Uint8Array(11*1024*1024)], 'large-map.png', {type:'image/png'});
+        const original = new File([bytes, new Uint8Array(15*1024*1024)], 'large-map.png', {type:'image/png'});
         await StudioStorage.setAsset('latest-map', original);
     }''', encoded)
     reopen_studio(page)
     page.wait_for_function("document.querySelector('#stageMapPreview').naturalWidth === 320")
-    assert page.evaluate('renderFiles.mapFileInput.size') < 10 * 1024 * 1024
-    assert page.evaluate("async () => (await StudioStorage.getAsset('latest-map')).file.size") > 10 * 1024 * 1024
+    assert page.evaluate('renderFiles.mapFileInput.size') <= 15 * 1024 * 1024
+    assert page.evaluate("async () => (await StudioStorage.getAsset('latest-map')).file.size") == (
+        len(output.getvalue()) + 15 * 1024 * 1024
+    )
 
 
 def test_restore_does_not_overwrite_a_new_manual_map(studio):

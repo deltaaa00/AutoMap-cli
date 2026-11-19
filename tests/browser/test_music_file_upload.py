@@ -74,8 +74,8 @@ def test_upload_rejects_wrong_type_and_oversized_files(studio):
     page.evaluate('async () => await window.videoStudioReady')
     page.locator('#musicFileInput').set_input_files({'name':'notes.txt','mimeType':'text/plain','buffer':b'notes'})
     assert 'supported audio' in page.locator('#musicUploadStatus').inner_text()
-    page.evaluate("handleMusicUpload(new File([new Uint8Array(10*1024*1024+1)], 'large.mp3', {type:'audio/mpeg'}))")
-    assert 'up to 10 MB' in page.locator('#musicUploadStatus').inner_text()
+    page.evaluate("handleMusicUpload(new File([new Uint8Array(15*1024*1024+1)], 'large.mp3', {type:'audio/mpeg'}))")
+    assert 'up to 15 MB' in page.locator('#musicUploadStatus').inner_text()
     assert page.locator('#musicFileInput').is_enabled()
 
 
