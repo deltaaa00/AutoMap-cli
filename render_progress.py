@@ -63,13 +63,20 @@ class RenderProgress:
                 return jsonify(status='error', error='Invalid render ID.'), 400
             with self.lock:
                 now = monotonic()
-                # Evict stale records older than 1 hour before checking capacity/duplicates.
+                # Keep active renders even if an encoding phase has no progress callbacks.
                 self.records = {key: value for key, value in self.records.items()
-                                if now - value['updated_at'] < 3600}
+                                if value['status'] == 'rendering' or now - value['updated_at'] < 3600}
                 if render_id in self.records:
                     return jsonify(status='error', error='This render ID has already been used.'), 409
                 if len(self.records) >= 256:
-                    return jsonify(status='error', error='Render service is busy. Try again later.'), 503
+                    oldest_finished = min(
+                        (key for key, value in self.records.items() if value['status'] != 'rendering'),
+                        key=lambda key: self.records[key]['updated_at'],
+                        default=None,
+                    )
+                    if oldest_finished is None:
+                        return jsonify(status='error', error='Render service is busy. Try again later.'), 503
+                    del self.records[oldest_finished]
                 self.records[render_id] = dict(status='rendering', progress=0,
                                                phase='Preparing materials', updated_at=now)
             g.render_progress_id = render_id

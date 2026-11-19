@@ -2514,6 +2514,7 @@ limitations under the License.
             const map = document.getElementById('stageMapPreview');
             const area = document.getElementById('stageMapArea');
             if (!map.naturalWidth || !map.naturalHeight) return;
+            area.style.justifyContent = map.naturalWidth < map.naturalHeight ? 'flex-end' : 'center';
             const scale = Math.min(area.clientWidth / map.naturalWidth, area.clientHeight / map.naturalHeight);
             map.style.width = `${map.naturalWidth * scale}px`;
             map.style.height = `${map.naturalHeight * scale}px`;

@@ -1643,12 +1643,38 @@ limitations under the License.
             updateCommandPreview();
         }
 
+        const RECENT_IDEAS_STORAGE_KEY = 'automap-recent-ideas';
+
+        function loadRecentIdeas() {
+            try {
+                const parsed = JSON.parse(localStorage.getItem(RECENT_IDEAS_STORAGE_KEY) || '[]');
+                return Array.isArray(parsed) ? parsed.map(x => String(x || '').trim()).filter(Boolean).slice(-30) : [];
+            } catch {
+                return [];
+            }
+        }
+
+        function rememberGeneratedIdea(ideaText) {
+            const cleaned = String(ideaText || '').trim();
+            if (!cleaned) return;
+            const current = loadRecentIdeas().filter(item => item.toLowerCase() !== cleaned.toLowerCase());
+            current.push(cleaned);
+            try {
+                localStorage.setItem(RECENT_IDEAS_STORAGE_KEY, JSON.stringify(current.slice(-30)));
+            } catch {}
+        }
+
         async function generateIdea() {
             const btn = document.getElementById('generateIdeaBtn');
             const icon = document.getElementById('generateIdeaIcon');
             const textEl = document.getElementById('generateIdeaText');
             const withParams = document.getElementById('ideaModeSelect')?.value === 'idea_and_params';
             const state = getFormState();
+            const avoidIdeas = loadRecentIdeas();
+            const currentTopic = document.getElementById('topicInput')?.value?.trim();
+            if (currentTopic && !avoidIdeas.some(item => item.toLowerCase() === currentTopic.toLowerCase())) {
+                avoidIdeas.push(currentTopic);
+            }
 
             if (btn) btn.disabled = true;
             if (icon) icon.className = 'fa-solid fa-spinner fa-spin text-[10px]';
@@ -1664,6 +1690,7 @@ limitations under the License.
                         api_key: state.api_key,
                         with_params: withParams,
                         temperature: state.temperature,
+                        avoid_ideas: avoidIdeas.slice(-30),
                     }),
                 });
                 let result;
@@ -1682,6 +1709,7 @@ limitations under the License.
                     scheduleTopicPreview();
                     flushTopicPreview();
                 }
+                rememberGeneratedIdea(result.idea);
 
                 if (withParams && result.params) {
                     const p = result.params;

@@ -1123,7 +1123,8 @@ def make_video() -> tuple[object, int]:
         map_clip = map_clip.resized(scale)
         box_w, box_h = int(map_clip.w), int(map_clip.h)
         map_y = map_top + (map_area_height - box_h) / 2
-        map_x = (canvas_w - box_w) / 2.0
+        map_x = float(canvas_w - box_w) if box_w < canvas_w else (canvas_w - box_w) / 2.0
+        map_clip_x = map_x - (24 if effects else 0)
 
         zoom_enabled = bool(data.get('zoom_enabled', False))
         zoom_x = max(0.0, min(1.0, _parse_finite_float(data.get('zoom_x'), 0.80)))
@@ -1165,7 +1166,7 @@ def make_video() -> tuple[object, int]:
             if raw_reveal is not None:
                 spec_w, spec_h, f1, f2, f3, blk, base, rt, pe, fd = raw_reveal
                 rust_reveal_spec = (
-                    (canvas_w - spec_w) // 2,
+                    int(map_clip_x),
                     int(map_y),
                     spec_w,
                     spec_h,
@@ -1186,7 +1187,7 @@ def make_video() -> tuple[object, int]:
             map_y -= 24
 
         title_clip = title_clip.with_position(("center", title_top))
-        map_clip = map_clip.with_position(("center", map_y))
+        map_clip = map_clip.with_position((map_clip_x, map_y))
         if reveal_active:
             dynamic_layers.add(id(map_clip))
 
