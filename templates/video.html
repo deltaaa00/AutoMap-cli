@@ -24,8 +24,8 @@ limitations under the License.
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <!-- Google Fonts: Plus Jakarta Sans, Space Grotesk, Inter & JetBrains Mono -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <!-- Interface type: IBM Plex Sans with JetBrains Mono for parameters -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
 
     <script>
         tailwind.config = {
@@ -33,16 +33,13 @@ limitations under the License.
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
-                        display: ['Space Grotesk', 'Plus Jakarta Sans', 'sans-serif'],
+                        sans: ['IBM Plex Sans', 'sans-serif'],
+                        display: ['IBM Plex Sans', 'sans-serif'],
                         mono: ['JetBrains Mono', 'monospace'],
                     },
                     colors: {
-                        slate: {
-                            850: '#131c2e',
-                            900: '#0d1424',
-                            950: '#060a12',
-                        }
+                        accent: {50:'#f0f7f2',100:'#dfede3',200:'#bcd5c4',300:'#8fb69a',400:'#5e936d',500:'#3d7b51',600:'#28623c',700:'#205232',800:'#1c432a',900:'#183823',950:'#102619'},
+                        slate: {50:'#fafafa',100:'#ededed',200:'#d4d4d7',300:'#bcbcc2',400:'#a1a1a6',500:'#85858b',600:'#717177',700:'#39393e',800:'#2b2b2f',850:'#202023',900:'#19191b',950:'#141415'}
                     }
                 }
             }
@@ -50,103 +47,6 @@ limitations under the License.
     </script>
 
     <style>
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(13, 20, 36, 0.7);
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(71, 85, 105, 0.75);
-            border-radius: 9999px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(129, 140, 248, 0.85);
-        }
-
-        /* Ambient Studio Aurora Backdrop */
-        .studio-backdrop {
-            background-color: #060a12;
-            background-image:
-                radial-gradient(at 12% 15%, rgba(244, 63, 94, 0.11) 0px, transparent 48%),
-                radial-gradient(at 88% 12%, rgba(99, 102, 241, 0.13) 0px, transparent 52%),
-                radial-gradient(at 55% 88%, rgba(168, 85, 247, 0.10) 0px, transparent 50%),
-                radial-gradient(at 20% 80%, rgba(245, 158, 11, 0.06) 0px, transparent 45%);
-        }
-
-        /* Subtle Studio Grid Pattern */
-        .canvas-grid {
-            background-size: 28px 28px;
-            background-image:
-                linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-        }
-
-        /* Glassmorphic Studio Panel */
-        .studio-glass {
-            background: linear-gradient(165deg, rgba(19, 28, 46, 0.82) 0%, rgba(11, 17, 30, 0.90) 100%);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(148, 163, 184, 0.12);
-            box-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.7), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
-        }
-
-        .studio-glass-hover {
-            transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
-        }
-        .studio-glass-hover:hover {
-            border-color: rgba(148, 163, 184, 0.22);
-            box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.8), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
-        }
-
-        /* Animated CSS Audio Equalizer Bars */
-        @keyframes eqPulse {
-            0%, 100% { transform: scaleY(0.22); opacity: 0.55; }
-            50% { transform: scaleY(1); opacity: 1; }
-        }
-        .eq-bar {
-            transform-origin: bottom;
-            animation: eqPulse 1.2s ease-in-out infinite;
-            animation-play-state: paused;
-            transform: scaleY(0.3);
-            transition: transform 0.2s ease;
-        }
-        .eq-active .eq-bar {
-            animation-play-state: running;
-        }
-        .eq-bar:nth-child(1) { animation-duration: 0.75s; animation-delay: 0.0s; }
-        .eq-bar:nth-child(2) { animation-duration: 1.05s; animation-delay: 0.15s; }
-        .eq-bar:nth-child(3) { animation-duration: 0.65s; animation-delay: 0.3s; }
-        .eq-bar:nth-child(4) { animation-duration: 0.95s; animation-delay: 0.1s; }
-        .eq-bar:nth-child(5) { animation-duration: 0.80s; animation-delay: 0.25s; }
-        .eq-bar:nth-child(6) { animation-duration: 1.10s; animation-delay: 0.05s; }
-        .eq-bar:nth-child(7) { animation-duration: 0.70s; animation-delay: 0.35s; }
-        .eq-bar:nth-child(8) { animation-duration: 0.90s; animation-delay: 0.2s; }
-        .eq-bar:nth-child(9) { animation-duration: 0.85s; animation-delay: 0.12s; }
-        .eq-bar:nth-child(10) { animation-duration: 1.00s; animation-delay: 0.28s; }
-        .eq-bar:nth-child(11) { animation-duration: 0.72s; animation-delay: 0.08s; }
-        .eq-bar:nth-child(12) { animation-duration: 0.98s; animation-delay: 0.22s; }
-
-        /* Ambient Cinema Stage Glow */
-        @keyframes cinemaGlow {
-            0%, 100% { opacity: 0.45; transform: scale(1); }
-            50% { opacity: 0.75; transform: scale(1.04); }
-        }
-        .cinema-ambient {
-            animation: cinemaGlow 6s ease-in-out infinite;
-        }
-
-        /* Timeline Shimmer */
-        @keyframes timelineScan {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(250%); }
-        }
-        .timeline-scanner {
-            animation: timelineScan 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-        }
-
         .video-preview-stage {
             width: min(100%, 315px);
             aspect-ratio: 9 / 16;
@@ -293,7 +193,7 @@ limitations under the License.
             .studio-navigation-actions a, .studio-navigation-actions button { min-height: 44px; }
             main { padding: 12px !important; gap: 16px !important; }
             main > section { gap: 16px !important; }
-            main .studio-glass.p-5, #renderForm { padding: 14px; }
+            main .studio-glass.p-5, #renderForm { padding: 16px; }
             main .justify-between { flex-wrap: wrap; gap: 8px; }
             main code { overflow-wrap: anywhere; }
             main input:not([type="checkbox"]):not([type="range"]):not([type="hidden"]),
@@ -320,87 +220,56 @@ limitations under the License.
             }
         }
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='studio.css') }}">
 </head>
-<body class="studio-backdrop text-slate-100 font-sans min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white overflow-x-hidden relative">
-
-    <!-- Ambient Decorative Background Orbs -->
-    <div class="pointer-events-none fixed inset-0 overflow-hidden z-0">
-        <div class="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-rose-600/10 blur-[130px]"></div>
-        <div class="absolute top-1/4 -right-32 w-[28rem] h-[28rem] rounded-full bg-indigo-600/10 blur-[140px]"></div>
-        <div class="absolute -bottom-40 left-1/3 w-[30rem] h-[30rem] rounded-full bg-purple-600/10 blur-[150px]"></div>
-    </div>
+<body class="studio-backdrop text-slate-100 font-sans min-h-screen flex flex-col selection:bg-accent-200 selection:text-slate-100 overflow-x-hidden relative">
 
     <!-- Top Navigation Bar -->
-    <header class="border-b border-slate-800/80 bg-slate-950/75 backdrop-blur-xl sticky top-0 z-30">
+    <header class="border-b border-slate-800/80 bg-slate-950/75 sticky top-0 z-30">
         <div class="studio-navigation max-w-[1640px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
             <!-- Brand & Studio Status -->
-            <div class="flex items-center gap-3.5">
+            <div class="flex items-center gap-4">
                 <div class="relative group">
-                    <div class="absolute -inset-1 rounded-xl bg-gradient-to-r from-rose-500 via-indigo-500 to-purple-600 opacity-60 blur group-hover:opacity-90 transition"></div>
-                    <div class="relative w-10 h-10 rounded-xl bg-slate-900 border border-white/15 flex items-center justify-center shadow-lg overflow-hidden">
-                        <!-- Custom Stylized AutoMap Video Generation SVG Icon -->
-                        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" aria-label="AutoMap Video Studio Logo">
-                            <defs>
-                                <linearGradient id="amVidGlobeGrad" x1="4" y1="4" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-                                    <stop offset="0%" stop-color="#fb7185" />
-                                    <stop offset="50%" stop-color="#818cf8" />
-                                    <stop offset="100%" stop-color="#c084fc" />
-                                </linearGradient>
-                                <linearGradient id="amVidPlayGrad" x1="14" y1="11" x2="26" y2="25" gradientUnits="userSpaceOnUse">
-                                    <stop offset="0%" stop-color="#f43f5e" />
-                                    <stop offset="55%" stop-color="#6366f1" />
-                                    <stop offset="100%" stop-color="#f59e0b" />
-                                </linearGradient>
-                            </defs>
-                            <!-- Outer Cartographic Globe Ring -->
-                            <circle cx="17" cy="18" r="12.5" stroke="url(#amVidGlobeGrad)" stroke-width="1.6" stroke-opacity="0.85" />
-                            <!-- Cartographic Meridian & Parallel Grid Arcs -->
-                            <ellipse cx="17" cy="18" rx="6.2" ry="12.5" stroke="url(#amVidGlobeGrad)" stroke-width="1.1" stroke-dasharray="2 1.5" stroke-opacity="0.55" />
-                            <path d="M5.2 14.5C9.5 16.2 15.5 16.5 22 15.2" stroke="url(#amVidGlobeGrad)" stroke-width="1.1" stroke-linecap="round" stroke-opacity="0.5" />
-                            <path d="M5.5 21.8C10 20.3 15.5 20.1 21.5 21.2" stroke="url(#amVidGlobeGrad)" stroke-width="1.1" stroke-linecap="round" stroke-opacity="0.5" />
-                            <!-- Audio Waveform Accent Bars (Left Rim) -->
-                            <rect x="2.2" y="15" width="1.6" height="6" rx="0.8" fill="#fb7185" />
-                            <rect x="4.8" y="12.5" width="1.6" height="11" rx="0.8" fill="#f43f5e" />
-                            <!-- Video Generation Play Prism Badge -->
-                            <path d="M15.2 11.4C15.2 10.5 16.2 9.95 17.0 10.42L27.6 16.82C28.35 17.27 28.35 18.35 27.6 18.8L17.0 25.2C16.2 25.67 15.2 25.12 15.2 24.22V11.4Z" fill="url(#amVidPlayGrad)" stroke="#ffffff" stroke-width="1.1" stroke-linejoin="round" />
-                            <!-- Map Coordinate Node Highlight -->
-                            <circle cx="11.5" cy="11.2" r="1.6" fill="#34d399" />
-                            <circle cx="31.5" cy="10.5" r="1.5" fill="#fbbf24" />
+                    <div class="relative w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden">
+                        <!-- Shared folded-map mark -->
+                        <svg class="w-7 h-7 automap-mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AutoMap folded map">
+                            <path d="M4 8l8-4 8 4 8-4v20l-8 4-8-4-8 4V8Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                            <path d="M12 4v20M20 8v20" stroke="currentColor" stroke-width="1.5"/>
                         </svg>
                     </div>
                 </div>
                 <div>
-                    <div class="flex items-center gap-2.5">
-                        <h1 class="font-display font-bold text-lg tracking-tight text-white">AutoMap Video Studio</h1>
-                        <span class="hidden md:inline-flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-slate-900/90 text-slate-400 border border-slate-800">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    <div class="flex items-center gap-3">
+                        <h1 class="font-display font-medium text-lg text-slate-100">AutoMap Video Studio</h1>
+                        <span class="hidden md:inline-flex items-center gap-2 text-xs font-mono px-3 py-1 rounded-full bg-slate-900/90 text-slate-400 border border-slate-800">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-800"></span>
                             FFmpeg / YT-DLP Pipeline
                         </span>
                     </div>
-                    <p class="text-xs text-slate-400 hidden sm:block">Audio mastering, 1–30s timeline slicing &amp; automated map video rendering</p>
+                    <p class="text-xs text-slate-400 hidden sm:block">Add audio, compose frames and render map videos</p>
                 </div>
             </div>
 
             <!-- Right Studio Controls & Navigation -->
             <div class="studio-navigation-actions flex items-center gap-3">
                 <!-- Workflow Step Indicator -->
-                <div class="hidden xl:flex items-center gap-2 bg-slate-900/90 border border-slate-800/90 rounded-xl px-3 py-1.5 text-[11px] font-mono text-slate-400">
-                    <span class="text-rose-400 font-semibold">01 Audio</span>
-                    <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
-                    <span id="headerSliceStepBadge" class="text-amber-400 font-semibold">02 Slice 8s</span>
-                    <i class="fa-solid fa-chevron-right text-[9px] text-slate-600"></i>
-                    <span class="text-indigo-400 font-semibold">03 Frame &amp; Render</span>
+                <div class="hidden xl:flex items-center gap-2 bg-slate-900/90 border border-slate-800/90 rounded-xl px-3 py-2 text-xs font-mono text-slate-400">
+                    <span class="text-slate-400 font-semibold">01 Audio</span>
+                    <i class="fa-solid fa-chevron-right text-xs text-slate-600"></i>
+                    <span id="headerSliceStepBadge" class="text-slate-400 font-semibold">02 Slice 8s</span>
+                    <i class="fa-solid fa-chevron-right text-xs text-slate-600"></i>
+                    <span class="text-accent-300 font-semibold">03 Frame &amp; Render</span>
                 </div>
 
-                <button type="button" id="clearAllDataBtn" onclick="clearAllUserData(this)" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-rose-950 text-rose-300 border border-rose-500/30 text-xs font-semibold transition-all shrink-0">Clear all data</button>
+                <button type="button" id="clearAllDataBtn" onclick="clearAllUserData(this)" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-semibold transition-colors shrink-0">Clear all data</button>
                 {% if config.WEB_AUTH_ENABLED and session.get('web_identity') %}
                 <form method="post" action="{{ url_for('web_logout') }}">
                     <input type="hidden" name="csrf_token" value="{{ session.get('logout_csrf', '') }}">
                     <button type="submit" class="px-4 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 text-xs font-semibold">Log out</button>
                 </form>
                 {% endif %}
-                <a href="/" class="px-4 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 hover:border-indigo-500/50 text-xs font-semibold transition-all flex items-center gap-2 shadow-sm hover:shadow-indigo-500/10 group">
-                    <i class="fa-solid fa-arrow-left text-indigo-400 transition-transform group-hover:-translate-x-0.5"></i>
+                <a href="/" class="px-4 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 hover:border-accent-500/50 text-xs font-semibold transition-colors flex items-center gap-2 group">
+                    <i class="fa-solid fa-arrow-left text-accent-300 transition-transform group-hover:-translate-x-0.5"></i>
                     <span>Back to Map Studio</span>
                 </a>
             </div>
@@ -408,95 +277,96 @@ limitations under the License.
     </header>
 
     <!-- Main Workspace Layout -->
-    <main class="relative z-10 flex-1 max-w-[1640px] w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <main id="videoWorkspace" class="relative z-10 flex-1 max-w-[1640px] w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+<nav class="workflow-nav" aria-label="Video workspace sections"><a href="#audioControls">01 Audio</a><a href="#composerControls">02 Compose</a><a href="#videoPreviewRail">03 Preview and render</a></nav>
 
         <!-- LEFT COLUMN: AUDIO MASTERING & TIMELINE SLICER (4 COLS) -->
-        <section class="lg:col-span-5 xl:col-span-4 flex flex-col gap-5">
+        <section id="audioControls" class="lg:col-span-5 xl:col-span-4 flex flex-col gap-5">
 
-            <!-- STEP 01: Music Downloader Card -->
+            <!-- STEP 01: Music source Card -->
             <div class="studio-glass studio-glass-hover rounded-2xl p-5 relative overflow-hidden">
                 <!-- Subtle top accent bar -->
-                <div class="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 opacity-80"></div>
+                <div class="absolute inset-x-0 top-0 h-0.5 bg-slate-800 opacity-80"></div>
 
                 <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/80">
-                    <div class="flex items-center gap-2.5">
-                        <span class="w-6 h-6 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-400 font-mono text-[11px] font-bold flex items-center justify-center">01</span>
+                    <div class="flex items-center gap-3">
+                        <span class="w-6 h-6 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 font-mono text-xs font-medium flex items-center justify-center">01</span>
                         <div>
                             <div class="flex items-center gap-2">
-                                <i class="fa-brands fa-youtube text-rose-500 text-sm"></i>
-                                <h2 class="font-display font-semibold text-base text-white">Music Downloader</h2>
+                                <i class="fa-brands fa-youtube text-slate-400 text-sm"></i>
+                                <h2 class="font-display font-semibold text-base text-slate-100">Music source</h2>
                             </div>
                         </div>
                     </div>
-                    <code class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-950/90 text-rose-300 border border-rose-500/20">/api/music_download</code>
+                    <code class="text-xs font-mono px-2 py-1 rounded-md bg-slate-950/90 text-slate-400 border border-slate-700">/api/music_download</code>
                 </div>
 
                 <!-- Animated Audio Spectrum / Equalizer Header Accent -->
-                <div id="musicEqBox" class="mb-4 px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-2.5 min-w-0">
-                        <div class="w-7 h-7 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
+                <div id="musicEqBox" class="mb-4 px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 shrink-0">
                             <i class="fa-solid fa-wave-square text-xs"></i>
                         </div>
                         <div class="min-w-0">
-                            <div class="text-[11px] font-semibold text-slate-200 truncate" id="musicEqStatus">Audio Stream Deck</div>
-                            <div class="text-[10px] font-mono text-slate-500 truncate">MP3 192kbps &bull; Stereo Master</div>
+                            <div class="text-xs font-semibold text-slate-200 truncate" id="musicEqStatus">Audio source</div>
+                            <div class="text-xs font-mono text-slate-500 truncate">MP3 192kbps &bull; Stereo Master</div>
                         </div>
                     </div>
                     <!-- 12-Bar CSS Equalizer -->
                     <div class="flex items-end gap-1 h-5 shrink-0 px-1" aria-hidden="true">
-                        <span class="eq-bar w-1 h-full rounded-full bg-gradient-to-t from-rose-600 to-rose-400"></span>
-                        <span class="eq-bar w-1 h-4 rounded-full bg-gradient-to-t from-rose-600 to-amber-400"></span>
-                        <span class="eq-bar w-1 h-full rounded-full bg-gradient-to-t from-rose-600 to-rose-400"></span>
-                        <span class="eq-bar w-1 h-3.5 rounded-full bg-gradient-to-t from-rose-600 to-indigo-400"></span>
-                        <span class="eq-bar w-1 h-full rounded-full bg-gradient-to-t from-rose-600 to-rose-400"></span>
-                        <span class="eq-bar w-1 h-4 rounded-full bg-gradient-to-t from-rose-600 to-amber-400"></span>
-                        <span class="eq-bar w-1 h-3 rounded-full bg-gradient-to-t from-rose-600 to-rose-400"></span>
-                        <span class="eq-bar w-1 h-full rounded-full bg-gradient-to-t from-rose-600 to-purple-400"></span>
-                        <span class="eq-bar w-1 h-4 rounded-full bg-gradient-to-t from-rose-600 to-rose-400"></span>
-                        <span class="eq-bar w-1 h-3.5 rounded-full bg-gradient-to-t from-rose-600 to-amber-400"></span>
-                        <span class="eq-bar w-1 h-full rounded-full bg-gradient-to-t from-rose-600 to-rose-400"></span>
-                        <span class="eq-bar w-1 h-3 rounded-full bg-gradient-to-t from-rose-600 to-indigo-400"></span>
+                        <span class="eq-bar w-1 h-full rounded-full bg-slate-800 "></span>
+                        <span class="eq-bar w-1 h-4 rounded-full bg-slate-800 "></span>
+                        <span class="eq-bar w-1 h-full rounded-full bg-slate-800 "></span>
+                        <span class="eq-bar w-1 h-3.5 rounded-full bg-slate-800 "></span>
+                        <span class="eq-bar w-1 h-full rounded-full bg-slate-800 "></span>
+                        <span class="eq-bar w-1 h-4 rounded-full bg-slate-800 "></span>
+                        <span class="eq-bar w-1 h-3 rounded-full bg-slate-800 "></span>
+                        <span class="eq-bar w-1 h-full rounded-full bg-slate-800 "></span>
+                        <span class="eq-bar w-1 h-4 rounded-full bg-slate-800 "></span>
+                        <span class="eq-bar w-1 h-3.5 rounded-full bg-slate-800 "></span>
+                        <span class="eq-bar w-1 h-full rounded-full bg-slate-800 "></span>
+                        <span class="eq-bar w-1 h-3 rounded-full bg-slate-800 "></span>
                     </div>
                 </div>
 
                 <form id="musicForm" onsubmit="handleMusicDownload(event)" class="space-y-4">
                     <div>
-                        <div class="flex justify-between items-center mb-1.5">
-                            <label for="musicUrlInput" class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                                <i class="fa-solid fa-link text-rose-400"></i>
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="musicUrlInput" class="text-xs font-medium text-slate-300 flex items-center gap-2">
+                                <i class="fa-solid fa-link text-slate-400"></i>
                                 YouTube / YouTube Music Link
                             </label>
-                            <span class="text-[10px] font-mono text-slate-500">URL</span>
+                            <span class="text-xs font-mono text-slate-500">URL</span>
                         </div>
                         <div class="flex gap-2">
                             <div class="relative flex-1">
                                 <input type="url" id="musicUrlInput" placeholder="https://music.youtube.com/watch?v=..." required
                                     autocomplete="off" spellcheck="false"
-                                    class="w-full px-3.5 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition">
+                                    class="w-full px-4 py-3 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-700 focus:ring-2 focus:ring-accent-500/20 transition">
                             </div>
-                            <button type="button" onclick="pasteMusicUrl()" class="px-3.5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 hover:border-rose-500/40 text-xs font-medium transition shrink-0 flex items-center gap-1.5" title="Paste from clipboard">
-                                <i class="fa-regular fa-paste text-rose-400"></i>
+                            <button type="button" onclick="pasteMusicUrl()" class="px-4 py-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 hover:border-slate-700 text-xs font-medium transition shrink-0 flex items-center gap-2" title="Paste from clipboard">
+                                <i class="fa-regular fa-paste text-slate-400"></i>
                                 <span class="hidden sm:inline">Paste</span>
                             </button>
                         </div>
                     </div>
 
-                    <button type="submit" id="musicBtn" class="w-full py-3 px-5 rounded-xl bg-gradient-to-r from-rose-600 via-red-600 to-orange-600 hover:from-rose-500 hover:via-red-500 hover:to-orange-500 text-white font-semibold text-sm shadow-lg shadow-rose-600/25 hover:shadow-rose-600/40 transition-all flex items-center justify-center gap-2.5 group">
+                    <button type="submit" id="musicBtn" class="w-full py-3 px-5 rounded-xl bg-slate-800 text-slate-100 font-semibold text-sm transition-colors flex items-center justify-center gap-3 group">
                         <i id="musicBtnIcon" class="fa-solid fa-download transition-transform group-hover:translate-y-0.5"></i>
                         <span id="musicBtnText">Download MP3</span>
                     </button>
                     <details class="mt-2">
-                        <summary class="text-[11px] font-medium text-slate-400 hover:text-slate-200 cursor-pointer select-none">
+                        <summary class="text-xs font-medium text-slate-400 hover:text-slate-200 cursor-pointer select-none">
                             Optional: YouTube Cookies (Netscape format, saved in browser)
                         </summary>
                         <label for="musicCookiesFileInput" class="mt-2 block text-xs text-slate-300">Upload cookies.txt</label>
                         <input type="file" id="musicCookiesFileInput" accept=".txt,text/plain"
                             onchange="handleMusicCookiesUpload(this)"
-                            class="mt-1 block w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-rose-600 file:px-3 file:py-2 file:text-white">
-                        <p id="musicCookiesFileStatus" role="status" class="mt-1 text-[11px] text-slate-400">Choose a Netscape cookies.txt file, or paste its contents below.</p>
+                            class="mt-1 block w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-slate-100">
+                        <p id="musicCookiesFileStatus" role="status" class="mt-1 text-xs text-slate-400">Choose a Netscape cookies.txt file, or paste its contents below.</p>
                         <textarea id="musicCookiesInput" rows="3"
                             placeholder="# Netscape HTTP Cookie File&#10;.youtube.com&#9;TRUE&#9;/&#9;TRUE&#9;..."
-                            class="mt-1.5 w-full px-3 py-2 bg-slate-950/90 border border-slate-700/80 rounded-xl text-[11px] font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-rose-500 transition"></textarea>
+                            class="mt-2 w-full px-3 py-2 bg-slate-950/90 border border-slate-700/80 rounded-xl text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-700 transition"></textarea>
                     </details>
                 </form>
 
@@ -504,20 +374,20 @@ limitations under the License.
                     <label for="musicFileInput" class="block text-xs font-medium text-slate-300">Or upload your own music</label>
                     <input type="file" id="musicFileInput" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.webm"
                         onchange="handleMusicUpload(this.files[0])"
-                        class="block w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-rose-600 file:px-3 file:py-2 file:text-white">
-                    <p id="musicUploadStatus" role="status" class="text-[11px] text-slate-400">MP3, WAV, M4A, AAC, OGG or FLAC · up to 15 MB. Upload a track to preview, cut or use it in your video.</p>
+                        class="block w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-slate-100">
+                    <p id="musicUploadStatus" role="status" class="text-xs text-slate-400">MP3, WAV, M4A, AAC, OGG or FLAC · up to 15 MB. Upload a track to preview, cut or use it in your video.</p>
                 </div>
 
                 <!-- Download status / result -->
-                <div id="musicResult" class="hidden mt-4 p-3.5 rounded-xl bg-slate-950/95 border border-rose-500/30 shadow-inner">
+                <div id="musicResult" class="hidden mt-4 p-4 rounded-xl bg-slate-950/95 border border-slate-700 ">
                     <div class="flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-2.5 min-w-0">
-                            <div class="w-7 h-7 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0">
-                                <i class="fa-solid fa-file-audio text-rose-400 text-xs"></i>
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                                <i class="fa-solid fa-file-audio text-slate-400 text-xs"></i>
                             </div>
                             <span id="musicResultText" class="text-xs font-mono text-slate-200 truncate">Ready</span>
                         </div>
-                        <button type="button" onclick="downloadMusicFile()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition flex items-center gap-1.5 shrink-0 shadow-sm shadow-rose-600/30">
+                        <button type="button" onclick="downloadMusicFile()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-800 text-slate-100 text-xs font-semibold transition flex items-center gap-2 shrink-0 ">
                             <i class="fa-solid fa-download"></i>
                             <span>Save</span>
                         </button>
@@ -529,57 +399,57 @@ limitations under the License.
             <!-- STEP 02: Music Cut (Timeline Segment Slicer) Card -->
             <div class="studio-glass studio-glass-hover rounded-2xl p-5 relative overflow-hidden">
                 <!-- Subtle top accent bar -->
-                <div class="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 opacity-80"></div>
+                <div class="absolute inset-x-0 top-0 h-0.5 bg-slate-800 opacity-80"></div>
 
                 <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/80">
-                    <div class="flex items-center gap-2.5">
-                        <span class="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 font-mono text-[11px] font-bold flex items-center justify-center">02</span>
+                    <div class="flex items-center gap-3">
+                        <span class="w-6 h-6 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 font-mono text-xs font-medium flex items-center justify-center">02</span>
                         <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-scissors text-amber-400 text-sm"></i>
-                            <h2 class="font-display font-semibold text-base text-white">Timeline Audio Cut</h2>
+                            <i class="fa-solid fa-scissors text-slate-400 text-sm"></i>
+                            <h2 class="font-display font-semibold text-base text-slate-100">Audio trim</h2>
                         </div>
                     </div>
-                    <code class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-950/90 text-amber-300 border border-amber-500/20">/api/music_cut</code>
+                    <code class="text-xs font-mono px-2 py-1 rounded-md bg-slate-950/90 text-slate-400 border border-slate-700">/api/music_cut</code>
                 </div>
 
                 <form id="cutForm" onsubmit="handleMusicCut(event)" class="space-y-4">
                     <div>
-                        <div class="flex justify-between items-center mb-1.5">
-                            <label for="cutStartInput" class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                                <i class="fa-solid fa-clock text-amber-400"></i>
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="cutStartInput" class="text-xs font-medium text-slate-300 flex items-center gap-2">
+                                <i class="fa-solid fa-clock text-slate-400"></i>
                                 Start Timecode
                             </label>
-                            <span id="cutWindowHeaderBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">MM:SS &bull; +8s Window</span>
+                            <span id="cutWindowHeaderBadge" class="text-xs font-mono px-2 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">MM:SS &bull; +8s Window</span>
                         </div>
 
                         <div class="relative">
                             <input type="text" id="cutStartInput" placeholder="01:30" required
                                 inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="5"
                                 oninput="onCutStartInput(this)"
-                                class="w-full px-3.5 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition tracking-wider">
-                            <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
-                                <span class="text-[10px] font-mono text-slate-500">IN &rarr; OUT</span>
+                                class="w-full px-4 py-3 bg-slate-950/90 border border-slate-800 rounded-xl text-sm font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-700 focus:ring-2 focus:ring-accent-500/20 transition ">
+                            <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+                                <span class="text-xs font-mono text-slate-500">IN &rarr; OUT</span>
                             </div>
                         </div>
 
                         <!-- Quick Timecode Presets -->
-                        <div class="flex items-center gap-1.5 mt-2 flex-wrap">
-                            <span class="text-[10px] font-mono text-slate-500 mr-1">Quick cue:</span>
-                            <button type="button" data-timecode="00:00" onclick="setCutPreset('00:00')" class="cut-preset-btn px-2 py-0.5 rounded-md bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40 text-[10px] font-mono transition">00:00</button>
-                            <button type="button" data-timecode="00:30" onclick="setCutPreset('00:30')" class="cut-preset-btn px-2 py-0.5 rounded-md bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40 text-[10px] font-mono transition">00:30</button>
-                            <button type="button" data-timecode="01:00" onclick="setCutPreset('01:00')" class="cut-preset-btn px-2 py-0.5 rounded-md bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40 text-[10px] font-mono transition">01:00</button>
-                            <button type="button" data-timecode="01:30" onclick="setCutPreset('01:30')" class="cut-preset-btn px-2 py-0.5 rounded-md bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40 text-[10px] font-mono transition">01:30</button>
-                            <button type="button" data-timecode="02:00" onclick="setCutPreset('02:00')" class="cut-preset-btn px-2 py-0.5 rounded-md bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40 text-[10px] font-mono transition">02:00</button>
+                        <div class="flex items-center gap-2 mt-2 flex-wrap">
+                            <span class="text-xs font-mono text-slate-500 mr-1">Quick cue:</span>
+                            <button type="button" data-timecode="00:00" onclick="setCutPreset('00:00')" class="cut-preset-btn px-2 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 hover:border-slate-700 text-xs font-mono transition">00:00</button>
+                            <button type="button" data-timecode="00:30" onclick="setCutPreset('00:30')" class="cut-preset-btn px-2 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 hover:border-slate-700 text-xs font-mono transition">00:30</button>
+                            <button type="button" data-timecode="01:00" onclick="setCutPreset('01:00')" class="cut-preset-btn px-2 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 hover:border-slate-700 text-xs font-mono transition">01:00</button>
+                            <button type="button" data-timecode="01:30" onclick="setCutPreset('01:30')" class="cut-preset-btn px-2 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 hover:border-slate-700 text-xs font-mono transition">01:30</button>
+                            <button type="button" data-timecode="02:00" onclick="setCutPreset('02:00')" class="cut-preset-btn px-2 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 hover:border-slate-700 text-xs font-mono transition">02:00</button>
                         </div>
 
                         <!-- Clip Duration Control (1 to 30 Seconds) -->
-                        <div class="mt-3.5 pt-3 border-t border-slate-800/80">
+                        <div class="mt-4 pt-3 border-t border-slate-800/80">
                             <div class="flex justify-between items-center mb-2">
-                                <label for="cutDurationInput" class="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-hourglass-half text-amber-400"></i>
+                                <label for="cutDurationInput" class="text-xs font-medium text-slate-300 flex items-center gap-2">
+                                    <i class="fa-solid fa-hourglass-half text-slate-400"></i>
                                     Clip Duration (1–30s)
                                 </label>
-                                <span class="text-[10px] font-mono text-slate-500">Min 1s &bull; Max 30s</span>
+                                <span class="text-xs font-mono text-slate-500">Min 1s &bull; Max 30s</span>
                             </div>
 
                             <div class="flex items-center gap-3">
@@ -591,62 +461,62 @@ limitations under the License.
                                         oninput="setCutDuration(this.value, false)"
                                         onchange="setCutDuration(this.value, true)"
                                         onblur="setCutDuration(this.value, true)"
-                                        class="w-16 pl-2.5 pr-5 py-1.5 bg-slate-950/90 border border-slate-800 rounded-xl text-xs font-mono font-bold text-amber-300 text-center focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition">
-                                    <span class="absolute right-2 text-[10px] font-mono text-slate-500 pointer-events-none">s</span>
+                                        class="w-16 pl-2.5 pr-5 py-2 bg-slate-950/90 border border-slate-800 rounded-xl text-xs font-mono font-medium text-slate-400 text-center focus:outline-none focus:border-slate-700 focus:ring-2 focus:ring-accent-500/20 transition">
+                                    <span class="absolute right-2 text-xs font-mono text-slate-500 pointer-events-none">s</span>
                                 </div>
                             </div>
 
                             <!-- Quick Duration Presets -->
-                            <div class="flex items-center gap-1.5 mt-2 flex-wrap">
-                                <span class="text-[10px] font-mono text-slate-500 mr-1">Duration:</span>
-                                <button type="button" data-duration="5" onclick="setCutDuration(5, true)" class="duration-preset-btn px-2.5 py-0.5 rounded-md bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40 text-[10px] font-mono transition">5s</button>
-                                <button type="button" data-duration="8" onclick="setCutDuration(8, true)" class="duration-preset-btn px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/50 text-[10px] font-mono font-semibold transition">8s</button>
-                                <button type="button" data-duration="10" onclick="setCutDuration(10, true)" class="duration-preset-btn px-2.5 py-0.5 rounded-md bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40 text-[10px] font-mono transition">10s</button>
-                                <button type="button" data-duration="15" onclick="setCutDuration(15, true)" class="duration-preset-btn px-2.5 py-0.5 rounded-md bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40 text-[10px] font-mono transition">15s</button>
-                                <button type="button" data-duration="20" onclick="setCutDuration(20, true)" class="duration-preset-btn px-2.5 py-0.5 rounded-md bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40 text-[10px] font-mono transition">20s</button>
-                                <button type="button" data-duration="30" onclick="setCutDuration(30, true)" class="duration-preset-btn px-2.5 py-0.5 rounded-md bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40 text-[10px] font-mono transition">30s</button>
+                            <div class="flex items-center gap-2 mt-2 flex-wrap">
+                                <span class="text-xs font-mono text-slate-500 mr-1">Duration:</span>
+                                <button type="button" data-duration="5" onclick="setCutDuration(5, true)" class="duration-preset-btn px-3 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 hover:border-slate-700 text-xs font-mono transition">5s</button>
+                                <button type="button" data-duration="8" onclick="setCutDuration(8, true)" class="duration-preset-btn px-3 py-1 rounded-md bg-slate-800 text-slate-400 border border-slate-700 text-xs font-mono font-semibold transition">8s</button>
+                                <button type="button" data-duration="10" onclick="setCutDuration(10, true)" class="duration-preset-btn px-3 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 hover:border-slate-700 text-xs font-mono transition">10s</button>
+                                <button type="button" data-duration="15" onclick="setCutDuration(15, true)" class="duration-preset-btn px-3 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 hover:border-slate-700 text-xs font-mono transition">15s</button>
+                                <button type="button" data-duration="20" onclick="setCutDuration(20, true)" class="duration-preset-btn px-3 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 hover:border-slate-700 text-xs font-mono transition">20s</button>
+                                <button type="button" data-duration="30" onclick="setCutDuration(30, true)" class="duration-preset-btn px-3 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 hover:border-slate-700 text-xs font-mono transition">30s</button>
                             </div>
                         </div>
 
                         <!-- Visual Timeline Window Badge & Range Preview -->
                         <div class="mt-3 p-3 rounded-xl bg-slate-950/90 border border-slate-800/90">
-                            <div class="flex items-center justify-between text-[11px] font-mono mb-2">
-                                <span class="text-slate-400 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-sliders text-amber-400 text-[10px]"></i>
+                            <div class="flex items-center justify-between text-xs font-mono mb-2">
+                                <span class="text-slate-400 flex items-center gap-2">
+                                    <i class="fa-solid fa-sliders text-slate-400 text-xs"></i>
                                     Active Slice Window
                                 </span>
                                 <div>
-                                    <span id="cutRangeStart" class="text-amber-400 font-semibold">--:--</span>
+                                    <span id="cutRangeStart" class="text-slate-400 font-semibold">--:--</span>
                                     <span class="text-slate-600 mx-1">&rarr;</span>
-                                    <span id="cutRangeEnd" class="text-amber-400 font-semibold">--:--</span>
-                                    <span id="cutDurationBadge" class="ml-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[10px]">8.0s</span>
+                                    <span id="cutRangeEnd" class="text-slate-400 font-semibold">--:--</span>
+                                    <span id="cutDurationBadge" class="ml-1 px-2 py-1 rounded bg-slate-800 text-slate-400 text-xs">8.0s</span>
                                 </div>
                             </div>
                             <!-- Dynamic Waveform Slice Bar -->
                             <div class="h-2 w-full rounded-full bg-slate-900 overflow-hidden relative border border-slate-800">
-                                <div id="cutVisualBar" class="h-full bg-gradient-to-r from-amber-500 to-orange-400 rounded-full transition-all duration-300" style="width: 25%; margin-left: 15%;"></div>
+                                <div id="cutVisualBar" class="h-full bg-slate-800 rounded-full transition-colors duration-300" style="width: 25%; margin-left: 15%;"></div>
                             </div>
                             <!-- Shows which track title will be sent with the cut request -->
-                            <p id="cutTitleHint" class="hidden text-[11px] text-amber-400/90 mt-2 font-mono truncate"></p>
+                            <p id="cutTitleHint" class="hidden text-xs text-slate-400 mt-2 font-mono truncate"></p>
                         </div>
                     </div>
 
-                    <button type="submit" id="cutBtn" class="w-full py-3 px-5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-semibold text-sm shadow-lg shadow-amber-600/25 hover:shadow-amber-600/40 transition-all flex items-center justify-center gap-2.5 group">
+                    <button type="submit" id="cutBtn" class="w-full py-3 px-5 rounded-xl bg-slate-800 text-slate-100 font-semibold text-sm transition-colors flex items-center justify-center gap-3 group">
                         <i id="cutBtnIcon" class="fa-solid fa-scissors transition-transform group-hover:rotate-12"></i>
                         <span id="cutBtnText">Cut 8 Seconds</span>
                     </button>
                 </form>
 
                 <!-- Cut result -->
-                <div id="cutResult" class="hidden mt-4 p-3.5 rounded-xl bg-slate-950/95 border border-amber-500/30 shadow-inner">
+                <div id="cutResult" class="hidden mt-4 p-4 rounded-xl bg-slate-950/95 border border-slate-700 ">
                     <div class="flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-2.5 min-w-0">
-                            <div class="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
-                                <i class="fa-solid fa-file-audio text-amber-400 text-xs"></i>
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                                <i class="fa-solid fa-file-audio text-slate-400 text-xs"></i>
                             </div>
                             <span id="cutResultText" class="text-xs font-mono text-slate-200 truncate">Ready</span>
                         </div>
-                        <button type="button" onclick="downloadCutFile()" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition flex items-center gap-1.5 shrink-0 shadow-sm shadow-amber-600/30">
+                        <button type="button" onclick="downloadCutFile()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-800 text-slate-100 text-xs font-semibold transition flex items-center gap-2 shrink-0 ">
                             <i class="fa-solid fa-download"></i>
                             <span>Save</span>
                         </button>
@@ -657,43 +527,43 @@ limitations under the License.
 
             <!-- Studio Pipeline Guide Card -->
             <div class="studio-glass rounded-2xl p-4">
-                <div class="flex items-center justify-between mb-2.5">
+                <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2 text-xs font-semibold text-slate-200">
-                        <i class="fa-solid fa-wand-magic-sparkles text-indigo-400"></i>
+                        <i class="fa-solid fa-map text-accent-300"></i>
                         <span>Studio Mastering Workflow</span>
                     </div>
-                    <span id="workflowDurationBadge" class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">1–30s Custom Duration</span>
+                    <span id="workflowDurationBadge" class="text-xs font-mono text-slate-400 bg-slate-800 border border-slate-700 px-2 py-1 rounded-full">1–30s Custom Duration</span>
                 </div>
-                <p class="text-[11px] text-slate-400 leading-relaxed">
-                    1. Paste a YouTube Music link and click <span class="text-rose-300 font-medium">Download MP3</span>.<br>
-                    2. Set a start timecode and duration (<span class="text-amber-300 font-medium">1–30 seconds</span>) in <span class="text-amber-300 font-medium">Timeline Audio Cut</span>.<br>
-                    3. Drop your generated <span class="text-indigo-300 font-medium">Map Slide</span> &amp; <span class="text-purple-300 font-medium">Background Motion</span> frame to render the final MP4.
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    1. Paste a YouTube Music link and click <span class="text-slate-400 font-medium">Download MP3</span>.<br>
+                    2. Set a start timecode and duration (<span class="text-slate-400 font-medium">1–30 seconds</span>) in <span class="text-slate-400 font-medium">Audio trim</span>.<br>
+                    3. Drop your generated <span class="text-accent-300 font-medium">Map Slide</span> &amp; <span class="text-slate-400 font-medium">Background Motion</span> frame to render the final MP4.
                 </p>
             </div>
 
         </section>
 
         <!-- RIGHT COLUMN: FRAME COMPOSER, CINEMA STAGE & RENDER ENGINE (8 COLS) -->
-        <section class="lg:col-span-7 xl:col-span-8 flex flex-col gap-5">
+        <section id="composerControls" class="lg:col-span-7 xl:col-span-8 flex flex-col gap-5">
 
             <!-- Render Video & Frame Builder Studio Card -->
             <div class="studio-glass rounded-2xl flex flex-col flex-1 overflow-hidden relative">
                 <!-- Subtle top accent bar -->
-                <div class="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 opacity-90"></div>
+                <div class="absolute inset-x-0 top-0 h-0.5 bg-slate-800 opacity-90"></div>
 
                 <!-- Studio Toolbar -->
-                <div class="px-5 py-3.5 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3 bg-slate-950/60">
+                <div class="px-5 py-4 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3 bg-slate-950/60">
                     <div class="flex items-center gap-3">
-                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" id="statusIndicator"></span>
-                        <h2 class="font-display font-semibold text-sm sm:text-base text-white">Frame Composer &amp; Render Engine</h2>
-                        <span id="studioMetaBadge" class="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-900 text-indigo-300 border border-indigo-500/30">Ready</span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-slate-800 " id="statusIndicator"></span>
+                        <h2 class="font-display font-semibold text-sm sm:text-base text-slate-100">Frame composer</h2>
+                        <span id="studioMetaBadge" class="text-xs font-mono px-3 py-1 rounded-md bg-slate-900 text-accent-300 border border-accent-500/30">Ready</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span class="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-0.5 rounded-md bg-slate-900 text-slate-400 border border-slate-800">
-                            <i class="fa-solid fa-film text-purple-400"></i>
+                        <span class="hidden sm:inline-flex items-center gap-2 text-xs font-mono px-3 py-1 rounded-md bg-slate-900 text-slate-400 border border-slate-800">
+                            <i class="fa-solid fa-film text-slate-400"></i>
                             1080p Composite
                         </span>
-                        <code class="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-950 text-indigo-300 border border-indigo-500/20">/api/render_video</code>
+                        <code class="text-xs font-mono px-2 py-1 rounded-md bg-slate-950 text-accent-300 border border-accent-500/20">/api/render_video</code>
                     </div>
                 </div>
 
@@ -701,34 +571,33 @@ limitations under the License.
                 <form id="renderForm" onsubmit="handleRenderVideo(event)" class="relative flex-1 p-5 flex flex-col gap-5">
 
                     <!-- Rendering overlay with Animated Equalizer & Timeline Scanner -->
-                    <div id="renderOverlay" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md z-20 flex flex-col items-center justify-center gap-5 rounded-b-2xl p-6">
+                    <div id="renderOverlay" class="hidden absolute inset-0 bg-slate-950/90 z-20 flex flex-col items-center justify-center gap-5 rounded-b-2xl p-6">
                         <div class="relative w-20 h-20 flex items-center justify-center">
-                            <div class="absolute -inset-2 rounded-full bg-indigo-500/20 blur-xl animate-pulse"></div>
-                            <div class="absolute inset-0 rounded-full border-4 border-indigo-500/20"></div>
-                            <div class="absolute inset-0 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin"></div>
-                            <i class="fa-solid fa-clapperboard text-indigo-400 text-2xl animate-pulse"></i>
+                            <div class="absolute inset-0 rounded-full border-4 border-accent-500/20"></div>
+                            <div class="absolute inset-0 rounded-full border-4 border-accent-500 border-t-transparent animate-spin"></div>
+                            <i class="fa-solid fa-clapperboard text-accent-300 text-2xl "></i>
                         </div>
 
                         <div class="text-center max-w-md">
-                            <div class="text-base font-display font-bold text-white tracking-tight">Encoding Master Video...</div>
+                            <div class="text-base font-display font-medium text-slate-100 ">Rendering video…</div>
                             <div class="text-xs text-slate-400 mt-1 font-mono">Compositing map frame, motion backdrop &amp; audio track via FFmpeg</div>
                         </div>
 
                         <!-- Animated Equalizer Bars during Render -->
-                        <div class="eq-active flex items-end gap-1.5 h-7 px-4 py-1.5 rounded-xl bg-slate-900/90 border border-indigo-500/30">
-                            <span class="eq-bar w-1.5 h-full rounded-full bg-indigo-400"></span>
-                            <span class="eq-bar w-1.5 h-4 rounded-full bg-purple-400"></span>
-                            <span class="eq-bar w-1.5 h-full rounded-full bg-rose-400"></span>
-                            <span class="eq-bar w-1.5 h-3.5 rounded-full bg-indigo-400"></span>
-                            <span class="eq-bar w-1.5 h-full rounded-full bg-emerald-400"></span>
-                            <span class="eq-bar w-1.5 h-4 rounded-full bg-purple-400"></span>
-                            <span class="eq-bar w-1.5 h-full rounded-full bg-indigo-400"></span>
-                            <span class="eq-bar w-1.5 h-3.5 rounded-full bg-rose-400"></span>
+                        <div class="eq-active flex items-end gap-2 h-7 px-4 py-2 rounded-xl bg-slate-900/90 border border-accent-500/30">
+                            <span class="eq-bar w-1.5 h-full rounded-full bg-accent-400"></span>
+                            <span class="eq-bar w-1.5 h-4 rounded-full bg-slate-800"></span>
+                            <span class="eq-bar w-1.5 h-full rounded-full bg-slate-800"></span>
+                            <span class="eq-bar w-1.5 h-3.5 rounded-full bg-accent-400"></span>
+                            <span class="eq-bar w-1.5 h-full rounded-full bg-slate-800"></span>
+                            <span class="eq-bar w-1.5 h-4 rounded-full bg-slate-800"></span>
+                            <span class="eq-bar w-1.5 h-full rounded-full bg-accent-400"></span>
+                            <span class="eq-bar w-1.5 h-3.5 rounded-full bg-slate-800"></span>
                         </div>
 
                         <div class="w-full max-w-md space-y-2">
-                            <div class="flex justify-between text-xs text-indigo-200"><span id="renderProgressPhase">Preparing materials</span><span id="renderProgressPercent">0%</span></div>
-                            <progress id="renderProgressBar" max="100" value="0" aria-label="Video render progress" class="w-full h-3 accent-indigo-500"></progress>
+                            <div class="flex justify-between text-xs text-accent-300"><span id="renderProgressPhase">Preparing materials</span><span id="renderProgressPercent">0%</span></div>
+                            <progress id="renderProgressBar" max="100" value="0" aria-label="Video render progress" class="w-full h-3 accent-accent-500"></progress>
                             <p id="renderProgressHint" class="text-xs text-slate-400" role="status">Progress will update when the worker starts encoding.</p>
                         </div>
                     </div>
@@ -737,38 +606,38 @@ limitations under the License.
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                         <!-- FRAME LAYER 01: Upload Map Slide (drag & drop) -->
-                        <div class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 hover:border-indigo-500/40 transition-all flex flex-col gap-2.5 group">
+                        <div class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 hover:border-accent-500/40 transition-colors flex flex-col gap-3 group">
                             <div class="flex items-center justify-between">
                                 <label class="text-xs font-semibold text-slate-200 flex items-center gap-2">
-                                    <span class="w-5 h-5 rounded-md bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 font-mono text-[10px] font-bold flex items-center justify-center">F1</span>
-                                    <i class="fa-solid fa-map text-indigo-400"></i>
-                                    <span>Foreground Map Slide</span>
+                                    <span class="w-5 h-5 rounded-md bg-accent-500/20 border border-accent-500/40 text-accent-300 font-mono text-xs font-medium flex items-center justify-center">F1</span>
+                                    <i class="fa-solid fa-map text-accent-300"></i>
+                                    <span>Map image</span>
                                 </label>
-                                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">Layer 01 &bull; Image</span>
+                                <span class="text-xs font-mono px-2 py-1 rounded bg-accent-500/10 text-accent-300 border border-accent-500/20">Layer 01 &bull; Image</span>
                             </div>
 
                             <div id="mapDropzone" data-input="mapFileInput"
-                                class="dropzone relative flex-1 min-h-[132px] rounded-xl border border-dashed border-slate-700/90 bg-slate-950/90 hover:border-indigo-500/80 hover:bg-slate-900/60 transition cursor-pointer px-4 py-4 flex flex-col justify-center text-center">
+                                class="dropzone relative flex-1 min-h-[132px] rounded-xl border border-dashed border-slate-700/90 bg-slate-950/90 hover:border-accent-500/80 hover:bg-slate-900/60 transition cursor-pointer px-4 py-4 flex flex-col justify-center text-center">
                                 <input type="file" id="mapFileInput" accept="image/*" class="hidden">
-                                <div class="dropzone-empty flex flex-col items-center gap-1.5 pointer-events-none">
-                                    <div class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-0.5">
+                                <div class="dropzone-empty flex flex-col items-center gap-2 pointer-events-none">
+                                    <div class="w-10 h-10 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center text-accent-300 mb-1">
                                         <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
                                     </div>
-                                    <p class="text-xs text-slate-300"><span class="text-indigo-400 font-semibold">Drop map image</span> or click to browse</p>
-                                    <p class="text-[10px] text-slate-500 font-mono">PNG / JPG &middot; max 15 MB</p>
+                                    <p class="text-xs text-slate-300"><span class="text-accent-300 font-semibold">Drop map image</span> or click to browse</p>
+                                    <p class="text-xs text-slate-500 font-mono">PNG / JPG &middot; max 15 MB</p>
                                 </div>
                                 <div class="dropzone-filled hidden items-center justify-between gap-3 text-left w-full">
-                                    <div class="flex items-center gap-2.5 min-w-0">
-                                        <div class="w-9 h-9 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center shrink-0 overflow-hidden">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <div class="w-9 h-9 rounded-lg bg-accent-500/15 border border-accent-500/30 flex items-center justify-center shrink-0 overflow-hidden">
                                             <img id="mapThumbPreview" src="" alt="" class="hidden w-full h-full object-cover">
-                                            <i id="mapThumbIcon" class="fa-solid fa-image text-indigo-400"></i>
+                                            <i id="mapThumbIcon" class="fa-solid fa-image text-accent-300"></i>
                                         </div>
                                         <div class="min-w-0">
-                                            <div class="text-[10px] font-mono uppercase tracking-wider text-indigo-400">Map Slide Ready</div>
+                                            <div class="text-xs font-mono text-accent-300">Map Slide Ready</div>
                                             <span class="dropzone-name block text-xs font-mono text-slate-200 truncate">map.png</span>
                                         </div>
                                     </div>
-                                    <button type="button" class="dropzone-clear w-7 h-7 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-800 transition flex items-center justify-center shrink-0" title="Remove">
+                                    <button type="button" class="dropzone-clear w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 transition flex items-center justify-center shrink-0" title="Remove">
                                         <i class="fa-solid fa-xmark"></i>
                                     </button>
                                 </div>
@@ -776,37 +645,37 @@ limitations under the License.
                         </div>
 
                         <!-- FRAME LAYER 02: Background Motion Video (drag & drop) -->
-                        <div class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 hover:border-purple-500/40 transition-all flex flex-col gap-2.5 group">
+                        <div class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 hover:border-slate-700 transition-colors flex flex-col gap-3 group">
                             <div class="flex items-center justify-between">
                                 <label class="text-xs font-semibold text-slate-200 flex items-center gap-2">
-                                    <span class="w-5 h-5 rounded-md bg-purple-500/20 border border-purple-500/40 text-purple-300 font-mono text-[10px] font-bold flex items-center justify-center">F2</span>
-                                    <i class="fa-solid fa-video text-purple-400"></i>
-                                    <span>Background Motion Loop</span>
+                                    <span class="w-5 h-5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 font-mono text-xs font-medium flex items-center justify-center">F2</span>
+                                    <i class="fa-solid fa-video text-slate-400"></i>
+                                    <span>Background video</span>
                                 </label>
-                                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">Layer 02 &bull; Video</span>
+                                <span class="text-xs font-mono px-2 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">Layer 02 &bull; Video</span>
                             </div>
 
                             <div id="bgDropzone" data-input="bgFileInput"
-                                class="dropzone relative flex-1 min-h-[132px] rounded-xl border border-dashed border-slate-700/90 bg-slate-950/90 hover:border-purple-500/80 hover:bg-slate-900/60 transition cursor-pointer px-4 py-4 flex flex-col justify-center text-center">
+                                class="dropzone relative flex-1 min-h-[132px] rounded-xl border border-dashed border-slate-700/90 bg-slate-950/90 hover:border-slate-700 hover:bg-slate-900/60 transition cursor-pointer px-4 py-4 flex flex-col justify-center text-center">
                                 <input type="file" id="bgFileInput" accept="video/*" class="hidden">
-                                <div class="dropzone-empty flex flex-col items-center gap-1.5 pointer-events-none">
-                                    <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-0.5">
+                                <div class="dropzone-empty flex flex-col items-center gap-2 pointer-events-none">
+                                    <div class="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 mb-1">
                                         <i class="fa-solid fa-film text-lg"></i>
                                     </div>
-                                    <p class="text-xs text-slate-300"><span class="text-purple-400 font-semibold">Drop background video</span> or click to browse</p>
-                                    <p class="text-[10px] text-slate-500 font-mono">MP4 / MOV / WEBM &middot; max 15 MB</p>
+                                    <p class="text-xs text-slate-300"><span class="text-slate-400 font-semibold">Drop background video</span> or click to browse</p>
+                                    <p class="text-xs text-slate-500 font-mono">MP4 / MOV / WEBM &middot; max 15 MB</p>
                                 </div>
                                 <div class="dropzone-filled hidden items-center justify-between gap-3 text-left w-full">
-                                    <div class="flex items-center gap-2.5 min-w-0">
-                                        <div class="w-9 h-9 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center shrink-0">
-                                            <i class="fa-solid fa-video text-purple-400"></i>
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <div class="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                                            <i class="fa-solid fa-video text-slate-400"></i>
                                         </div>
                                         <div class="min-w-0">
-                                            <div class="text-[10px] font-mono uppercase tracking-wider text-purple-400">Motion Backdrop Ready</div>
+                                            <div class="text-xs font-mono text-slate-400">Motion Backdrop Ready</div>
                                             <span class="dropzone-name block text-xs font-mono text-slate-200 truncate">background.mp4</span>
                                         </div>
                                     </div>
-                                    <button type="button" class="dropzone-clear w-7 h-7 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-800 transition flex items-center justify-center shrink-0" title="Remove">
+                                    <button type="button" class="dropzone-clear w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 transition flex items-center justify-center shrink-0" title="Remove">
                                         <i class="fa-solid fa-xmark"></i>
                                     </button>
                                 </div>
@@ -819,24 +688,24 @@ limitations under the License.
                     <div class="grid grid-cols-1 md:grid-cols-2 items-start gap-4">
 
                         <!-- Video Title Banner Input -->
-                        <div id="titlePanel" class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 flex flex-col gap-2.5">
+                        <div id="titlePanel" class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 flex flex-col gap-3">
                             <div>
                                 <div class="flex items-center justify-between mb-2">
                                     <label for="videoTitleInput" class="text-xs font-semibold text-slate-200 flex items-center gap-2">
-                                        <span class="w-5 h-5 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[10px] font-bold flex items-center justify-center">F3</span>
-                                        <i class="fa-solid fa-heading text-emerald-400"></i>
-                                        <span>Headline Overlay Title</span>
+                                        <span class="w-5 h-5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 font-mono text-xs font-medium flex items-center justify-center">F3</span>
+                                        <i class="fa-solid fa-heading text-slate-400"></i>
+                                        <span>Headline</span>
                                     </label>
-                                    <span class="text-[10px] font-mono text-slate-500">Burn-in Caption</span>
+                                    <span class="text-xs font-mono text-slate-500">Burn-in Caption</span>
                                 </div>
                                 <textarea id="videoTitleInput" rows="2" placeholder="My awesome map video" maxlength="1000"
                                     autocomplete="off" spellcheck="false"
                                     oninput="updateStageTitlePreview(this.value)"
-                                    class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition"></textarea>
+                                    class="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-700 focus:ring-2 focus:ring-accent-500/20 transition"></textarea>
                             </div>
                             <div class="grid grid-cols-2 gap-3">
                                 <label for="titleFontSelect" class="text-xs text-slate-300">Title font
-                                    <select id="titleFontSelect" onchange="updateTitleStyle()" class="mt-1 w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white">
+                                    <select id="titleFontSelect" onchange="updateTitleStyle()" class="mt-1 w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-100">
                                         {% for font in title_fonts %}
                                         <option value="{{ font }}" {% if font == 'DIN Condensed.ttf' %}selected{% endif %}>{{ font.rsplit('.', 1)[0] }}{% if font in ['kodchasan.ttf', 'arialroundedmtbold.ttf'] %} (Latin){% endif %}</option>
                                         {% endfor %}
@@ -854,12 +723,12 @@ limitations under the License.
                                     <input id="titleOtherLinesColor" type="color" value="#ffe735" oninput="updateTitleStyle()" class="mt-1 block w-full h-9 p-1 bg-slate-950 border border-slate-700 rounded-lg cursor-pointer">
                                 </label>
                             </div>
-                            <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1 gap-2">
-                                <button type="button" onclick="resetTitleStyle()" class="text-emerald-400 hover:text-emerald-300">Reset to defaults</button>
+                            <div class="flex items-center justify-between text-xs text-slate-500 pt-1 gap-2">
+                                <button type="button" onclick="resetTitleStyle()" class="text-slate-400 hover:text-slate-400">Reset to defaults</button>
                                 <span id="titleCharCount">0 chars</span>
                             </div>
-                            <p class="text-[10px] text-slate-500">Size at 1080×1920. Long titles shrink automatically to fit.</p>
-                            <p class="text-[10px] text-slate-500">Enter starts a new line. Colors also apply to automatically wrapped lines.</p>
+                            <p class="text-xs text-slate-500">Size at 1080×1920. Long titles shrink automatically to fit.</p>
+                            <p class="text-xs text-slate-500">Enter starts a new line. Colors also apply to automatically wrapped lines.</p>
                             <label class="flex items-center gap-2 text-xs text-slate-300">
                                 <input id="titleUppercase" type="checkbox" checked onchange="updateTitleStyle()" class="accent-emerald-400">
                                 Uppercase headline lettering (uncheck for mixed-case title)
@@ -876,10 +745,10 @@ limitations under the License.
                                 <input id="mapZoomToggle" type="checkbox" onchange="updateMapZoomUI(true); saveVideoSettings()" class="accent-emerald-400">
                                 Camera zoom to point on map
                             </label>
-                            <div id="mapZoomPanel" class="hidden rounded-xl border border-slate-800 bg-slate-950/70 p-3 space-y-2.5">
+                            <div id="mapZoomPanel" class="hidden rounded-xl border border-slate-800 bg-slate-950/70 p-3 space-y-3">
                                 <div class="flex items-center justify-between gap-2">
-                                    <span class="text-[11px] font-medium text-slate-300">Click country <span class="text-slate-500">(Ctrl = free point)</span></span>
-                                    <span id="zoomTargetCountry" class="text-[11px] font-mono text-cyan-300">Russia (81%, 36%)</span>
+                                    <span class="text-xs font-medium text-slate-300">Click country <span class="text-slate-500">(Ctrl = free point)</span></span>
+                                    <span id="zoomTargetCountry" class="text-xs font-mono text-slate-400">Russia (81%, 36%)</span>
                                 </div>
                                 <div id="zoomPickerWrap"
                                     onclick="pickZoomPoint(event)"
@@ -888,30 +757,30 @@ limitations under the License.
                                     class="relative mx-auto w-full max-w-[340px] rounded-lg overflow-hidden border border-slate-700/80 bg-slate-900 cursor-pointer select-none">
                                     <img id="zoomPickerImg" draggable="false" alt="Zoom target picker" class="w-full h-auto block hidden pointer-events-none select-none">
                                     <img id="zoomHoverOutline" draggable="false" alt="" class="hidden pointer-events-none absolute inset-0 w-full h-full object-fill select-none">
-                                    <div id="zoomPickerPlaceholder" class="py-6 text-center text-[11px] text-slate-500">Upload or load a map first</div>
-                                    <div id="zoomHoverPin" class="hidden pointer-events-none absolute w-7 h-7 -ml-3.5 -mt-3.5 rounded-full border-2 border-amber-300 bg-amber-400/25 shadow-[0_0_14px_rgba(252,211,77,0.95)]"></div>
-                                    <div id="zoomHoverLabel" class="hidden pointer-events-none absolute px-2 py-0.5 rounded-md bg-slate-950/90 border border-amber-400/60 text-[10px] font-semibold text-amber-200 whitespace-nowrap shadow-lg -translate-x-1/2 -translate-y-full -mt-4"></div>
-                                    <div id="zoomPickerPin" class="pointer-events-none absolute w-5 h-5 -ml-2.5 -mt-2.5 rounded-full border-2 border-cyan-300 bg-rose-500/80 shadow-[0_0_10px_rgba(34,211,238,0.9)]" style="left:80.7%;top:35.8%;"></div>
+                                    <div id="zoomPickerPlaceholder" class="py-6 text-center text-xs text-slate-500">Upload or load a map first</div>
+                                    <div id="zoomHoverPin" class="hidden pointer-events-none absolute w-7 h-7 -ml-3.5 -mt-3.5 rounded-full border-2 border-slate-700 bg-slate-800 "></div>
+                                    <div id="zoomHoverLabel" class="hidden pointer-events-none absolute px-2 py-1 rounded-md bg-slate-950/90 border border-slate-700 text-xs font-semibold text-slate-400 whitespace-nowrap -translate-x-1/2 -translate-y-full -mt-4"></div>
+                                    <div id="zoomPickerPin" class="pointer-events-none absolute w-5 h-5 -ml-2.5 -mt-2.5 rounded-full border-2 border-slate-700 bg-slate-800 " style="left:80.7%;top:35.8%;"></div>
                                 </div>
                                 <input id="mapZoomX" type="hidden" value="0.807">
                                 <input id="mapZoomY" type="hidden" value="0.358">
                                 <input id="mapZoomCountry" type="hidden" value="Russia">
                                 <input id="mapZoomCountryKey" type="hidden" value="russia">
                                 <div class="grid grid-cols-3 gap-2">
-                                    <label class="text-[11px] text-slate-400">
+                                    <label class="text-xs text-slate-400">
                                         <span>Zoom (x)</span>
                                         <input id="mapZoomScale" type="number" min="1.2" max="3.5" step="0.1" value="2.0" onchange="saveVideoSettings()"
-                                            class="mt-1 w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                            class="mt-1 w-full px-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-slate-100">
                                     </label>
-                                    <label class="text-[11px] text-slate-400">
+                                    <label class="text-xs text-slate-400">
                                         <span>Start (s)</span>
                                         <input id="mapZoomStart" type="number" min="0" max="15" step="0.5" value="1.5" onchange="saveVideoSettings()"
-                                            class="mt-1 w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                            class="mt-1 w-full px-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-slate-100">
                                     </label>
-                                    <label class="text-[11px] text-slate-400">
+                                    <label class="text-xs text-slate-400">
                                         <span>Duration (s)</span>
                                         <input id="mapZoomDuration" type="number" min="0.5" max="10" step="0.5" value="2.5" onchange="saveVideoSettings()"
-                                            class="mt-1 w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                            class="mt-1 w-full px-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-slate-100">
                                     </label>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2 items-end pt-1">
@@ -919,10 +788,10 @@ limitations under the License.
                                         <input id="mapZoomOutToggle" type="checkbox" checked onchange="updateZoomOutUI(); saveVideoSettings()" class="accent-cyan-400">
                                         <span>Zoom out at end</span>
                                     </label>
-                                    <label id="mapZoomOutDurationWrap" class="text-[11px] text-slate-400">
+                                    <label id="mapZoomOutDurationWrap" class="text-xs text-slate-400">
                                         <span>Zoom out (s)</span>
                                         <input id="mapZoomOutDuration" type="number" min="0.5" max="10" step="0.5" value="2.0" onchange="saveVideoSettings()"
-                                            class="mt-1 w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                            class="mt-1 w-full px-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-slate-100">
                                     </label>
                                 </div>
                                 <div class="pt-1.5 border-t border-slate-800/80 space-y-2">
@@ -930,71 +799,71 @@ limitations under the License.
                                         <input id="revealCountryToggle" type="checkbox" checked onchange="updateRevealUI(true); saveVideoSettings()" class="accent-emerald-400">
                                         <span>Country reveal animation (cover + &quot;...&quot; &rarr; reveal color &amp; value)</span>
                                     </label>
-                                    <div id="revealControlsPanel" class="hidden pl-5 space-y-1.5">
+                                    <div id="revealControlsPanel" class="hidden pl-5 space-y-2">
                                         <div class="flex flex-wrap items-end gap-3">
-                                            <label class="block text-[11px] text-slate-400">
+                                            <label class="block text-xs text-slate-400">
                                                 <span>Reveal at (s)</span>
                                                 <input id="revealTimeInput" type="number" min="0.5" max="20" step="0.1" value="5.5" onchange="updateRevealUI(); saveVideoSettings()"
-                                                    class="mt-1 w-28 block px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-white">
+                                                    class="mt-1 w-28 block px-2 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-slate-100">
                                             </label>
-                                            <label class="block text-[11px] text-slate-400">
+                                            <label class="block text-xs text-slate-400">
                                                 <span>Cover color</span>
-                                                <span class="mt-1 flex items-center gap-1.5">
+                                                <span class="mt-1 flex items-center gap-2">
                                                     <input id="revealColorInput" type="color" value="#000000" onchange="onRevealColorChange()"
-                                                        class="w-9 h-8 rounded-lg bg-slate-900 border border-slate-700 cursor-pointer p-0.5">
-                                                    <span id="revealColorHex" class="text-[11px] font-mono text-slate-300">#000000</span>
+                                                        class="w-9 h-8 rounded-lg bg-slate-900 border border-slate-700 cursor-pointer p-1">
+                                                    <span id="revealColorHex" class="text-xs font-mono text-slate-300">#000000</span>
                                                 </span>
                                             </label>
                                         </div>
-                                        <p class="text-[10px] text-slate-500">Timeline: 3 dots appear &rarr; camera zooms while country &amp; dots stay visible &rarr; after zoom, dots vanish &amp; country reveals.</p>
+                                        <p class="text-xs text-slate-500">Timeline: 3 dots appear &rarr; camera zooms while country &amp; dots stay visible &rarr; after zoom, dots vanish &amp; country reveals.</p>
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Shorts Auto-Montage Overlays (Top Stickers + Animated Subscribe Pill) -->
-                            <div class="mt-2 pt-3 border-t border-slate-800/80 flex flex-col gap-2.5">
+                            <div class="mt-2 pt-3 border-t border-slate-800/80 flex flex-col gap-3">
                                 <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <span class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                                        <i class="fa-solid fa-wand-magic-sparkles text-rose-400"></i>
+                                    <span class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                        <i class="fa-solid fa-map text-slate-400"></i>
                                         <span>Shorts Auto-Montage Overlays</span>
-                                        <span class="px-1.5 py-0.5 rounded bg-slate-900 text-[10px] font-mono font-normal text-slate-400 border border-slate-800">Optional</span>
+                                        <span class="px-2 py-1 rounded bg-slate-900 text-xs font-mono font-normal text-slate-400 border border-slate-800">Optional</span>
                                     </span>
-                                    <div class="flex flex-wrap items-center gap-1.5">
+                                    <div class="flex flex-wrap items-center gap-2">
                                         <button type="button" id="shortsPresetBtn" onclick="applyShortsViralPreset()"
-                                            class="px-2.5 py-1 rounded-lg bg-gradient-to-r from-rose-500/20 to-amber-500/20 hover:from-rose-500/30 hover:to-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-semibold transition flex items-center gap-1">
-                                            <i class="fa-solid fa-bolt text-amber-400"></i>
+                                            class="px-3 py-1 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 text-xs font-mono font-semibold transition flex items-center gap-1">
+                                            <i class="fa-solid fa-bolt text-slate-400"></i>
                                             <span>Apply Reference Video Preset</span>
                                         </button>
                                         <button type="button" id="clearOverlaysBtn" onclick="clearAutoMontageOverlays()"
-                                            class="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 text-[10px] font-mono font-semibold transition flex items-center gap-1">
-                                            <i class="fa-solid fa-rotate-left text-rose-400"></i>
+                                            class="px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-slate-400 border border-slate-700 hover:border-slate-700 text-xs font-mono font-semibold transition flex items-center gap-1">
+                                            <i class="fa-solid fa-rotate-left text-slate-400"></i>
                                             <span>Clear Overlays</span>
                                         </button>
                                     </div>
                                 </div>
-                                <p class="text-[10px] text-slate-400">Optional overlays — leave as None / unchecked to render a standard map video without extra badges.</p>
+                                <p class="text-xs text-slate-400">Optional overlays — leave as None / unchecked to render a standard map video without extra badges.</p>
 
                                 <div class="flex items-center justify-between gap-2 pt-0.5">
-                                    <span class="text-[11px] font-medium text-slate-300">Top corner stickers</span>
+                                    <span class="text-xs font-medium text-slate-300">Top corner stickers</span>
                                     <button type="button" id="autoPickStickersBtn" onclick="setAutoStickers()"
-                                        class="px-2.5 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 text-[10px] font-mono font-semibold transition flex items-center gap-1">
-                                        <span>✨ Auto-Pick Stickers by Title</span>
+                                        class="px-3 py-1 rounded-lg bg-accent-500/15 hover:bg-accent-500/25 text-accent-300 border border-accent-500/30 text-xs font-mono font-semibold transition flex items-center gap-1">
+                                        <span>Match stickers to title</span>
                                     </button>
                                 </div>
 
-                                <!-- Interactive Left & Right Variant Picker for Auto-Pick Stickers by Title -->
-                                <div id="autoStickerVariantsBox" class="hidden p-2.5 rounded-xl bg-slate-950/90 border border-indigo-500/30 flex flex-col gap-2">
-                                    <div class="flex items-center justify-between gap-2 text-[10px]">
-                                        <span id="autoStickerThemeLabel" class="font-mono text-indigo-300">Suggested variants for title</span>
+                                <!-- Interactive Left & Right Variant Picker for Match stickers to title -->
+                                <div id="autoStickerVariantsBox" class="hidden p-3 rounded-xl bg-slate-950/90 border border-accent-500/30 flex flex-col gap-2">
+                                    <div class="flex items-center justify-between gap-2 text-xs">
+                                        <span id="autoStickerThemeLabel" class="font-mono text-accent-300">Suggested variants for title</span>
                                         <button type="button" onclick="document.getElementById('autoStickerVariantsBox').classList.add('hidden')" class="text-slate-500 hover:text-slate-300">Hide</button>
                                     </div>
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         <div>
-                                            <div class="text-[10px] text-slate-400 mb-1">Left sticker options:</div>
+                                            <div class="text-xs text-slate-400 mb-1">Left sticker options:</div>
                                             <div id="autoLeftVariantsList" class="flex flex-wrap gap-1"></div>
                                         </div>
                                         <div>
-                                            <div class="text-[10px] text-slate-400 mb-1">Right sticker options:</div>
+                                            <div class="text-xs text-slate-400 mb-1">Right sticker options:</div>
                                             <div id="autoRightVariantsList" class="flex flex-wrap gap-1"></div>
                                         </div>
                                     </div>
@@ -1003,183 +872,183 @@ limitations under the License.
                                 <div class="sticker-pickers grid grid-cols-2 gap-3">
                                     <div>
                                         <label for="topLeftStickerSelect" class="text-xs text-slate-300">Top-left sticker
-                                            <select id="topLeftStickerSelect" onchange="updateAutoMontagePreview()" class="mt-1 w-full px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white">
+                                            <select id="topLeftStickerSelect" onchange="updateAutoMontagePreview()" class="mt-1 w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100">
                                                 <option value="none" selected>None (No sticker)</option>
-                                                <option value="auto">✨ Auto-match (Library)</option>
+                                                <option value="auto">Auto-match (Library)</option>
                                                 <optgroup label="Generated Styles (Auto Theme)">
-                                                    <option value="gen_diecut:auto">✨ Generated Die-Cut Sticker</option>
-                                                    <option value="gen_neon:auto">💫 Generated Neon Badge</option>
-                                                    <option value="gen_stamp:auto">🏷️ Generated Editorial Stamp</option>
+                                                    <option value="gen_diecut:auto">Generated Die-Cut Sticker</option>
+                                                    <option value="gen_neon:auto">Generated Neon Badge</option>
+                                                    <option value="gen_stamp:auto">Generated Editorial Stamp</option>
                                                 </optgroup>
                                                 <optgroup label="Holiday &amp; Seasonal">
-                                                    <option value="santa">🎅 Santa Claus</option>
-                                                    <option value="gift">🎁 Festive Gift</option>
-                                                    <option value="snowflake">❄️ Winter Snowflake</option>
-                                                    <option value="pumpkin">🎃 Halloween Pumpkin</option>
+                                                    <option value="santa">Santa Claus</option>
+                                                    <option value="gift">Festive Gift</option>
+                                                    <option value="snowflake">Winter Snowflake</option>
+                                                    <option value="pumpkin">Halloween Pumpkin</option>
                                                 </optgroup>
                                                 <optgroup label="Geography &amp; Travel">
-                                                    <option value="globe">🌍 Earth Globe</option>
-                                                    <option value="compass">🧭 Explorer Compass</option>
-                                                    <option value="pin">📍 Map Location Pin</option>
-                                                    <option value="plane">✈️ Travel Airplane</option>
+                                                    <option value="globe">Earth Globe</option>
+                                                    <option value="compass">Explorer Compass</option>
+                                                    <option value="pin">Map Location Pin</option>
+                                                    <option value="plane">Travel Airplane</option>
                                                 </optgroup>
                                                 <optgroup label="Economy &amp; Wealth">
-                                                    <option value="money">💰 Money Bag</option>
-                                                    <option value="chart">📈 Growth Chart</option>
-                                                    <option value="diamond">💎 Luxury Diamond</option>
+                                                    <option value="money">Money Bag</option>
+                                                    <option value="chart">Growth Chart</option>
+                                                    <option value="diamond">Luxury Diamond</option>
                                                 </optgroup>
                                                 <optgroup label="History, Power &amp; Military">
-                                                    <option value="crown">👑 Royal Crown</option>
-                                                    <option value="shield">🛡️ Defense Shield</option>
-                                                    <option value="swords">⚔️ Crossed Swords</option>
+                                                    <option value="crown">Royal Crown</option>
+                                                    <option value="shield">Defense Shield</option>
+                                                    <option value="swords">Crossed Swords</option>
                                                 </optgroup>
                                                 <optgroup label="Science &amp; Tech">
-                                                    <option value="rocket">🚀 Space Rocket</option>
-                                                    <option value="bolt">⚡ High Voltage / Energy</option>
+                                                    <option value="rocket">Space Rocket</option>
+                                                    <option value="bolt">High Voltage / Energy</option>
                                                 </optgroup>
                                                 <optgroup label="Viral &amp; Ranking">
-                                                    <option value="trophy">🏆 Champion Trophy</option>
-                                                    <option value="fire">🔥 Viral Fire</option>
+                                                    <option value="trophy">Champion Trophy</option>
+                                                    <option value="fire">Viral Fire</option>
                                                     <option value="star">⭐ Gold Star</option>
-                                                    <option value="heart">❤️ Red Heart</option>
-                                                    <option value="skull">💀 Danger Skull</option>
+                                                    <option value="heart">Red Heart</option>
+                                                    <option value="skull">Danger Skull</option>
                                                 </optgroup>
                                                 <optgroup label="Wildlife, Nature &amp; Weather">
-                                                    <option value="bear">🐻 Bear</option>
-                                                    <option value="paw">🐾 Animal Paw</option>
-                                                    <option value="tree">🌲 Forest Tree</option>
-                                                    <option value="wolf">🐺 Wolf</option>
-                                                    <option value="sun">☀️ Sun / Climate</option>
+                                                    <option value="bear">Bear</option>
+                                                    <option value="paw">Animal Paw</option>
+                                                    <option value="tree">Forest Tree</option>
+                                                    <option value="wolf">Wolf</option>
+                                                    <option value="sun">Sun / Climate</option>
                                                 </optgroup>
                                                 <optgroup label="Food, Drinks &amp; Lifestyle">
-                                                    <option value="beer">🍺 Beer Mug</option>
-                                                    <option value="coffee">☕ Coffee / Tea</option>
-                                                    <option value="wine">🍷 Wine Glass</option>
-                                                    <option value="pizza">🍕 Pizza / Food</option>
+                                                    <option value="beer">Beer Mug</option>
+                                                    <option value="coffee">Coffee / Tea</option>
+                                                    <option value="wine">Wine Glass</option>
+                                                    <option value="pizza">Pizza / Food</option>
                                                 </optgroup>
                                                 <optgroup label="People, Sports &amp; Transport">
-                                                    <option value="brain">🧠 Brain / IQ</option>
-                                                    <option value="book">📚 Books / Language</option>
-                                                    <option value="soccer">⚽ Football / Sports</option>
-                                                    <option value="car">🚗 Car / Transport</option>
+                                                    <option value="brain">Brain / IQ</option>
+                                                    <option value="book">Books / Language</option>
+                                                    <option value="soccer">Football / Sports</option>
+                                                    <option value="car">Car / Transport</option>
                                                 </optgroup>
                                                 <optgroup label="More Nature, Science &amp; Lifestyle">
-                                                    <option value="mountain">🏔️ Mountain</option>
-                                                    <option value="volcano">🌋 Volcano</option>
-                                                    <option value="island">🏝️ Island</option>
-                                                    <option value="rainbow">🌈 Rainbow</option>
-                                                    <option value="moon">🌙 Moon</option>
-                                                    <option value="rain">🌧️ Rain</option>
-                                                    <option value="robot">🤖 Robot</option>
-                                                    <option value="satellite">🛰️ Satellite</option>
-                                                    <option value="laptop">💻 Laptop</option>
-                                                    <option value="graduation">🎓 Graduation</option>
-                                                    <option value="medal">🏅 Medal</option>
-                                                    <option value="cat">🐱 Cat</option>
-                                                    <option value="dog">🐶 Dog</option>
-                                                    <option value="fish">🐟 Fish</option>
-                                                    <option value="burger">🍔 Burger</option>
-                                                    <option value="train">🚆 Train</option>
+                                                    <option value="mountain">Mountain</option>
+                                                    <option value="volcano">Volcano</option>
+                                                    <option value="island">Island</option>
+                                                    <option value="rainbow">Rainbow</option>
+                                                    <option value="moon">Moon</option>
+                                                    <option value="rain">Rain</option>
+                                                    <option value="robot">Robot</option>
+                                                    <option value="satellite">Satellite</option>
+                                                    <option value="laptop">Laptop</option>
+                                                    <option value="graduation">Graduation</option>
+                                                    <option value="medal">Medal</option>
+                                                    <option value="cat">Cat</option>
+                                                    <option value="dog">Dog</option>
+                                                    <option value="fish">Fish</option>
+                                                    <option value="burger">Burger</option>
+                                                    <option value="train">Train</option>
                                                 </optgroup>
                                             </select>
                                         </label>
                                         <input id="leftStickerImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="selectLeftStickerImage(this.files[0])" class="hidden">
-                                        <div class="mt-1.5 flex items-center justify-between gap-1.5 text-[10px]">
+                                        <div class="mt-2 flex items-center justify-between gap-2 text-xs">
                                             <span id="leftStickerFileName" class="text-slate-500 truncate">Preset or custom file</span>
                                             <div class="flex items-center gap-1 shrink-0">
-                                                <button type="button" onclick="document.getElementById('leftStickerImageInput').click()" class="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-indigo-300 border border-slate-700 transition">Upload file</button>
-                                                <button type="button" onclick="clearLeftStickerImage()" class="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-800 transition">Clear</button>
+                                                <button type="button" onclick="document.getElementById('leftStickerImageInput').click()" class="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-accent-300 border border-slate-700 transition">Upload file</button>
+                                                <button type="button" onclick="clearLeftStickerImage()" class="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 transition">Clear</button>
                                             </div>
                                         </div>
                                     </div>
                                     <div>
                                         <label for="topRightStickerSelect" class="text-xs text-slate-300">Top-right sticker
-                                            <select id="topRightStickerSelect" onchange="updateAutoMontagePreview()" class="mt-1 w-full px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white">
+                                            <select id="topRightStickerSelect" onchange="updateAutoMontagePreview()" class="mt-1 w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100">
                                                 <option value="none" selected>None (No sticker)</option>
-                                                <option value="auto">✨ Auto-match (Library)</option>
+                                                <option value="auto">Auto-match (Library)</option>
                                                 <optgroup label="Generated Styles (Auto Theme)">
-                                                    <option value="gen_diecut:auto">✨ Generated Die-Cut Sticker</option>
-                                                    <option value="gen_neon:auto">💫 Generated Neon Badge</option>
-                                                    <option value="gen_stamp:auto">🏷️ Generated Editorial Stamp</option>
+                                                    <option value="gen_diecut:auto">Generated Die-Cut Sticker</option>
+                                                    <option value="gen_neon:auto">Generated Neon Badge</option>
+                                                    <option value="gen_stamp:auto">Generated Editorial Stamp</option>
                                                 </optgroup>
                                                 <optgroup label="Holiday &amp; Seasonal">
-                                                    <option value="gift">🎁 Festive Gift</option>
-                                                    <option value="santa">🎅 Santa Claus</option>
-                                                    <option value="snowflake">❄️ Winter Snowflake</option>
-                                                    <option value="pumpkin">🎃 Halloween Pumpkin</option>
+                                                    <option value="gift">Festive Gift</option>
+                                                    <option value="santa">Santa Claus</option>
+                                                    <option value="snowflake">Winter Snowflake</option>
+                                                    <option value="pumpkin">Halloween Pumpkin</option>
                                                 </optgroup>
                                                 <optgroup label="Geography &amp; Travel">
-                                                    <option value="globe">🌍 Earth Globe</option>
-                                                    <option value="compass">🧭 Explorer Compass</option>
-                                                    <option value="pin">📍 Map Location Pin</option>
-                                                    <option value="plane">✈️ Travel Airplane</option>
+                                                    <option value="globe">Earth Globe</option>
+                                                    <option value="compass">Explorer Compass</option>
+                                                    <option value="pin">Map Location Pin</option>
+                                                    <option value="plane">Travel Airplane</option>
                                                 </optgroup>
                                                 <optgroup label="Economy &amp; Wealth">
-                                                    <option value="money">💰 Money Bag</option>
-                                                    <option value="chart">📈 Growth Chart</option>
-                                                    <option value="diamond">💎 Luxury Diamond</option>
+                                                    <option value="money">Money Bag</option>
+                                                    <option value="chart">Growth Chart</option>
+                                                    <option value="diamond">Luxury Diamond</option>
                                                 </optgroup>
                                                 <optgroup label="History, Power &amp; Military">
-                                                    <option value="crown">👑 Royal Crown</option>
-                                                    <option value="shield">🛡️ Defense Shield</option>
-                                                    <option value="swords">⚔️ Crossed Swords</option>
+                                                    <option value="crown">Royal Crown</option>
+                                                    <option value="shield">Defense Shield</option>
+                                                    <option value="swords">Crossed Swords</option>
                                                 </optgroup>
                                                 <optgroup label="Science &amp; Tech">
-                                                    <option value="rocket">🚀 Space Rocket</option>
-                                                    <option value="bolt">⚡ High Voltage / Energy</option>
+                                                    <option value="rocket">Space Rocket</option>
+                                                    <option value="bolt">High Voltage / Energy</option>
                                                 </optgroup>
                                                 <optgroup label="Viral &amp; Ranking">
-                                                    <option value="trophy">🏆 Champion Trophy</option>
-                                                    <option value="fire">🔥 Viral Fire</option>
+                                                    <option value="trophy">Champion Trophy</option>
+                                                    <option value="fire">Viral Fire</option>
                                                     <option value="star">⭐ Gold Star</option>
-                                                    <option value="heart">❤️ Red Heart</option>
-                                                    <option value="skull">💀 Danger Skull</option>
+                                                    <option value="heart">Red Heart</option>
+                                                    <option value="skull">Danger Skull</option>
                                                 </optgroup>
                                                 <optgroup label="Wildlife, Nature &amp; Weather">
-                                                    <option value="bear">🐻 Bear</option>
-                                                    <option value="paw">🐾 Animal Paw</option>
-                                                    <option value="tree">🌲 Forest Tree</option>
-                                                    <option value="wolf">🐺 Wolf</option>
-                                                    <option value="sun">☀️ Sun / Climate</option>
+                                                    <option value="bear">Bear</option>
+                                                    <option value="paw">Animal Paw</option>
+                                                    <option value="tree">Forest Tree</option>
+                                                    <option value="wolf">Wolf</option>
+                                                    <option value="sun">Sun / Climate</option>
                                                 </optgroup>
                                                 <optgroup label="Food, Drinks &amp; Lifestyle">
-                                                    <option value="beer">🍺 Beer Mug</option>
-                                                    <option value="coffee">☕ Coffee / Tea</option>
-                                                    <option value="wine">🍷 Wine Glass</option>
-                                                    <option value="pizza">🍕 Pizza / Food</option>
+                                                    <option value="beer">Beer Mug</option>
+                                                    <option value="coffee">Coffee / Tea</option>
+                                                    <option value="wine">Wine Glass</option>
+                                                    <option value="pizza">Pizza / Food</option>
                                                 </optgroup>
                                                 <optgroup label="People, Sports &amp; Transport">
-                                                    <option value="brain">🧠 Brain / IQ</option>
-                                                    <option value="book">📚 Books / Language</option>
-                                                    <option value="soccer">⚽ Football / Sports</option>
-                                                    <option value="car">🚗 Car / Transport</option>
+                                                    <option value="brain">Brain / IQ</option>
+                                                    <option value="book">Books / Language</option>
+                                                    <option value="soccer">Football / Sports</option>
+                                                    <option value="car">Car / Transport</option>
                                                 </optgroup>
                                                 <optgroup label="More Nature, Science &amp; Lifestyle">
-                                                    <option value="mountain">🏔️ Mountain</option>
-                                                    <option value="volcano">🌋 Volcano</option>
-                                                    <option value="island">🏝️ Island</option>
-                                                    <option value="rainbow">🌈 Rainbow</option>
-                                                    <option value="moon">🌙 Moon</option>
-                                                    <option value="rain">🌧️ Rain</option>
-                                                    <option value="robot">🤖 Robot</option>
-                                                    <option value="satellite">🛰️ Satellite</option>
-                                                    <option value="laptop">💻 Laptop</option>
-                                                    <option value="graduation">🎓 Graduation</option>
-                                                    <option value="medal">🏅 Medal</option>
-                                                    <option value="cat">🐱 Cat</option>
-                                                    <option value="dog">🐶 Dog</option>
-                                                    <option value="fish">🐟 Fish</option>
-                                                    <option value="burger">🍔 Burger</option>
-                                                    <option value="train">🚆 Train</option>
+                                                    <option value="mountain">Mountain</option>
+                                                    <option value="volcano">Volcano</option>
+                                                    <option value="island">Island</option>
+                                                    <option value="rainbow">Rainbow</option>
+                                                    <option value="moon">Moon</option>
+                                                    <option value="rain">Rain</option>
+                                                    <option value="robot">Robot</option>
+                                                    <option value="satellite">Satellite</option>
+                                                    <option value="laptop">Laptop</option>
+                                                    <option value="graduation">Graduation</option>
+                                                    <option value="medal">Medal</option>
+                                                    <option value="cat">Cat</option>
+                                                    <option value="dog">Dog</option>
+                                                    <option value="fish">Fish</option>
+                                                    <option value="burger">Burger</option>
+                                                    <option value="train">Train</option>
                                                 </optgroup>
                                             </select>
                                         </label>
                                         <input id="rightStickerImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="selectRightStickerImage(this.files[0])" class="hidden">
-                                        <div class="mt-1.5 flex items-center justify-between gap-1.5 text-[10px]">
+                                        <div class="mt-2 flex items-center justify-between gap-2 text-xs">
                                             <span id="rightStickerFileName" class="text-slate-500 truncate">Preset or custom file</span>
                                             <div class="flex items-center gap-1 shrink-0">
-                                                <button type="button" onclick="document.getElementById('rightStickerImageInput').click()" class="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-indigo-300 border border-slate-700 transition">Upload file</button>
-                                                <button type="button" onclick="clearRightStickerImage()" class="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-800 transition">Clear</button>
+                                                <button type="button" onclick="document.getElementById('rightStickerImageInput').click()" class="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-accent-300 border border-slate-700 transition">Upload file</button>
+                                                <button type="button" onclick="clearRightStickerImage()" class="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 transition">Clear</button>
                                             </div>
                                         </div>
                                     </div>
@@ -1187,60 +1056,60 @@ limitations under the License.
 
                                 <label class="flex items-center gap-2 text-xs text-slate-300 pt-0.5">
                                     <input id="subscribeBadgeToggle" type="checkbox" onchange="updateAutoMontagePreview()" class="accent-rose-500">
-                                    <span>Animated <strong class="text-white">[ ❤️ Subscribe! ▶️ ]</strong> pill below title</span>
+                                    <span>Animated <strong class="text-slate-100">[ Subscribe! ▶]</strong> pill below title</span>
                                 </label>
 
                                 <input id="subscribeImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="selectSubscribeImage(this.files[0])" class="hidden">
-                                <div class="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800/90 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                                    <span id="subscribeFileName" class="text-slate-400 truncate">Built-in [ ❤️ Subscribe! ▶️ ] or upload file</span>
-                                    <div class="flex items-center gap-1.5 shrink-0">
-                                        <button type="button" onclick="document.getElementById('subscribeImageInput').click()" class="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-[10px] font-semibold transition">
+                                <div class="p-3 rounded-xl bg-slate-950/90 border border-slate-800/90 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                    <span id="subscribeFileName" class="text-slate-400 truncate">Built-in [ Subscribe! ▶] or upload file</span>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <button type="button" onclick="document.getElementById('subscribeImageInput').click()" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-semibold transition">
                                             Upload custom badge image (PNG/WebP)
                                         </button>
-                                        <button type="button" onclick="clearSubscribeImage()" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-800 text-[10px] transition">
+                                        <button type="button" onclick="clearSubscribeImage()" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 text-xs transition">
                                             Remove file
                                         </button>
                                     </div>
                                 </div>
 
                                 <div class="grid grid-cols-3 gap-2">
-                                    <label for="subscribeTextInput" class="col-span-2 text-[11px] text-slate-400">Badge text
+                                    <label for="subscribeTextInput" class="col-span-2 text-xs text-slate-400">Badge text
                                         <input id="subscribeTextInput" type="text" maxlength="40" value="Subscribe!" placeholder="Subscribe!"
                                             oninput="updateAutoMontagePreview()"
-                                            class="mt-1 w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white">
+                                            class="mt-1 w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100">
                                     </label>
-                                    <label for="subscribeDelayInput" class="text-[11px] text-slate-400">Fade-in (s)
+                                    <label for="subscribeDelayInput" class="text-xs text-slate-400">Fade-in (s)
                                         <input id="subscribeDelayInput" type="number" min="0" max="25" step="0.5" value="2.5"
                                             oninput="saveVideoSettings()"
-                                            class="mt-1 w-full px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-amber-300">
+                                            class="mt-1 w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-slate-400">
                                     </label>
                                 </div>
                             </div>
 
-                            <p id="titlePreviewStatus" role="status" aria-live="polite" class="text-[11px] text-slate-400"></p>
+                            <p id="titlePreviewStatus" role="status" aria-live="polite" class="text-xs text-slate-400"></p>
                         </div>
 
                         <!-- Watermark image and text controls -->
                         <div id="watermarkPanel" class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 flex flex-col gap-3">
                                 <h3 class="text-xs font-semibold text-slate-200 flex items-center gap-2">
-                                    <i class="fa-solid fa-stamp text-emerald-400"></i> Watermark
-                                    <span class="ml-auto text-[10px] font-normal text-slate-500">Optional</span>
+                                    <i class="fa-solid fa-stamp text-slate-400"></i> Watermark
+                                    <span class="ml-auto text-xs font-normal text-slate-500">Optional</span>
                                 </h3>
                                 <div id="watermarkDropzone" role="button" tabindex="0" aria-label="Upload watermark image" aria-describedby="watermarkUploadHint">
                                     <img id="watermarkThumbPreview" alt="Selected watermark logo" class="hidden">
                                     <p id="watermarkUploadPrompt" class="text-xs text-slate-200">Drop your watermark image here, or click to browse</p>
-                                    <p id="watermarkUploadHint" class="mt-1 text-[10px] text-slate-500">PNG, JPEG or WebP · up to 15 MB</p>
+                                    <p id="watermarkUploadHint" class="mt-1 text-xs text-slate-500">PNG, JPEG or WebP · up to 15 MB</p>
                                 </div>
                                 <input id="watermarkFileInput" type="file" accept="image/png,image/jpeg,image/webp" onchange="selectWatermark(this.files[0])" class="hidden">
-                                <div class="flex items-center justify-between gap-2 text-[11px]">
+                                <div class="flex items-center justify-between gap-2 text-xs">
                                     <span id="watermarkFileName" class="text-xs font-medium text-slate-200 truncate">No logo selected</span>
-                                    <button type="button" onclick="clearWatermarkImage()" class="text-emerald-400">Remove logo</button>
+                                    <button type="button" onclick="clearWatermarkImage()" class="text-slate-400">Remove logo</button>
                                 </div>
                                 <label class="block text-xs text-slate-300" for="watermarkTextInput">Watermark text
-                                    <input id="watermarkTextInput" type="text" maxlength="80" placeholder="YOUR CHANNEL" oninput="updateWatermarkPreview()" class="mt-1 w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white">
+                                    <input id="watermarkTextInput" type="text" maxlength="80" placeholder="YOUR CHANNEL" oninput="updateWatermarkPreview()" class="mt-1 w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-100">
                                 </label>
                                 <label class="block text-xs text-slate-300" for="watermarkFontSelect">Watermark text font
-                                    <select id="watermarkFontSelect" onchange="updateWatermarkPreview()" class="mt-1 w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white">
+                                    <select id="watermarkFontSelect" onchange="updateWatermarkPreview()" class="mt-1 w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-100">
                                         {% for font in title_fonts %}
                                         <option value="{{ font }}" {% if font == 'DIN Condensed.ttf' %}selected{% endif %}>{{ font.rsplit('.', 1)[0] }}{% if font in ['kodchasan.ttf', 'arialroundedmtbold.ttf'] %} (Latin){% endif %}</option>
                                         {% endfor %}
@@ -1251,34 +1120,34 @@ limitations under the License.
                                 </label>
                                 <label class="flex items-center gap-2 text-xs text-slate-300 pt-1">
                                     <input id="watermarkStarsToggle" type="checkbox" onchange="updateWatermarkPreview()" class="accent-emerald-400">
-                                    <span>Show 3 stars / footer badge (<strong class="text-amber-300">★ ★ ★</strong>) beneath watermark</span>
+                                    <span>Show 3 stars / footer badge (<strong class="text-slate-400"></strong>) beneath watermark</span>
                                 </label>
                                 <input id="watermarkStarsImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="selectWatermarkStarsImage(this.files[0])" class="hidden">
-                                <div class="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800/90 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                                    <span id="watermarkStarsFileName" class="text-slate-400 truncate">Built-in ★ ★ ★ or upload file</span>
-                                    <div class="flex items-center gap-1.5 shrink-0">
-                                        <button type="button" onclick="document.getElementById('watermarkStarsImageInput').click()" class="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[10px] font-semibold transition">
+                                <div class="p-3 rounded-xl bg-slate-950/90 border border-slate-800/90 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                    <span id="watermarkStarsFileName" class="text-slate-400 truncate">Built-in or upload file</span>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <button type="button" onclick="document.getElementById('watermarkStarsImageInput').click()" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-semibold transition">
                                             Upload custom stars / footer image
                                         </button>
-                                        <button type="button" onclick="clearWatermarkStarsImage()" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-800 text-[10px] transition">
+                                        <button type="button" onclick="clearWatermarkStarsImage()" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 text-xs transition">
                                             Remove file
                                         </button>
                                     </div>
                                 </div>
-                                <p class="text-[10px] text-slate-500">Your logo is center-cropped to a circle below the map. Watermark text uses its own font near the bottom.</p>
-                                <p id="watermarkPreviewStatus" role="status" aria-live="polite" class="text-[11px] text-slate-400"></p>
+                                <p class="text-xs text-slate-500">Your logo is center-cropped to a circle below the map. Watermark text uses its own font near the bottom.</p>
+                                <p id="watermarkPreviewStatus" role="status" aria-live="polite" class="text-xs text-slate-400"></p>
                         </div>
 
                         <!-- Codec Selection (Synced Visual Cards + Original Select) -->
                         <div id="codecPanel" class="md:col-span-2 self-start p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 flex flex-col gap-3">
                             <div class="flex items-center justify-between">
                                 <label for="codecSelect" class="text-xs font-semibold text-slate-200 flex items-center gap-2">
-                                    <span class="w-5 h-5 rounded-md bg-sky-500/20 border border-sky-500/40 text-sky-300 font-mono text-[10px] font-bold flex items-center justify-center">F4</span>
-                                    <i class="fa-solid fa-microchip text-sky-400"></i>
+                                    <span class="w-5 h-5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 font-mono text-xs font-medium flex items-center justify-center">F4</span>
+                                    <i class="fa-solid fa-microchip text-slate-400"></i>
                                     <span>Hardware / Software Codec</span>
                                 </label>
                                 <select id="codecSelect" onchange="syncCodecCards(this.value)"
-                                    class="px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-sky-300 focus:outline-none focus:border-sky-500 transition">
+                                    class="px-3 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-400 focus:outline-none focus:border-slate-700 transition">
                                     <option value="libx264" selected>libx264</option>
                                     <option value="h264_nvenc" disabled>h264_nvenc</option>
                                     <option value="h264_videotoolbox" disabled>h264_videotoolbox</option>
@@ -1288,112 +1157,39 @@ limitations under the License.
                             <!-- Interactive Codec Pill Cards -->
                             <div class="grid grid-cols-3 gap-2 pt-1">
                                 <button type="button" data-codec="libx264" onclick="selectCodecCard('libx264')"
-                                    class="codec-card p-2 rounded-xl border border-sky-500/50 bg-sky-500/10 text-left transition">
+                                    class="codec-card p-2 rounded-xl border border-slate-700 bg-slate-800 text-left transition">
                                     <div class="flex items-center justify-between">
-                                        <span class="text-[11px] font-mono font-bold text-white">libx264</span>
-                                        <i class="fa-solid fa-server text-[10px] text-sky-400"></i>
+                                        <span class="text-xs font-mono font-medium text-slate-100">libx264</span>
+                                        <i class="fa-solid fa-server text-xs text-slate-400"></i>
                                     </div>
-                                    <div class="text-[10px] text-slate-400 mt-0.5 truncate">Universal CPU</div>
+                                    <div class="text-xs text-slate-400 mt-1 truncate">Universal CPU</div>
                                 </button>
                                 <button type="button" data-codec="h264_nvenc" disabled onclick="selectCodecCard('h264_nvenc')"
                                     class="codec-card p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 text-left transition">
                                     <div class="flex items-center justify-between">
-                                        <span class="text-[11px] font-mono font-bold text-slate-200">nvenc</span>
-                                        <i class="fa-solid fa-bolt text-[10px] text-emerald-400"></i>
+                                        <span class="text-xs font-mono font-medium text-slate-200">nvenc</span>
+                                        <i class="fa-solid fa-bolt text-xs text-slate-400"></i>
                                     </div>
-                                    <div class="text-[10px] text-slate-400 mt-0.5 truncate">NVIDIA GPU</div>
+                                    <div class="text-xs text-slate-400 mt-1 truncate">NVIDIA GPU</div>
                                 </button>
                                 <button type="button" data-codec="h264_videotoolbox" disabled onclick="selectCodecCard('h264_videotoolbox')"
                                     class="codec-card p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 text-left transition">
                                     <div class="flex items-center justify-between">
-                                        <span class="text-[11px] font-mono font-bold text-slate-200">videotoolbox</span>
-                                        <i class="fa-brands fa-apple text-[10px] text-purple-400"></i>
+                                        <span class="text-xs font-mono font-medium text-slate-200">videotoolbox</span>
+                                        <i class="fa-brands fa-apple text-xs text-slate-400"></i>
                                     </div>
-                                    <div class="text-[10px] text-slate-400 mt-0.5 truncate">Apple Silicon</div>
+                                    <div class="text-xs text-slate-400 mt-1 truncate">Apple Silicon</div>
                                 </button>
                             </div>
-                            <p id="codecStatus" role="status" aria-live="polite" class="text-[11px] text-slate-400">Checking encoders on the render worker…</p>
-                            <p id="studioSaveStatus" role="status" class="text-[11px] text-slate-500">Settings and selected files are saved automatically on this device.</p>
-                            <p id="renderAudioStatus" role="status" class="text-[11px] text-amber-300">No music uploaded · video will be silent.</p>
+                            <p id="codecStatus" role="status" aria-live="polite" class="text-xs text-slate-400">Checking encoders on the render worker…</p>
+                            <p id="studioSaveStatus" role="status" class="text-xs text-slate-500">Settings and selected files are saved automatically on this device.</p>
+                            <p id="renderAudioStatus" role="status" class="text-xs text-slate-400">No music uploaded · video will be silent.</p>
                         </div>
 
-                    </div>
-
-                    <!-- CINEMA-GRADE VIDEO PREVIEW STAGE -->
-                    <div class="relative rounded-2xl bg-slate-950 border border-slate-800/90 overflow-hidden p-4 canvas-grid">
-                        <!-- Ambient Cinema Glow -->
-                        <div class="cinema-ambient pointer-events-none absolute -inset-10 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-rose-500/10 blur-2xl"></div>
-
-                        <div class="relative z-10 flex flex-wrap items-center justify-between gap-2 mb-3">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                                <span class="text-xs font-display font-semibold text-slate-200 uppercase tracking-wider">Video Preview</span>
-                                <span id="stageModeLabel" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800">Live Frame Composite</span>
-                            </div>
-                            <div class="flex items-center gap-2 text-[11px] font-mono text-slate-400">
-                                <span id="stageCodecBadge" class="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-sky-400">libx264</span>
-                                <span id="stageDurationBadge" class="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-amber-400">00:08.00</span>
-                            </div>
-                        </div>
-
-                        <!-- Stage Screen -->
-                        <div class="video-preview-stage effects-on relative z-10 mx-auto rounded-xl bg-slate-950 border border-slate-800/90 shadow-2xl overflow-hidden flex items-center justify-center">
-                            <!-- Background video live preview (when user selects bgFileInput) -->
-                            <video id="stageBgPreview" class="hidden absolute inset-0 w-full h-full object-cover" muted loop playsinline></video>
-                            <div class="stage-scrim absolute inset-0 pointer-events-none"></div>
-
-                            <!-- Composite Foreground (Title + Map preview before final render) -->
-                            <div id="stageCompositeBox" class="relative z-10 flex flex-col items-center justify-center text-center w-full h-full">
-                                <div id="stageTopLeftSticker" class="hidden"></div>
-                                <div id="stageTopRightSticker" class="hidden"></div>
-                                <div id="stageTitleBanner" class="text-white hidden"></div>
-                                <div id="stageAccentRow" class="hidden">
-                                    <div id="stageSubscribeBanner" class="hidden"></div>
-                                </div>
-                                <div id="stageMapArea">
-                                    <img id="stageMapPreview" alt="Map frame preview" class="hidden object-contain">
-                                    <canvas id="stageRevealCanvas" class="hidden pointer-events-none absolute inset-0 w-full h-full z-10"></canvas>
-                                    <div id="stageEmptyPlaceholder" class="flex flex-col items-center gap-2 text-slate-500">
-                                        <div class="w-12 h-12 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-center text-slate-400 shadow-inner">
-                                            <i class="fa-solid fa-photo-film text-xl text-indigo-400/80"></i>
-                                        </div>
-                                        <p class="text-xs font-medium text-slate-400">Drop a Map Slide &amp; Background Video above to preview frame layout</p>
-                                        <p class="text-[10px] font-mono text-slate-600">Rendered MP4 will appear here for instant cinema playback</p>
-                                    </div>
-                                </div>
-                                <img id="stageWatermarkImage" alt="Watermark logo preview" class="hidden">
-                                <div id="stageWatermarkText" class="hidden"></div>
-                                <div id="stageWatermarkStars" class="hidden"></div>
-                            </div>
-
-                            <!-- Intro Fade Veil -->
-                            <div id="stageIntroVeil" class="hidden pointer-events-none absolute inset-0 z-[15] bg-black"></div>
-
-                            <!-- Watermarks share the same 1080×1920 coordinate space as the map. -->
-                            <!-- Rendered Final Video Player (revealed when /api/render_video succeeds) -->
-                            <video id="renderedVideoPlayer" class="hidden absolute inset-0 z-20 w-full h-full object-contain bg-black" controls playsinline></video>
-                        </div>
-
-                        <!-- Live Animation Transport Bar -->
-                        <div id="previewPlaybackBar" class="relative z-10 mt-2.5 flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/85 border border-slate-800/90 text-[11px] font-mono">
-                            <div class="flex items-center gap-1.5">
-                                <button type="button" id="previewPlayPauseBtn" onclick="togglePreviewAnimation()"
-                                    class="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 transition flex items-center gap-1.5">
-                                    <i id="previewPlayPauseIcon" class="fa-solid fa-pause text-[10px]"></i>
-                                    <span id="previewPlayPauseLabel">Pause</span>
-                                </button>
-                                <button type="button" id="previewRestartBtn" onclick="restartPreviewAnimation()"
-                                    class="px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1" title="Restart preview animation">
-                                    <i class="fa-solid fa-rotate-left text-[10px]"></i>
-                                    <span>Restart</span>
-                                </button>
-                            </div>
-                            <span id="previewTimeIndicator" class="text-slate-300 tabular-nums">00:00.0 / 00:08.0</span>
-                        </div>
                     </div>
 
                     <details class="p-4 rounded-xl bg-slate-950/80 border border-slate-700 space-y-3" id="youtubePanel">
-                        <summary class="cursor-pointer text-sm font-semibold text-rose-300"><i class="fa-brands fa-youtube mr-2"></i>YouTube upload <span id="youtubeConnectionBadge" role="status" class="ml-2 text-xs font-normal text-slate-400">Checking sign-in…</span></summary>
+                        <summary class="cursor-pointer text-sm font-semibold text-slate-400"><i class="fa-brands fa-youtube mr-2"></i>YouTube upload <span id="youtubeConnectionBadge" role="status" class="ml-2 text-xs font-normal text-slate-400">Checking sign-in…</span></summary>
                         <div class="space-y-3 mt-3 text-xs">
                             <p class="text-slate-400">Connect your channel once, then upload automatically after rendering. Credentials stay on the server.</p>
                             <p class="text-slate-400">Rendered videos are vertical 9:16 and up to 30 seconds long, ready for Shorts. YouTube classifies them automatically after processing.</p>
@@ -1402,7 +1198,7 @@ limitations under the License.
                             </label>
                             <p class="text-slate-400 break-all">Web application redirect URI: <code id="youtubeRedirect">Loading…</code>. Desktop app files work on localhost.</p>
                             <div class="flex flex-wrap gap-2">
-                                <button type="button" id="youtubeConnect" onclick="connectYouTube()" class="px-3 py-2 rounded-lg bg-rose-700 hover:bg-rose-600">Connect Google / YouTube</button>
+                                <button type="button" id="youtubeConnect" onclick="connectYouTube()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-800">Connect Google / YouTube</button>
                                 <button type="button" id="youtubeSignOut" onclick="disconnectYouTube()" disabled class="px-3 py-2 rounded-lg bg-slate-700 disabled:opacity-50">Sign out of YouTube</button>
                             </div>
                             <p id="youtubeConnection" role="status" class="text-slate-300">Checking connection…</p>
@@ -1423,33 +1219,134 @@ limitations under the License.
                                 </select>
                             </label>
                             <label class="flex items-center gap-2"><input id="youtubeKids" type="checkbox">Made for kids</label>
-                            <button type="button" id="youtubeUpload" onclick="uploadToYouTube()" disabled class="px-3 py-2 rounded-lg bg-rose-700 disabled:opacity-50">Upload rendered Short to YouTube</button>
+                            <button type="button" id="youtubeUpload" onclick="uploadToYouTube()" disabled class="px-3 py-2 rounded-lg bg-slate-800 disabled:opacity-50">Upload rendered Short to YouTube</button>
                             <p id="youtubeUploadStatus" role="status" aria-live="polite" class="text-slate-300"></p>
-                            <a id="youtubeVideoLink" class="hidden text-rose-300 underline" target="_blank" rel="noopener noreferrer">Open YouTube Short</a>
+                            <a id="youtubeVideoLink" class="hidden text-slate-400 underline" target="_blank" rel="noopener noreferrer">Open YouTube Short</a>
                         </div>
                     </details>
 
-                    <!-- Render button & Master Action Bar -->
+                </form>
+            </div>
+
+            <!-- Studio Console Output -->
+            <div class="studio-glass rounded-2xl overflow-hidden">
+                <div class="px-4 py-3 bg-slate-950/90 border-b border-slate-800/80 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-800"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-800"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-800"></span>
+                        </div>
+                        <span class="text-xs font-semibold text-slate-400 border-b-2 border-slate-700 pb-2 -mb-2.5 flex items-center gap-2 transition">
+                            <i class="fa-solid fa-terminal"></i>
+                            <span>Studio Telemetry &amp; Output</span>
+                        </span>
+                    </div>
+                    <button type="button" onclick="clearConsole()" class="text-xs font-mono text-slate-400 hover:text-slate-100 px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 transition">
+                        Clear Log
+                    </button>
+                </div>
+
+                <div id="consoleTabContent" class="p-4 bg-slate-950/95 font-mono text-xs h-36 overflow-y-auto space-y-2">
+                    <div class="text-slate-500">[System] Video Studio initialized and ready.</div>
+                    <div class="text-slate-400">[Info] Paste a YouTube Music link and click <span class="text-slate-400">Download MP3</span>.</div>
+                </div>
+            </div>
+
+        </section>
+<aside id="videoPreviewRail" aria-label="Video preview and export">                    <!-- CINEMA-GRADE VIDEO PREVIEW STAGE -->
+                    <div id="videoPreview" class="relative rounded-2xl bg-slate-950 border border-slate-800/90 overflow-hidden p-4 canvas-grid">
+                        <!-- Ambient Cinema Glow -->
+
+                        <div class="relative z-10 flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-slate-800"></span>
+                                <span class="text-xs font-display font-semibold text-slate-200 ">Video Preview</span>
+                                <span id="stageModeLabel" class="text-xs font-mono px-2 py-1 rounded bg-slate-900 text-slate-400 border border-slate-800">Live Frame Composite</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs font-mono text-slate-400">
+                                <span id="stageCodecBadge" class="px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400">libx264</span>
+                                <span id="stageDurationBadge" class="px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400">00:08.00</span>
+                            </div>
+                        </div>
+
+                        <!-- Stage Screen -->
+                        <div class="video-preview-stage effects-on relative z-10 mx-auto rounded-xl bg-slate-950 border border-slate-800/90 overflow-hidden flex items-center justify-center">
+                            <!-- Background video live preview (when user selects bgFileInput) -->
+                            <video id="stageBgPreview" class="hidden absolute inset-0 w-full h-full object-cover" muted loop playsinline></video>
+                            <div class="stage-scrim absolute inset-0 pointer-events-none"></div>
+
+                            <!-- Composite Foreground (Title + Map preview before final render) -->
+                            <div id="stageCompositeBox" class="relative z-10 flex flex-col items-center justify-center text-center w-full h-full">
+                                <div id="stageTopLeftSticker" class="hidden"></div>
+                                <div id="stageTopRightSticker" class="hidden"></div>
+                                <div id="stageTitleBanner" class="text-white hidden"></div>
+                                <div id="stageAccentRow" class="hidden">
+                                    <div id="stageSubscribeBanner" class="hidden"></div>
+                                </div>
+                                <div id="stageMapArea">
+                                    <img id="stageMapPreview" alt="Map frame preview" class="hidden object-contain">
+                                    <canvas id="stageRevealCanvas" class="hidden pointer-events-none absolute inset-0 w-full h-full z-10"></canvas>
+                                    <div id="stageEmptyPlaceholder" class="flex flex-col items-center gap-2 text-slate-500">
+                                        <div class="w-12 h-12 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-center text-slate-400 ">
+                                            <i class="fa-solid fa-photo-film text-xl text-accent-400/80"></i>
+                                        </div>
+                                        <p class="text-xs font-medium text-slate-400">Add a map and background video to preview</p>
+                                        <p class="text-xs font-mono text-slate-600">Your rendered video will appear here</p>
+                                    </div>
+                                </div>
+                                <img id="stageWatermarkImage" alt="Watermark logo preview" class="hidden">
+                                <div id="stageWatermarkText" class="hidden"></div>
+                                <div id="stageWatermarkStars" class="hidden"></div>
+                            </div>
+
+                            <!-- Intro Fade Veil -->
+                            <div id="stageIntroVeil" class="hidden pointer-events-none absolute inset-0 z-[15] bg-black"></div>
+
+                            <!-- Watermarks share the same 1080×1920 coordinate space as the map. -->
+                            <!-- Rendered Final Video Player (revealed when /api/render_video succeeds) -->
+                            <video id="renderedVideoPlayer" class="hidden absolute inset-0 z-20 w-full h-full object-contain bg-black" controls playsinline></video>
+                        </div>
+
+                        <!-- Live Animation Transport Bar -->
+                        <div id="previewPlaybackBar" class="relative z-10 mt-3 flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-900/85 border border-slate-800/90 text-xs font-mono">
+                            <div class="flex items-center gap-2">
+                                <button type="button" id="previewPlayPauseBtn" onclick="togglePreviewAnimation()"
+                                    class="px-3 py-1 rounded-lg bg-accent-500/20 hover:bg-accent-500/30 text-accent-300 border border-accent-500/40 transition flex items-center gap-2">
+                                    <i id="previewPlayPauseIcon" class="fa-solid fa-pause text-xs"></i>
+                                    <span id="previewPlayPauseLabel">Pause</span>
+                                </button>
+                                <button type="button" id="previewRestartBtn" onclick="restartPreviewAnimation()"
+                                    class="px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1" title="Restart preview animation">
+                                    <i class="fa-solid fa-rotate-left text-xs"></i>
+                                    <span>Restart</span>
+                                </button>
+                            </div>
+                            <span id="previewTimeIndicator" class="text-slate-300 tabular-nums">00:00.0 / 00:08.0</span>
+                        </div>
+                    </div>
+
+<div class="workspace-actions">                    <!-- Render button & Master Action Bar -->
                     <div class="mt-auto pt-1 flex flex-col gap-3">
-                        <button type="submit" id="renderBtn" class="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:via-purple-500 hover:to-indigo-500 text-white font-display font-semibold text-sm shadow-xl shadow-indigo-600/25 hover:shadow-indigo-600/40 transition-all flex items-center justify-center gap-2.5 group">
-                            <i id="renderBtnIcon" class="fa-solid fa-film transition-transform group-hover:scale-110"></i>
+                        <button type="submit" form="renderForm" id="renderBtn" class="w-full py-4 px-6 rounded-xl bg-slate-800 text-slate-100 font-display font-semibold text-sm transition-colors flex items-center justify-center gap-3 group">
+                            <i id="renderBtnIcon" class="fa-solid fa-film transition-transform "></i>
                             <span id="renderBtnText">Render video</span>
                         </button>
 
                         <!-- Render result -->
-                        <div id="renderResult" class="hidden p-3.5 rounded-xl bg-slate-950/95 border border-emerald-500/40 shadow-lg">
+                        <div id="renderResult" class="hidden p-4 rounded-xl bg-slate-950/95 border border-slate-700 ">
                             <div class="flex flex-wrap items-center justify-between gap-3">
-                                <div class="flex items-center gap-2.5 min-w-0">
-                                    <div class="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                                        <i class="fa-solid fa-file-video text-emerald-400 text-sm"></i>
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                                        <i class="fa-solid fa-file-video text-slate-400 text-sm"></i>
                                     </div>
                                     <div class="min-w-0">
-                                        <div class="text-[10px] font-mono uppercase tracking-wider text-emerald-400">Master Render Complete</div>
+                                        <div class="text-xs font-mono text-slate-400">Master Render Complete</div>
                                         <span id="renderResultText" class="block text-xs font-mono text-slate-200 truncate">Ready</span>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2 shrink-0">
-                                    <button type="button" id="downloadVideoBtn" onclick="downloadRenderedVideo()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold transition flex items-center gap-2 shadow-md shadow-emerald-600/25">
+                                    <button type="button" id="downloadVideoBtn" onclick="downloadRenderedVideo()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-100 text-xs font-semibold transition flex items-center gap-2 ">
                                         <i class="fa-solid fa-download"></i>
                                         <span>Download video</span>
                                     </button>
@@ -1457,40 +1354,12 @@ limitations under the License.
                             </div>
                         </div>
                     </div>
-                </form>
-            </div>
-
-            <!-- Studio Console Output -->
-            <div class="studio-glass rounded-2xl overflow-hidden">
-                <div class="px-4 py-2.5 bg-slate-950/90 border-b border-slate-800/80 flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div class="flex items-center gap-1.5">
-                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
-                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
-                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
-                        </div>
-                        <span class="text-xs font-semibold text-rose-400 border-b-2 border-rose-500 pb-2 -mb-2.5 flex items-center gap-1.5 transition">
-                            <i class="fa-solid fa-terminal"></i>
-                            <span>Studio Telemetry &amp; Output</span>
-                        </span>
-                    </div>
-                    <button type="button" onclick="clearConsole()" class="text-[11px] font-mono text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 transition">
-                        Clear Log
-                    </button>
-                </div>
-
-                <div id="consoleTabContent" class="p-4 bg-slate-950/95 font-mono text-xs h-36 overflow-y-auto space-y-1.5">
-                    <div class="text-slate-500">[System] Video Studio initialized and ready.</div>
-                    <div class="text-slate-400">[Info] Paste a YouTube Music link and click <span class="text-rose-400">Download MP3</span>.</div>
-                </div>
-            </div>
-
-        </section>
+</div></aside>
     </main>
 
     <!-- Notification Toast -->
-    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-medium">
-        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-colors duration-300 pointer-events-none bg-slate-900/95 border border-slate-700/80 text-slate-100 px-4 py-3 rounded-xl flex items-center gap-3 text-xs font-medium">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-slate-400 text-base"></i>
         <span id="toastMsg">Operation successful</span>
     </div>
 
@@ -1674,7 +1543,7 @@ limitations under the License.
                 URL.revokeObjectURL(url);
             }
         }
-        // --- Music Downloader ---
+        // --- Music source ---
         let musicDataUrl = null;   // populated with data:audio/mpeg;base64,... from the API
         let musicFileName = 'music_automap';  // filename stem taken from the API "title" field
         let musicAudioFile = null;
@@ -1751,7 +1620,7 @@ limitations under the License.
                 input.disabled = false;
                 input.value = '';
                 document.getElementById('musicBtn').disabled = false;
-                setEqualizerActive(false, 'Audio Stream Deck');
+                setEqualizerActive(false, 'Audio source');
             }
         }
 
@@ -1823,8 +1692,8 @@ limitations under the License.
                 const audioEl = document.getElementById(id);
                 if (!audioEl) return;
                 audioEl.addEventListener('play', () => setEqualizerActive(true, 'Playing Audio Preview...'));
-                audioEl.addEventListener('pause', () => setEqualizerActive(false, 'Audio Stream Deck'));
-                audioEl.addEventListener('ended', () => setEqualizerActive(false, 'Audio Stream Deck'));
+                audioEl.addEventListener('pause', () => setEqualizerActive(false, 'Audio source'));
+                audioEl.addEventListener('ended', () => setEqualizerActive(false, 'Audio source'));
             });
 
             // Initialize timeline slice preview and duration badges
@@ -2031,9 +1900,9 @@ limitations under the License.
             document.querySelectorAll('.duration-preset-btn').forEach((btn) => {
                 const btnDur = parseInt(btn.dataset.duration, 10);
                 if (btnDur === clamped) {
-                    btn.className = 'duration-preset-btn px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/50 text-[10px] font-mono font-semibold transition';
+                    btn.className = 'duration-preset-btn px-3 py-1 rounded-md bg-slate-800 text-accent-300 border border-accent-400 text-xs font-mono font-semibold transition';
                 } else {
-                    btn.className = 'duration-preset-btn px-2.5 py-0.5 rounded-md bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40 text-[10px] font-mono transition';
+                    btn.className = 'duration-preset-btn px-3 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-100 border border-slate-800 hover:border-slate-600 text-xs font-mono transition';
                 }
             });
 
@@ -2090,9 +1959,9 @@ limitations under the License.
             const currentVal = input.value.trim();
             document.querySelectorAll('.cut-preset-btn').forEach((btn) => {
                 if (btn.dataset.timecode === currentVal) {
-                    btn.className = 'cut-preset-btn px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/50 text-[10px] font-mono font-semibold transition';
+                    btn.className = 'cut-preset-btn px-2 py-1 rounded-md bg-slate-800 text-accent-300 border border-accent-400 text-xs font-mono font-semibold transition';
                 } else {
-                    btn.className = 'cut-preset-btn px-2 py-0.5 rounded-md bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-300 border border-slate-800 hover:border-amber-500/40 text-[10px] font-mono transition';
+                    btn.className = 'cut-preset-btn px-2 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-100 border border-slate-800 hover:border-slate-600 text-xs font-mono transition';
                 }
             });
 
@@ -2235,7 +2104,7 @@ limitations under the License.
                 logToConsole(`[API Error] ${error.message}`, 'error');
                 showToast("Music cut failed. Check console logs.", "error");
                 metaBadge.textContent = "Error";
-                setEqualizerActive(false, 'Audio Stream Deck');
+                setEqualizerActive(false, 'Audio source');
             } finally {
                 const finalDur = getCutDuration();
                 btn.disabled = false;
@@ -2278,7 +2147,7 @@ limitations under the License.
             const colorMap = {
                 cmd: 'text-emerald-400 font-semibold',
                 info: 'text-slate-300',
-                success: 'text-indigo-400 font-medium',
+                success: 'text-accent-300 font-medium',
                 warn: 'text-amber-400',
                 error: 'text-rose-400 font-semibold'
             };
@@ -2458,7 +2327,7 @@ limitations under the License.
             if (!target || !hoverPin || !hoverLabel) return;
             const leftPct = `${(target.x * 100).toFixed(1)}%`;
             const topPct = `${(target.y * 100).toFixed(1)}%`;
-            hoverPin.classList.toggle('transition-all', !event.ctrlKey);
+            hoverPin.classList.toggle('transition-colors', !event.ctrlKey);
             hoverPin.classList.toggle('duration-75', !event.ctrlKey);
             hoverPin.style.left = leftPct;
             hoverPin.style.top = topPct;
@@ -2849,7 +2718,7 @@ limitations under the License.
             const bar = document.getElementById('previewPlaybackBar');
             const player = document.getElementById('renderedVideoPlayer');
             const mp4Active = player && !player.classList.contains('hidden');
-            if (icon) icon.className = previewAnimPlaying ? 'fa-solid fa-pause text-[10px]' : 'fa-solid fa-play text-[10px]';
+            if (icon) icon.className = previewAnimPlaying ? 'fa-solid fa-pause text-xs' : 'fa-solid fa-play text-xs';
             if (label) label.textContent = previewAnimPlaying ? 'Pause' : 'Play';
             if (bar) bar.classList.toggle('opacity-40', !!mp4Active);
         }
@@ -2964,57 +2833,57 @@ limitations under the License.
         }
 
         const STICKER_CATALOG = {
-            auto: '✨ Auto',
-            santa: '🎅 Santa',
-            gift: '🎁 Gift',
-            snowflake: '❄️ Snow',
-            pumpkin: '🎃 Pumpkin',
-            globe: '🌍 Globe',
-            compass: '🧭 Compass',
-            pin: '📍 Pin',
-            plane: '✈️ Plane',
-            money: '💰 Money',
-            chart: '📈 Chart',
-            diamond: '💎 Diamond',
-            crown: '👑 Crown',
-            shield: '🛡️ Shield',
-            swords: '⚔️ Swords',
-            rocket: '🚀 Rocket',
-            bolt: '⚡ Bolt',
-            trophy: '🏆 Trophy',
-            fire: '🔥 Fire',
+            auto: 'Auto',
+            santa: 'Santa',
+            gift: 'Gift',
+            snowflake: 'Snow',
+            pumpkin: 'Pumpkin',
+            globe: 'Globe',
+            compass: 'Compass',
+            pin: 'Pin',
+            plane: 'Plane',
+            money: 'Money',
+            chart: 'Chart',
+            diamond: 'Diamond',
+            crown: 'Crown',
+            shield: 'Shield',
+            swords: 'Swords',
+            rocket: 'Rocket',
+            bolt: 'Bolt',
+            trophy: 'Trophy',
+            fire: 'Fire',
             star: '⭐ Star',
-            heart: '❤️ Heart',
-            skull: '💀 Skull',
-            bear: '🐻 Bear',
-            paw: '🐾 Paw',
-            tree: '🌲 Tree',
-            wolf: '🐺 Wolf',
-            beer: '🍺 Beer',
-            coffee: '☕ Coffee',
-            wine: '🍷 Wine',
-            pizza: '🍕 Pizza',
-            soccer: '⚽ Football',
-            car: '🚗 Car',
-            brain: '🧠 Brain',
-            book: '📚 Book',
-            sun: '☀️ Sun',
-            mountain: '🏔️ Mountain',
-            volcano: '🌋 Volcano',
-            island: '🏝️ Island',
-            rainbow: '🌈 Rainbow',
-            moon: '🌙 Moon',
-            rain: '🌧️ Rain',
-            robot: '🤖 Robot',
-            satellite: '🛰️ Satellite',
-            laptop: '💻 Laptop',
-            graduation: '🎓 Graduation',
-            medal: '🏅 Medal',
-            cat: '🐱 Cat',
-            dog: '🐶 Dog',
-            fish: '🐟 Fish',
-            burger: '🍔 Burger',
-            train: '🚆 Train',
+            heart: 'Heart',
+            skull: 'Skull',
+            bear: 'Bear',
+            paw: 'Paw',
+            tree: 'Tree',
+            wolf: 'Wolf',
+            beer: 'Beer',
+            coffee: 'Coffee',
+            wine: 'Wine',
+            pizza: 'Pizza',
+            soccer: 'Football',
+            car: 'Car',
+            brain: 'Brain',
+            book: 'Book',
+            sun: 'Sun',
+            mountain: 'Mountain',
+            volcano: 'Volcano',
+            island: 'Island',
+            rainbow: 'Rainbow',
+            moon: 'Moon',
+            rain: 'Rain',
+            robot: 'Robot',
+            satellite: 'Satellite',
+            laptop: 'Laptop',
+            graduation: 'Graduation',
+            medal: 'Medal',
+            cat: 'Cat',
+            dog: 'Dog',
+            fish: 'Fish',
+            burger: 'Burger',
+            train: 'Train',
 
         };
 
@@ -3188,7 +3057,7 @@ limitations under the License.
                 opt.value = value;
                 const [prefix, base] = value.split(':');
                 const styleLabel = prefix === 'gen_diecut' ? 'Die-Cut' : prefix === 'gen_neon' ? 'Neon' : 'Stamp';
-                opt.textContent = `✨ Generated ${styleLabel} (${base})`;
+                opt.textContent = `Generated ${styleLabel} (${base})`;
                 select.appendChild(opt);
             }
             select.value = value;
@@ -3238,7 +3107,7 @@ limitations under the License.
 
                 const addGroup = (heading, entries) => {
                     const label = document.createElement('div');
-                    label.className = 'w-full text-[9px] font-mono uppercase tracking-wider text-slate-500 mt-0.5';
+                    label.className = 'w-full text-xs font-mono   text-slate-500 mt-1';
                     label.textContent = heading;
                     container.appendChild(label);
 
@@ -3247,8 +3116,8 @@ limitations under the License.
                         btn.type = 'button';
                         const active = currentValue === val || (prefixMatch && currentValue.startsWith(prefixMatch));
                         btn.className = active
-                            ? 'px-2 py-0.5 rounded-md bg-indigo-500/30 text-white border border-indigo-400 text-[10px] font-medium transition'
-                            : 'px-2 py-0.5 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-[10px] transition';
+                            ? 'px-2 py-0.5 rounded-md bg-accent-500/30 text-slate-100 border border-accent-400 text-xs font-medium transition'
+                            : 'px-2 py-0.5 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs transition';
                         btn.textContent = text;
                         btn.onclick = () => pickStickerVariant(side, val);
                         container.appendChild(btn);
@@ -3262,9 +3131,9 @@ limitations under the License.
 
                 const baseLabel = STICKER_CATALOG[baseKind] || baseKind;
                 addGroup('Generated (Custom Art)', [
-                    { val: 'gen_diecut:auto', prefixMatch: 'gen_diecut:', text: `✨ Die-Cut (${baseLabel})` },
-                    { val: 'gen_neon:auto', prefixMatch: 'gen_neon:', text: `💫 Neon Badge (${baseLabel})` },
-                    { val: 'gen_stamp:auto', prefixMatch: 'gen_stamp:', text: `🏷️ Stamp (${baseLabel})` },
+                    { val: 'gen_diecut:auto', prefixMatch: 'gen_diecut:', text: `Die-Cut (${baseLabel})` },
+                    { val: 'gen_neon:auto', prefixMatch: 'gen_neon:', text: `Neon Badge (${baseLabel})` },
+                    { val: 'gen_stamp:auto', prefixMatch: 'gen_stamp:', text: `Stamp (${baseLabel})` },
                 ]);
             };
 
@@ -3311,7 +3180,7 @@ limitations under the License.
             document.getElementById('introFadeToggle').checked = true;
             document.getElementById('visualEffects').checked = true;
             updateVisualEffects();
-            showToast('Applied Reference Video Auto-Montage Preset!', 'success');
+            showToast('Applied Reference Video Auto-Montage Preset', 'success');
         }
 
         let subscribePreviewUrl;
@@ -3368,7 +3237,7 @@ limitations under the License.
             const input = document.getElementById('subscribeImageInput');
             if (input) input.value = '';
             const nameEl = document.getElementById('subscribeFileName');
-            if (nameEl) nameEl.textContent = 'Built-in [ ❤️ Subscribe! ▶️ ] or upload file';
+            if (nameEl) nameEl.textContent = 'Built-in [ Subscribe! ▶] or upload file';
             if (subscribeCustomUrl) {
                 URL.revokeObjectURL(subscribeCustomUrl);
                 subscribeCustomUrl = null;
@@ -3406,7 +3275,7 @@ limitations under the License.
             const input = document.getElementById('watermarkStarsImageInput');
             if (input) input.value = '';
             const nameEl = document.getElementById('watermarkStarsFileName');
-            if (nameEl) nameEl.textContent = 'Built-in ★ ★ ★ or upload file';
+            if (nameEl) nameEl.textContent = 'Built-in or upload file';
             if (watermarkStarsCustomUrl) {
                 URL.revokeObjectURL(watermarkStarsCustomUrl);
                 watermarkStarsCustomUrl = null;
@@ -3781,7 +3650,7 @@ limitations under the License.
                         return;
                     }
                     const img = new Image();
-                    img.alt = '★ ★ ★';
+                    img.alt = '';
                     img.src = url;
                     await img.decode();
                     starsBox.replaceChildren(img);
@@ -3926,7 +3795,7 @@ limitations under the License.
                 const isMatch = card.dataset.codec === codec;
                 card.setAttribute('aria-pressed', String(isMatch));
                 if (isMatch) {
-                    card.className = 'codec-card p-2 rounded-xl border border-sky-500/50 bg-sky-500/10 text-left transition';
+                    card.className = 'codec-card p-2 rounded-xl border border-slate-700 bg-slate-800 text-left transition';
                 } else {
                     card.className = 'codec-card p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 text-left transition';
                 }
@@ -4013,14 +3882,14 @@ limitations under the License.
                 zone.addEventListener(ev, (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    zone.classList.add('border-indigo-500', 'bg-slate-900');
+                    zone.classList.add('border-accent-500', 'bg-slate-900');
                 })
             );
             ['dragleave', 'drop'].forEach((ev) =>
                 zone.addEventListener(ev, (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    zone.classList.remove('border-indigo-500', 'bg-slate-900');
+                    zone.classList.remove('border-accent-500', 'bg-slate-900');
                 })
             );
             zone.addEventListener('drop', (e) => {
@@ -4444,8 +4313,8 @@ limitations under the License.
             msg.textContent = message;
             if (type === 'success') icon.className = "fa-solid fa-circle-check text-emerald-400 text-base";
             else if (type === 'warn') icon.className = "fa-solid fa-triangle-exclamation text-amber-400 text-base";
-            else if (type === 'error') icon.className = "fa-solid fa-circle-xmark text-rose-400 text-base";
-            else icon.className = "fa-solid fa-circle-info text-indigo-400 text-base";
+            else if (type === 'error') icon.className = "fa-solid fa-circle-xmark text-slate-400 text-base";
+            else icon.className = "fa-solid fa-circle-info text-accent-300 text-base";
 
             toast.classList.remove('translate-y-20', 'opacity-0');
             clearTimeout(window.toastTimeout);

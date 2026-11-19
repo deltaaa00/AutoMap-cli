@@ -19,30 +19,27 @@ limitations under the License.
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AutoMap Studio — AI Cartographic Engine & CLI Dashboard</title>
+    <title>AutoMap Studio — Map generation workspace</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <!-- Google Fonts: Plus Jakarta Sans, Space Grotesk, Inter & JetBrains Mono -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-    
+    <!-- Interface type: IBM Plex Sans with JetBrains Mono for parameters -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
-                        display: ['Space Grotesk', 'Plus Jakarta Sans', 'sans-serif'],
+                        sans: ['IBM Plex Sans', 'sans-serif'],
+                        display: ['IBM Plex Sans', 'sans-serif'],
                         mono: ['JetBrains Mono', 'monospace'],
                     },
                     colors: {
-                        slate: {
-                            850: '#131c2e',
-                            900: '#0d1424',
-                            950: '#060a12',
-                        }
+                        accent: {50:'#f0f7f2',100:'#dfede3',200:'#bcd5c4',300:'#8fb69a',400:'#5e936d',500:'#3d7b51',600:'#28623c',700:'#205232',800:'#1c432a',900:'#183823',950:'#102619'},
+                        slate: {50:'#fafafa',100:'#ededed',200:'#d4d4d7',300:'#bcbcc2',400:'#a1a1a6',500:'#85858b',600:'#717177',700:'#39393e',800:'#2b2b2f',850:'#202023',900:'#19191b',950:'#141415'}
                     }
                 }
             }
@@ -50,140 +47,8 @@ limitations under the License.
     </script>
 
     <style>
-        #aiTemperature::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 22px;
-            height: 22px;
-            border: 3px solid #e0e7ff;
-            border-radius: 50%;
-            background: #818cf8;
-            box-shadow: 0 0 12px rgba(129, 140, 248, .6);
-        }
-        #aiTemperature::-moz-range-thumb {
-            width: 16px;
-            height: 16px;
-            border: 3px solid #e0e7ff;
-            border-radius: 50%;
-            background: #818cf8;
-            box-shadow: 0 0 12px rgba(129, 140, 248, .6);
-        }
-        #aiTemperature:focus-visible {
-            outline: 2px solid #a5b4fc;
-            outline-offset: 6px;
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(13, 20, 36, 0.6);
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(71, 85, 105, 0.7);
-            border-radius: 9999px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(99, 102, 241, 0.85);
-        }
-
-        @keyframes checkPop {
-            0% {
-                opacity: 0;
-                transform: scale(0.35) rotate(-18deg);
-            }
-            65% {
-                opacity: 1;
-                transform: scale(1.25) rotate(4deg);
-            }
-            100% {
-                opacity: 1;
-                transform: scale(1) rotate(0deg);
-            }
-        }
-        .check-pop {
-            display: inline-block;
-            animation: checkPop 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-        }
-
-        /* Ambient Aurora Backdrop Animations */
-        @keyframes auroraFloat {
-            0%, 100% {
-                transform: translate3d(0, 0, 0) scale(1);
-            }
-            33% {
-                transform: translate3d(35px, -25px, 0) scale(1.08);
-            }
-            66% {
-                transform: translate3d(-25px, 20px, 0) scale(0.95);
-            }
-        }
-        @keyframes pulseGlow {
-            0%, 100% { opacity: 0.45; }
-            50% { opacity: 0.8; }
-        }
-        @keyframes radarSweep {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        @keyframes checkPopIn {
-            0% { transform: scale(0.25) rotate(-25deg); opacity: 0; }
-            65% { transform: scale(1.25) rotate(6deg); opacity: 1; }
-            100% { transform: scale(1) rotate(0deg); opacity: 1; }
-        }
-        .check-pop-in {
-            display: inline-block;
-            animation: checkPopIn 0.36s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-        }
-        .aurora-blob-1 {
-            animation: auroraFloat 18s ease-in-out infinite;
-        }
-        .aurora-blob-2 {
-            animation: auroraFloat 24s ease-in-out infinite reverse;
-        }
-        .aurora-blob-3 {
-            animation: auroraFloat 20s ease-in-out 4s infinite;
-        }
-        .radar-spin {
-            animation: radarSweep 4s linear infinite;
-        }
-
-        /* Cartographic Grid Pattern */
-        .canvas-grid {
-            background-size: 32px 32px, 160px 160px;
-            background-image: 
-                linear-gradient(to right, rgba(99, 102, 241, 0.045) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(99, 102, 241, 0.045) 1px, transparent 1px),
-                linear-gradient(to right, rgba(148, 163, 184, 0.06) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
-        }
-
-        /* Glassmorphic Card Surface */
-        .cyber-card {
-            background: linear-gradient(165deg, rgba(15, 23, 42, 0.82) 0%, rgba(9, 14, 26, 0.92) 100%);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            box-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.7), inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
-        }
-
-        /* Range Slider Custom Styling */
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 18px;
-            width: 18px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #818cf8, #6366f1);
-            cursor: pointer;
-            border: 2px solid #e0e7ff;
-            box-shadow: 0 0 14px rgba(99, 102, 241, 0.75);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-        input[type=range]::-webkit-slider-thumb:hover {
-            transform: scale(1.18);
-            box-shadow: 0 0 20px rgba(129, 140, 248, 0.95);
-        }
-
+        @keyframes radarSweep { to { transform: rotate(360deg); } }
+        .radar-spin { animation: radarSweep 2s linear infinite; }
         /* Custom Color Picker Input */
         input[type="color"] {
             -webkit-appearance: none;
@@ -200,22 +65,20 @@ limitations under the License.
         }
         /* Avoid large composited blur layers while scrolling or opening a touch keyboard. */
         @media (max-width: 1023px), (pointer: coarse) {
-            #ambientBackdrop { display: none; }
+
             .cyber-card, [class*="backdrop-blur"] {
                 backdrop-filter: none !important;
                 -webkit-backdrop-filter: none !important;
             }
             header { position: relative !important; }
         }
-        @media (prefers-reduced-motion: reduce) {
-            .aurora-blob-1, .aurora-blob-2, .aurora-blob-3 { animation: none; }
-        }
+
         /* Phone layouts keep controls reachable without shrinking form text. */
         @media (max-width: 639px) {
-            header > div { height: auto !important; min-height: 64px; flex-wrap: wrap; gap: 10px !important; padding-block: 12px; }
+            header > div { height: auto !important; min-height: 64px; flex-wrap: wrap; gap: 12px !important; padding-block: 12px; }
             header > div > div:last-child { width: 100%; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
             header a, header button { min-height: 44px; }
-            #headerApiText { font-size: 10px; }
+            #headerApiText { font-size: 12px; }
             main { padding: 12px !important; gap: 16px !important; }
             main > section, #cliForm, #fillingStudioModal .flex-1 { min-width: 0; }
             main > section > .p-5 { padding: 16px; }
@@ -225,7 +88,7 @@ limitations under the License.
             #fillingStudioModal select { font-size: 16px; min-height: 44px; }
             main button, #fillingStudioModal button { min-height: 44px; }
             #cliForm input[type=range], #fillingStudioModal input[type=range] { min-width: 0; min-height: 28px; }
-            #cliForm .justify-between:has(> label) { flex-wrap: wrap; gap: 6px; }
+            #cliForm .justify-between:has(> label) { flex-wrap: wrap; gap: 8px; }
             #cliForm code { overflow-wrap: anywhere; }
             .mobile-style-entry { flex-wrap: wrap; }
             .mobile-style-entry > div:last-child { width: 100%; justify-content: flex-end; }
@@ -240,94 +103,59 @@ limitations under the License.
             #fillingStudioModal > div { max-height: calc(100dvh - 16px); }
             #fillingStudioModal > div > div { padding: 12px; }
             #fillingStudioModal > div > div:first-child { flex-shrink: 0; gap: 8px; }
-            #fillingStudioModal > div > div:first-child > div { gap: 10px; min-width: 0; }
+            #fillingStudioModal > div > div:first-child > div { gap: 12px; min-width: 0; }
             #fillingStudioModal h3 + code { display: none; }
             #fillingStudioModal h3 { font-size: 14px; }
-            #fillingStudioModal > div > div:first-child p { font-size: 10px; }
+            #fillingStudioModal > div > div:first-child p { font-size: 12px; }
             #fillingStudioModal button[onclick="closeFillingStudio()"] { min-width: 44px; flex-shrink: 0; }
             #fillingStudioModal > div > div:last-child { flex-shrink: 0; }
-            #fillingNumList input[type=number] { width: 0; flex: 1; min-width: 0; padding-inline: 5px; }
+            #fillingNumList input[type=number] { width: 0; flex: 1; min-width: 0; padding-inline: 4px; }
             #fillingNumList button, #fillingTxtList button { min-width: 36px; flex-shrink: 0; }
             #fillingNumList input[type=color], #fillingTxtList input[type=color] { width: 32px; height: 44px; }
             #toast { left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); overflow-wrap: anywhere; }
-            .aurora-blob-1, .aurora-blob-2, .aurora-blob-3 { animation: none; }
         }
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='studio.css') }}">
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white overflow-x-hidden relative">
-
-    <!-- Ambient Animated Aurora Glow Backdrop -->
-    <div id="ambientBackdrop" class="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
-        <div class="aurora-blob-1 absolute -top-36 -left-36 w-[540px] h-[540px] rounded-full bg-indigo-600/15 blur-[130px]"></div>
-        <div class="aurora-blob-2 absolute top-1/4 -right-40 w-[500px] h-[500px] rounded-full bg-purple-600/15 blur-[140px]"></div>
-        <div class="aurora-blob-3 absolute -bottom-40 left-1/3 w-[600px] h-[420px] rounded-full bg-cyan-500/10 blur-[150px]"></div>
-        <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.08),transparent_60%)]"></div>
-    </div>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col selection:bg-accent-200 selection:text-slate-100 overflow-x-hidden relative">
 
     <!-- Top Navigation Bar -->
-    <header class="border-b border-slate-800/80 bg-slate-950/75 backdrop-blur-xl sticky top-0 z-30">
+    <header class="border-b border-slate-800/80 bg-slate-950/75 sticky top-0 z-30">
         <div class="max-w-[1640px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
             <!-- Brand -->
-            <div class="flex items-center gap-3.5">
+            <div class="flex items-center gap-4">
                 <div class="relative group">
-                    <div class="absolute -inset-1 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 opacity-60 blur group-hover:opacity-90 transition duration-300"></div>
-                    <div class="relative w-10 h-10 rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center shadow-lg border border-indigo-400/30">
-                        <!-- Custom Stylized AutoMap Vector Brand Mark -->
-                        <svg class="w-7 h-7" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="AutoMap Studio Logo">
-                            <defs>
-                                <linearGradient id="automapMapFoldGrad" x1="4" y1="6" x2="36" y2="34" gradientUnits="userSpaceOnUse">
-                                    <stop offset="0%" stop-color="#818cf8" stop-opacity="0.32" />
-                                    <stop offset="50%" stop-color="#6366f1" stop-opacity="0.16" />
-                                    <stop offset="100%" stop-color="#22d3ee" stop-opacity="0.28" />
-                                </linearGradient>
-                                <linearGradient id="automapStrokeGrad" x1="5" y1="5" x2="35" y2="35" gradientUnits="userSpaceOnUse">
-                                    <stop offset="0%" stop-color="#a5b4fc" />
-                                    <stop offset="50%" stop-color="#818cf8" />
-                                    <stop offset="100%" stop-color="#38bdf8" />
-                                </linearGradient>
-                                <linearGradient id="automapPinGrad" x1="16" y1="6" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-                                    <stop offset="0%" stop-color="#38bdf8" />
-                                    <stop offset="100%" stop-color="#c084fc" />
-                                </linearGradient>
-                            </defs>
-                            <!-- Folded Cartographic Map Panels -->
-                            <path d="M5.5 11.5L14.5 7.5L25.5 11.5L34.5 7.5V28.5L25.5 32.5L14.5 28.5L5.5 32.5V11.5Z" fill="url(#automapMapFoldGrad)" stroke="url(#automapStrokeGrad)" stroke-width="1.6" stroke-linejoin="round" />
-                            <path d="M14.5 7.5V28.5M25.5 11.5V32.5" stroke="#818cf8" stroke-width="1.1" stroke-opacity="0.45" stroke-dasharray="2 2" />
-                            <!-- Cartographic Globe & Meridian Ring -->
-                            <circle cx="20" cy="20" r="8.5" fill="#090e1a" fill-opacity="0.78" stroke="url(#automapStrokeGrad)" stroke-width="1.6" />
-                            <ellipse cx="20" cy="20" rx="4.2" ry="8.5" stroke="#38bdf8" stroke-width="1.15" stroke-opacity="0.8" />
-                            <path d="M11.8 20H28.2M13 16.2H27M13 23.8H27" stroke="#a5b4fc" stroke-width="1.05" stroke-opacity="0.65" stroke-linecap="round" />
-                            <!-- Compass Star & Geospatial Node Accent -->
-                            <path d="M20 9.2L21.4 13.2L25.4 14.6L21.4 16L20 20L18.6 16L14.6 14.6L18.6 13.2L20 9.2Z" fill="url(#automapPinGrad)" />
-                            <circle cx="20" cy="14.6" r="1.4" fill="#ffffff" />
-                            <circle cx="15" cy="23.5" r="1.3" fill="#34d399" />
-                            <circle cx="24.8" cy="22.2" r="1.3" fill="#38bdf8" />
+                    <div class="relative w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center border border-accent-400/30">
+                        <!-- Flat folded-map mark -->
+                        <svg class="w-7 h-7 automap-mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AutoMap folded map">
+                            <path d="M4 8l8-4 8 4 8-4v20l-8 4-8-4-8 4V8Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                            <path d="M12 4v20M20 8v20" stroke="currentColor" stroke-width="1.5"/>
                         </svg>
                     </div>
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <h1 class="font-display font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent">AutoMap Studio</h1>
+                        <h1 class="font-display font-medium text-lg  text-slate-100">AutoMap Studio</h1>
                     </div>
-                    <p class="text-xs text-slate-400 hidden sm:block">AI Cartographic Synthesis &bull; CLI Parameter Studio</p>
+                    <p class="text-xs text-slate-400 hidden sm:block">Map generation workspace</p>
                 </div>
             </div>
 
             <!-- Connection Mode & Quick Studio Actions -->
-            <div class="flex items-center gap-2.5 sm:gap-3">
+            <div class="flex items-center gap-3 sm:gap-3">
                 <!-- API Key & System Status Indicator -->
-                <div id="statusIndicator" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-emerald-500/30 text-xs text-emerald-300 transition-all">
-                    <span id="headerApiDot" class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
-                    <span id="headerApiText" class="font-mono text-[11px]">System Ready</span>
+                <div id="statusIndicator" class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-700 text-xs text-slate-400 transition-colors">
+                    <span id="headerApiDot" class="w-2 h-2 rounded-full bg-slate-800 "></span>
+                    <span id="headerApiText" class="font-mono text-xs">System Ready</span>
                 </div>
 
                 <!-- Video Studio Navigation Link -->
-                <a href="/studio" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600/90 to-orange-600/90 hover:from-rose-500 hover:to-orange-500 text-white text-xs font-semibold shadow-lg shadow-rose-600/20 hover:shadow-rose-600/35 border border-white/10 transition-all flex items-center gap-2 group">
+                <a href="/studio" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-100 text-xs font-semibold border border-slate-700 transition-colors flex items-center gap-2 group">
                     <i class="fa-solid fa-clapperboard text-xs transition-transform group-hover:rotate-6"></i>
                     <span>Video Studio</span>
-                    <i class="fa-solid fa-arrow-right text-[10px] opacity-75 group-hover:translate-x-0.5 transition-transform"></i>
+                    <i class="fa-solid fa-arrow-right text-xs opacity-75 group-hover:translate-x-0.5 transition-transform"></i>
                 </a>
-                <button type="button" id="clearAllDataBtn" onclick="clearAllUserData(this)" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-rose-950 text-rose-300 border border-rose-500/30 text-xs font-semibold transition-all shrink-0">Clear all data</button>
+                <button type="button" id="clearAllDataBtn" onclick="clearAllUserData(this)" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-semibold transition-colors shrink-0">Clear all data</button>
                 {% if config.WEB_AUTH_ENABLED and session.get('web_identity') %}
                 <form method="post" action="{{ url_for('web_logout') }}">
                     <input type="hidden" name="csrf_token" value="{{ session.get('logout_csrf', '') }}">
@@ -339,121 +167,123 @@ limitations under the License.
     </header>
 
     <!-- Main Workspace Layout -->
-    <main class="relative z-10 flex-1 max-w-[1640px] w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
+    <main id="mapWorkspace" class="relative z-10 flex-1 max-w-[1640px] w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
         <nav aria-label="Workspace sections" class="flex gap-2 lg:hidden col-span-full">
-            <a href="#cliForm" class="flex-1 text-center text-xs font-semibold rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-indigo-200">Parameters</a>
-            <a href="#mapStage" class="flex-1 text-center text-xs font-semibold rounded-xl border border-indigo-500/40 bg-indigo-500/15 px-3 py-3 text-indigo-200">Map preview</a>
+            <a href="#cliForm" class="flex-1 text-center text-xs font-semibold rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-accent-300">Parameters</a>
+            <a href="#mapStage" class="flex-1 text-center text-xs font-semibold rounded-xl border border-accent-500/40 bg-accent-500/15 px-3 py-3 text-accent-300">Map preview</a>
         </nav>
         <!-- LEFT COLUMN: CLI FLAGS & CONFIGURATION (5 Cols on Desktop) -->
-        <section class="lg:col-span-5 xl:col-span-4 flex flex-col gap-5">
-            
+        <section id="mapControls" class="lg:col-span-5 xl:col-span-4 flex flex-col gap-5">
+<div class="control-scroll">
+
             <!-- Main Parameters Card -->
-            <div class="cyber-card border border-slate-800/90 rounded-2xl p-5 shadow-2xl relative overflow-hidden">
+            <div class="cyber-card border border-slate-800/90 rounded-2xl p-5 relative overflow-hidden">
                 <!-- Subtle top highlight bar -->
-                <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent"></div>
+                <div class="absolute inset-x-0 top-0 h-px bg-slate-800 "></div>
 
                 <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/80">
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-7 h-7 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                    <div class="flex items-center gap-3">
+                        <div class="w-7 h-7 rounded-lg bg-accent-500/15 border border-accent-500/30 flex items-center justify-center text-accent-300">
                             <i class="fa-solid fa-sliders text-xs"></i>
                         </div>
                         <div>
-                            <h2 class="font-display font-semibold text-sm sm:text-base text-white leading-tight">Generation Parameters</h2>
-                            <p class="text-[11px] text-slate-400">Configure AI query &amp; cartographic CLI flags</p>
+                            <h2 class="font-display font-semibold text-sm sm:text-base text-slate-100 leading-tight">Map parameters</h2>
+                            <p class="text-xs text-slate-400">Configure AI query &amp; cartographic CLI flags</p>
                         </div>
                     </div>
-                    <button type="button" onclick="resetForm()" class="text-xs px-2.5 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-indigo-300 hover:border-indigo-500/40 transition flex items-center gap-1.5" title="Reset to default values">
-                        <i class="fa-solid fa-rotate-left text-[11px]"></i>
+                    <button type="button" onclick="resetForm()" class="text-xs px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-accent-300 hover:border-accent-500/40 transition flex items-center gap-2" title="Reset to default values">
+                        <i class="fa-solid fa-rotate-left text-xs"></i>
                         <span>Reset</span>
                     </button>
                 </div>
 
                 <form style="scroll-margin-top: 145px" id="cliForm" onsubmit="handleGenerate(event)" class="space-y-5">
-                    
+
                     <!-- API Key Input: shown only when the server has no .env key -->
-                    <div id="apiKeySection" class="hidden p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/30 transition-colors">
-                        <div class="flex justify-between items-center mb-1.5">
-                            <label for="apiKeyInput" class="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
-                                <i class="fa-solid fa-key text-amber-400"></i>
+                    <div id="apiKeySection" class="hidden p-4 rounded-xl bg-slate-800 border border-slate-700 transition-colors">
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="apiKeyInput" class="text-xs font-semibold text-slate-400 flex items-center gap-2">
+                                <i class="fa-solid fa-key text-slate-400"></i>
                                 <span id="apiKeyLabel">Gemini API Key</span>
                             </label>
-                            <span class="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">Saved in browser</span>
+                            <span class="text-xs font-mono px-2 py-1 rounded bg-slate-800 text-slate-400">Saved in browser</span>
                         </div>
                         <div class="relative">
                             <input type="password" id="apiKeyInput" placeholder="Paste your Gemini API key (AIza...)..."
                                 autocomplete="off" spellcheck="false"
                                 oninput="updateApiKeyIndicator()" onchange="updateApiKeyIndicator()"
-                                class="w-full px-3.5 py-2.5 pr-10 bg-slate-950/90 border border-amber-500/40 rounded-xl text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition">
-                            <button type="button" onclick="toggleApiKeyVisibility()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" title="Show / hide key">
+                                class="w-full px-4 py-3 pr-10 bg-slate-950/90 border border-slate-700 rounded-xl text-sm font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-700 focus:ring-1 focus:ring-accent-400 transition">
+                            <button type="button" onclick="toggleApiKeyVisibility()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-100 p-1" title="Show / hide key">
                                 <i id="apiKeyEyeIcon" class="fa-solid fa-eye text-xs"></i>
                             </button>
                         </div>
-                        <p class="text-[11px] text-amber-300/75 mt-1.5 flex items-center gap-1">
-                            <i class="fa-solid fa-shield-halved text-[10px]"></i>
+                        <p class="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                            <i class="fa-solid fa-shield-halved text-xs"></i>
                             <span>Saved in this browser for your next visit. Clear this field to remove the saved key.</span>
                         </p>
                     </div>
 
-                    <!-- Topic / Prompt Input + Interactive Quick Prompt Presets -->
+                    <h3 class="workflow-heading"><span>01</span> Topic and map</h3>
+<!-- Topic / Prompt Input + Interactive Prompt presets -->
                     <div>
-                        <div class="flex flex-wrap justify-between items-center gap-2 mb-1.5">
-                            <label for="topicInput" class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                                <i class="fa-solid fa-wand-magic-sparkles text-indigo-400"></i>
-                                Map Topic or AI Query
+                        <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+                            <label for="topicInput" class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                <i class="fa-solid fa-map text-accent-300"></i>
+                                Map topic or question
                             </label>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-2">
                                 <select id="ideaModeSelect" title="Idea generation mode"
-                                    class="px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-300 focus:outline-none focus:border-amber-500/60">
+                                    class="px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-slate-700">
                                     <option value="idea_only">Idea only</option>
                                     <option value="idea_and_params">Idea + Params</option>
                                 </select>
                                 <button type="button" id="generateIdeaBtn" onclick="generateIdea()"
-                                    class="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border border-amber-500/35 text-[11px] font-medium transition flex items-center gap-1.5">
-                                    <i id="generateIdeaIcon" class="fa-solid fa-lightbulb text-[10px]"></i>
+                                    class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-700 text-xs font-medium transition flex items-center gap-2">
+                                    <i id="generateIdeaIcon" class="fa-solid fa-lightbulb text-xs"></i>
                                     <span id="generateIdeaText">Generate idea</span>
                                 </button>
                             </div>
                         </div>
                         <div class="relative group">
-                            <input type="text" id="topicInput" placeholder="e.g., What is the most popular drink in your country?" 
+                            <input type="text" id="topicInput" placeholder="e.g., What is the most popular drink in your country?"
                                 oninput="scheduleTopicPreview(event)" oncompositionend="scheduleTopicPreview(event)" onchange="flushTopicPreview()"
-                                class="w-full pl-3.5 pr-9 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition shadow-inner">
+                                class="w-full pl-3.5 pr-9 py-3 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 transition ">
                             <button type="button" onclick="clearTopicInput()" title="Clear prompt" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1 transition">
                                 <i class="fa-solid fa-xmark text-xs"></i>
                             </button>
                         </div>
 
-                        <p class="mt-1.5 text-[11px] text-slate-500">Your last topic is saved. New ideas are generated only when you click Generate idea.</p>
+                        <p class="mt-2 text-xs text-slate-500">Your last topic is saved. New ideas are generated only when you click Generate idea.</p>
 
-                        <!-- Quick Prompt Presets Chips -->
-                        <div class="mt-2.5">
-                            <div class="flex items-center justify-between mb-1.5">
-                                <span class="text-[11px] font-medium text-slate-400 flex items-center gap-1">
-                                    <i class="fa-solid fa-bolt text-amber-400 text-[10px]"></i>
-                                    Quick Prompt Presets
+                        <!-- Prompt presets Chips -->
+                        <div class="mt-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-medium text-slate-400 flex items-center gap-1">
+                                    <i class="fa-solid fa-bolt text-slate-400 text-xs"></i>
+                                    Prompt presets
                                 </span>
-                                <span class="text-[10px] text-slate-500">1-click auto-config</span>
+                                <span class="text-xs text-slate-500">1-click auto-config</span>
                             </div>
-                            <div class="flex flex-wrap gap-1.5" id="presetChipsContainer">
+                            <div class="flex flex-wrap gap-2" id="presetChipsContainer">
                                 <button type="button" onclick="applyPromptPreset('How many people live in your country?', 'number', 'default', 'show_most_least')"
-                                    class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-indigo-500/15 text-slate-300 hover:text-indigo-200 border border-slate-800 hover:border-indigo-500/40 transition flex items-center gap-1.5 group">
-                                    <i class="fa-solid fa-users text-[10px] text-indigo-400 group-hover:scale-110 transition-transform"></i>
+                                    class="text-xs px-3 py-1 rounded-lg bg-slate-900/90 hover:bg-accent-500/15 text-slate-300 hover:text-accent-300 border border-slate-800 hover:border-accent-500/40 transition flex items-center gap-2 group">
+                                    <i class="fa-solid fa-users text-xs text-accent-300 transition-transform"></i>
                                     <span>Population in your country?</span>
                                 </button>
                                 <button type="button" onclick="applyPromptPreset('What is the most popular hot drink in your country?', 'text', 'default', 'none')"
-                                    class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-emerald-500/15 text-slate-300 hover:text-emerald-200 border border-slate-800 hover:border-emerald-500/40 transition flex items-center gap-1.5 group">
-                                    <i class="fa-solid fa-mug-hot text-[10px] text-emerald-400 group-hover:scale-110 transition-transform"></i>
+                                    class="text-xs px-3 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-slate-400 border border-slate-800 hover:border-slate-700 transition flex items-center gap-2 group">
+                                    <i class="fa-solid fa-mug-hot text-xs text-slate-400 transition-transform"></i>
                                     <span>Most popular hot drink?</span>
                                 </button>
                                 <button type="button" onclick="applyPromptPreset('What is the GDP per capita in your country?', 'number', 'flag', 'show_most_least')"
-                                    class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-amber-500/15 text-slate-300 hover:text-amber-200 border border-slate-800 hover:border-amber-500/40 transition flex items-center gap-1.5 group">
-                                    <i class="fa-solid fa-coins text-[10px] text-amber-400 group-hover:scale-110 transition-transform"></i>
+                                    class="text-xs px-3 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-slate-400 border border-slate-800 hover:border-slate-700 transition flex items-center gap-2 group">
+                                    <i class="fa-solid fa-coins text-xs text-slate-400 transition-transform"></i>
                                     <span>GDP per capita? (Flags)</span>
                                 </button>
                                 <button type="button" onclick="applyPromptPreset('What is the forest coverage percentage in your continent?', 'number', 'world', 'none')"
-                                    class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/90 hover:bg-sky-500/15 text-slate-300 hover:text-sky-200 border border-slate-800 hover:border-sky-500/40 transition flex items-center gap-1.5 group">
-                                    <i class="fa-solid fa-tree text-[10px] text-sky-400 group-hover:scale-110 transition-transform"></i>
+                                    class="text-xs px-3 py-1 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-slate-400 border border-slate-800 hover:border-slate-700 transition flex items-center gap-2 group">
+                                    <i class="fa-solid fa-tree text-xs text-slate-400 transition-transform"></i>
                                     <span>Forest coverage? (World)</span>
                                 </button>
                             </div>
@@ -464,39 +294,39 @@ limitations under the License.
                             ondragover="handleCsvDragOver(event)"
                             ondragleave="handleCsvDragLeave(event)"
                             ondrop="handleCsvDrop(event)"
-                            class="mt-3 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 space-y-2 transition-colors">
+                            class="mt-3 p-3 rounded-xl bg-slate-950/80 border border-slate-800/90 space-y-2 transition-colors">
                             <div class="flex items-center justify-between gap-2">
-                                <span class="text-[11px] font-medium text-slate-300 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-file-csv text-emerald-400 text-[11px]"></i>
+                                <span class="text-xs font-medium text-slate-300 flex items-center gap-2">
+                                    <i class="fa-solid fa-file-csv text-slate-400 text-xs"></i>
                                     Ideas from CSV (.csv)
                                 </span>
                                 <div class="flex items-center gap-2 min-w-0">
                                     <a href="/api/batch-template" download="batch_template.csv" id="downloadBatchTemplateLink"
-                                        class="text-[10px] font-medium text-indigo-400 hover:text-indigo-300 underline shrink-0"
+                                        class="text-xs font-medium text-accent-300 hover:text-accent-300 underline shrink-0"
                                         title="Download CSV template">Template</a>
-                                    <span id="ideasFileBadge" class="text-[10px] font-mono text-slate-500 truncate max-w-[110px]">No file</span>
+                                    <span id="ideasFileBadge" class="text-xs font-mono text-slate-500 truncate max-w-[110px]">No file</span>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
-                                <label for="ideasFileInput" class="flex-1 cursor-pointer px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-[11px] font-medium text-slate-300 hover:text-white transition text-center truncate">
-                                    <i class="fa-solid fa-upload mr-1 text-indigo-400"></i>
-                                    <span id="ideasFileLabelText">Choose or Drop CSV</span>
+                                <label for="ideasFileInput" class="flex-1 cursor-pointer px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-xs font-medium text-slate-300 hover:text-slate-100 transition text-center truncate">
+                                    <i class="fa-solid fa-upload mr-1 text-accent-300"></i>
+                                    <span id="ideasFileLabelText">Choose CSV</span>
                                 </label>
                                 <input type="file" id="ideasFileInput" accept=".csv" class="hidden" onchange="handleIdeasFileSelected(event)">
                                 <button type="button" id="generateBatchBtn" onclick="generateMapsFromFile()" disabled
-                                    class="px-3 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-semibold text-white transition flex items-center gap-1.5">
-                                    <i class="fa-solid fa-layer-group text-[10px]"></i>
-                                    <span>Generate All</span>
+                                    class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-slate-100 transition flex items-center gap-2">
+                                    <i class="fa-solid fa-layer-group text-xs"></i>
+                                    <span>Generate all</span>
                                 </button>
                             </div>
-                            <label class="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer select-none pt-0.5">
-                                <input type="checkbox" id="batchParallelToggle" checked class="rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500">
+                            <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none pt-0.5">
+                                <input type="checkbox" id="batchParallelToggle" checked class="rounded border-slate-700 bg-slate-900 text-accent-500 focus:ring-accent-500">
                                 <span>Parallel per-map requests (with progress bar)</span>
                             </label>
-                            <div id="batchResultsPanel" class="hidden pt-2 border-t border-slate-800/80 space-y-1.5">
+                            <div id="batchResultsPanel" class="hidden pt-2 border-t border-slate-800/80 space-y-2">
                                 <div class="flex items-center justify-between">
-                                    <span id="batchResultsSummary" class="text-[10px] font-mono text-emerald-300">0 maps ready</span>
-                                    <button type="button" onclick="downloadAllBatchResults()" class="text-[10px] font-semibold px-2 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 transition">
+                                    <span id="batchResultsSummary" class="text-xs font-mono text-slate-400">0 maps ready</span>
+                                    <button type="button" onclick="downloadAllBatchResults()" class="text-xs font-semibold px-2 py-1 rounded bg-accent-500/20 hover:bg-accent-500/30 text-accent-300 border border-accent-500/30 transition">
                                         <i class="fa-solid fa-download mr-1"></i>Download All
                                     </button>
                                 </div>
@@ -508,16 +338,16 @@ limitations under the License.
                     <!-- 1. Flag: -m, --mode (Visual Segmented Cards) -->
                     <div>
                         <div class="flex justify-between items-center mb-2">
-                            <label class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                                <i class="fa-solid fa-database text-indigo-400 text-[11px]"></i>
-                                Data Mode
+                            <label class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                <i class="fa-solid fa-database text-accent-300 text-xs"></i>
+                                Data mode
                             </label>
                         </div>
-                        <div class="grid grid-cols-2 gap-2.5">
+                        <div class="grid grid-cols-2 gap-3">
                             <label class="cursor-pointer group relative">
                                 <input type="radio" name="mode" value="text" checked onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-gradient-to-br peer-checked:from-indigo-600/20 peer-checked:to-purple-600/10 peer-checked:border-indigo-500 peer-checked:shadow-[0_0_20px_rgba(99,102,241,0.2)] peer-checked:[&_.mode-dot]:opacity-100 hover:border-slate-700 transition-all flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-indigo-400 shrink-0 shadow-inner">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-slate-800 peer-checked:border-accent-500 peer-checked:[&_.mode-dot]:opacity-100 hover:border-slate-700 transition-colors flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-accent-300 shrink-0 ">
                                         <!-- Mini SVG Illustration for Text Mode -->
                                         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M4 7V5h16v2M9 20h6M12 5v15"/>
@@ -526,16 +356,16 @@ limitations under the License.
                                     <div class="min-w-0 flex-1">
                                         <div class="flex items-center justify-between">
                                             <span class="text-sm font-semibold text-slate-100 font-mono">text</span>
-                                            <span class="mode-dot w-2 h-2 rounded-full bg-indigo-400 opacity-0 transition"></span>
+                                            <span class="mode-dot w-2 h-2 rounded-full bg-accent-400 opacity-0 transition"></span>
                                         </div>
-                                        <div class="text-[11px] text-slate-400 truncate">Categories &amp; labels</div>
+                                        <div class="text-xs text-slate-400 truncate">Categories &amp; labels</div>
                                     </div>
                                 </div>
                             </label>
                             <label class="cursor-pointer group relative">
                                 <input type="radio" name="mode" value="number" onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-gradient-to-br peer-checked:from-emerald-600/20 peer-checked:to-teal-600/10 peer-checked:border-emerald-500 peer-checked:shadow-[0_0_20px_rgba(16,185,129,0.2)] peer-checked:[&_.mode-dot]:opacity-100 hover:border-slate-700 transition-all flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-slate-800 peer-checked:border-slate-700 peer-checked:[&_.mode-dot]:opacity-100 hover:border-slate-700 transition-colors flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 shrink-0 ">
                                         <!-- Mini SVG Illustration for Number Mode -->
                                         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
@@ -544,9 +374,9 @@ limitations under the License.
                                     <div class="min-w-0 flex-1">
                                         <div class="flex items-center justify-between">
                                             <span class="text-sm font-semibold text-slate-100 font-mono">number</span>
-                                            <span class="mode-dot w-2 h-2 rounded-full bg-emerald-400 opacity-0 transition"></span>
+                                            <span class="mode-dot w-2 h-2 rounded-full bg-slate-800 opacity-0 transition"></span>
                                         </div>
-                                        <div class="text-[11px] text-slate-400 truncate">Numeric ranges</div>
+                                        <div class="text-xs text-slate-400 truncate">Numeric ranges</div>
                                     </div>
                                 </div>
                             </label>
@@ -556,77 +386,77 @@ limitations under the License.
                     <!-- 2. Flag: -mp, --map-type (Visual Segmented Cards with SVG Mini-Illustrations) -->
                     <div>
                         <div class="flex justify-between items-center mb-2">
-                            <label class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                                <i class="fa-solid fa-layer-group text-indigo-400 text-[11px]"></i>
-                                Map Canvas Type
+                            <label class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                <i class="fa-solid fa-layer-group text-accent-300 text-xs"></i>
+                                Map canvas
                             </label>
                         </div>
-                        <div class="grid grid-cols-2 gap-2.5">
+                        <div class="grid grid-cols-2 gap-3">
                             <!-- Default Europe Map -->
                             <label class="cursor-pointer group">
                                 <input type="radio" name="map_type" value="default" checked onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-gradient-to-b peer-checked:from-indigo-600/20 peer-checked:to-slate-950 peer-checked:border-indigo-500 peer-checked:shadow-[0_0_20px_rgba(99,102,241,0.2)] text-center hover:border-slate-700 transition-all flex flex-col items-center">
-                                    <div class="w-10 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-1.5 text-indigo-400 group-hover:scale-105 transition-transform">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-slate-800 peer-checked:border-accent-500 text-center hover:border-slate-700 transition-colors flex flex-col items-center">
+                                    <div class="w-10 h-8 rounded-lg bg-accent-500/10 border border-accent-500/20 flex items-center justify-center mb-2 text-accent-300 transition-transform">
                                         <i class="fa-solid fa-map text-sm"></i>
                                     </div>
                                     <div class="text-xs font-semibold font-mono text-slate-100">default</div>
-                                    <div class="text-[10px] text-slate-400 mt-0.5">Europe Relief</div>
+                                    <div class="text-xs text-slate-400 mt-1">Europe Relief</div>
                                 </div>
                             </label>
                             <!-- Flag Map -->
                             <label class="cursor-pointer group">
                                 <input type="radio" name="map_type" value="flag" onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-gradient-to-b peer-checked:from-amber-500/20 peer-checked:to-slate-950 peer-checked:border-amber-500 peer-checked:shadow-[0_0_20px_rgba(245,158,11,0.2)] text-center hover:border-slate-700 transition-all flex flex-col items-center">
-                                    <div class="w-10 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-1.5 text-amber-400 group-hover:scale-105 transition-transform">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-slate-800 peer-checked:border-slate-700 text-center hover:border-slate-700 transition-colors flex flex-col items-center">
+                                    <div class="w-10 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center mb-2 text-slate-400 transition-transform">
                                         <i class="fa-solid fa-flag text-sm"></i>
                                     </div>
                                     <div class="text-xs font-semibold font-mono text-slate-100">flag</div>
-                                    <div class="text-[10px] text-slate-400 mt-0.5">National Flags</div>
+                                    <div class="text-xs text-slate-400 mt-1">National Flags</div>
                                 </div>
                             </label>
                             <!-- World Map -->
                             <label class="cursor-pointer group">
                                 <input type="radio" name="map_type" value="world" onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-gradient-to-b peer-checked:from-sky-500/20 peer-checked:to-slate-950 peer-checked:border-sky-500 peer-checked:shadow-[0_0_20px_rgba(14,165,233,0.2)] text-center hover:border-slate-700 transition-all flex flex-col items-center">
-                                    <div class="w-10 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center mb-1.5 text-sky-400 group-hover:scale-105 transition-transform">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-slate-800 peer-checked:border-slate-700 text-center hover:border-slate-700 transition-colors flex flex-col items-center">
+                                    <div class="w-10 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center mb-2 text-slate-400 transition-transform">
                                         <i class="fa-solid fa-globe text-sm"></i>
                                     </div>
                                     <div class="text-xs font-semibold font-mono text-slate-100">world</div>
-                                    <div class="text-[10px] text-slate-400 mt-0.5">Continents</div>
+                                    <div class="text-xs text-slate-400 mt-1">Continents</div>
                                 </div>
                             </label>
                             <!-- World Countries Map -->
                             <label class="cursor-pointer group">
                                 <input type="radio" name="map_type" value="world_countries" onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-gradient-to-b peer-checked:from-emerald-500/20 peer-checked:to-slate-950 peer-checked:border-emerald-500 peer-checked:shadow-[0_0_20px_rgba(16,185,129,0.2)] text-center hover:border-slate-700 transition-all flex flex-col items-center">
-                                    <div class="w-10 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-1.5 text-emerald-400 group-hover:scale-105 transition-transform">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-slate-800 peer-checked:border-slate-700 text-center hover:border-slate-700 transition-colors flex flex-col items-center">
+                                    <div class="w-10 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center mb-2 text-slate-400 transition-transform">
                                         <i class="fa-solid fa-earth-americas text-sm"></i>
                                     </div>
                                     <div class="text-xs font-semibold text-slate-100">World Countries</div>
-                                    <div class="text-[10px] text-slate-400 mt-0.5">All Nations</div>
+                                    <div class="text-xs text-slate-400 mt-1">All Nations</div>
                                 </div>
                             </label>
                         </div>
                     </div>
 
-                    <!-- 3. Flag: -gsm, --global-size-modifier -->
+<details class="settings-group" open><summary><span>02</span> Map appearance</summary><div class="settings-group-body">                    <!-- 3. Flag: -gsm, --global-size-modifier -->
                     <div>
                         <div class="flex justify-between items-center mb-2">
-                            <label for="gsmNumber" class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                                <i class="fa-solid fa-text-height text-indigo-400 text-[11px]"></i>
-                                Global Size Modifier
+                            <label for="gsmNumber" class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                <i class="fa-solid fa-text-height text-accent-300 text-xs"></i>
+                                Global size modifier
                             </label>
                         </div>
                         <div class="flex items-center gap-3 bg-slate-950/80 p-3 rounded-xl border border-slate-800">
-                            <input type="range" id="gsmRange" min="-50" max="100" step="1" value="15" 
+                            <input type="range" id="gsmRange" min="-50" max="100" step="1" value="15"
                                 oninput="syncGsm(this.value)"
                                 class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
                             <div class="flex items-center bg-slate-900 border border-slate-700/80 rounded-lg overflow-hidden shrink-0">
-                                <button type="button" onclick="adjustGsm(-1)" class="px-2.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 transition">-</button>
+                                <button type="button" onclick="adjustGsm(-1)" class="px-3 py-1 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">-</button>
                                 <input type="number" id="gsmNumber" name="gsm" value="15" step="1"
                                     oninput="syncGsm(this.value)"
-                                    class="w-14 text-center bg-transparent text-sm font-mono text-white focus:outline-none">
-                                <button type="button" onclick="adjustGsm(1)" class="px-2.5 py-1 text-slate-400 hover:text-white hover:bg-slate-800 transition">+</button>
+                                    class="w-14 text-center bg-transparent text-sm font-mono text-slate-100 focus:outline-none">
+                                <button type="button" onclick="adjustGsm(1)" class="px-3 py-1 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">+</button>
                             </div>
                         </div>
                     </div>
@@ -634,57 +464,57 @@ limitations under the License.
                     <!-- 4. Flag: -eop, --extra-option -->
                     <div>
                         <div class="flex justify-between items-center mb-2">
-                            <label id="extraOptionSelect" class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                                <i class="fa-solid fa-sparkles text-indigo-400 text-[11px]"></i>
+                            <label id="extraOptionSelect" class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                <i class="fa-solid fa-sparkles text-accent-300 text-xs"></i>
                                 Extra Display Options
                             </label>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <label class="cursor-pointer">
                                 <input type="checkbox" id="showMostLeastToggle" value="show_most_least" onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="px-2 py-2.5 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-indigo-600/20 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
+                                <div class="px-2 py-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-accent-600/20 peer-checked:border-accent-500 text-center hover:border-slate-700 transition">
                                     <div class="text-xs font-semibold text-slate-200 truncate">Show Most / Least</div>
-                                    <div class="text-[10px] text-slate-400 mt-0.5">Min / Max HUD</div>
+                                    <div class="text-xs text-slate-400 mt-1">Min / Max HUD</div>
                                 </div>
                             </label>
                             <label class="cursor-pointer">
                                 <input type="checkbox" id="shortFormToggle" value="short_form" onchange="updateCommandPreview()" class="peer sr-only">
-                                <div class="px-2.5 py-2.5 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-indigo-600/20 peer-checked:border-indigo-500 text-center hover:border-slate-700 transition">
+                                <div class="px-3 py-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-accent-600/20 peer-checked:border-accent-500 text-center hover:border-slate-700 transition">
                                     <div class="text-xs font-semibold text-slate-200">Short Form</div>
-                                    <div class="text-[10px] text-slate-400 mt-0.5">Compact (1k/1M)</div>
+                                    <div class="text-xs text-slate-400 mt-1">Compact (1k/1M)</div>
                                 </div>
                             </label>
                         </div>
-                        <p id="extraOptionHint" class="text-[11px] text-slate-400 mt-1.5 hidden"></p>
-                        <label class="mt-2.5 flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-slate-700 transition cursor-pointer">
+                        <p id="extraOptionHint" class="text-xs text-slate-400 mt-2 hidden"></p>
+                        <label class="mt-3 flex items-center justify-between gap-3 px-3 py-3 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-slate-700 transition cursor-pointer">
                             <div>
-                                <div class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-list-ul text-indigo-400 text-[11px]"></i>
+                                <div class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                    <i class="fa-solid fa-list-ul text-accent-300 text-xs"></i>
                                     Legend Overlay
                                 </div>
-                                <div class="text-[10px] text-slate-400 mt-0.5">Float color legend in the left sea area</div>
+                                <div class="text-xs text-slate-400 mt-1">Float color legend in the left sea area</div>
                             </div>
                             <input type="checkbox" id="showLegendToggle" onchange="updateCommandPreview()"
-                                class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500">
+                                class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-accent-500 focus:ring-accent-500">
                         </label>
-                        <label class="mt-2 flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-slate-700 transition cursor-pointer">
+                        <label class="mt-2 flex items-center justify-between gap-3 px-3 py-3 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-slate-700 transition cursor-pointer">
                             <div>
-                                <div class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-highlighter text-amber-400 text-[11px]"></i>
+                                <div class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                    <i class="fa-solid fa-highlighter text-slate-400 text-xs"></i>
                                     Highlight Min / Max Countries
                                 </div>
-                                <div class="text-[10px] text-slate-400 mt-0.5">Soft glow on highest &amp; lowest values (number mode)</div>
+                                <div class="text-xs text-slate-400 mt-1">Soft glow on highest &amp; lowest values (number mode)</div>
                             </div>
                             <input type="checkbox" id="highlightExtremaToggle" onchange="updateCommandPreview()"
-                                class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500">
+                                class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-accent-500 focus:ring-accent-500">
                         </label>
                         <div id="highlightColorsRow" class="hidden mt-2 grid grid-cols-2 gap-2 px-3 py-2 rounded-xl border border-slate-800/80 bg-slate-950/50">
-                            <label class="flex items-center justify-between gap-2 text-[11px] text-slate-300 cursor-pointer">
+                            <label class="flex items-center justify-between gap-2 text-xs text-slate-300 cursor-pointer">
                                 <span>Highest color</span>
                                 <input type="color" id="highlightHighColor" value="#00e5ff" onchange="updateCommandPreview()"
                                     class="h-6 w-9 rounded border border-slate-700 bg-slate-900 cursor-pointer">
                             </label>
-                            <label class="flex items-center justify-between gap-2 text-[11px] text-slate-300 cursor-pointer">
+                            <label class="flex items-center justify-between gap-2 text-xs text-slate-300 cursor-pointer">
                                 <span>Lowest color</span>
                                 <input type="color" id="highlightLowColor" value="#ff2daa" onchange="updateCommandPreview()"
                                     class="h-6 w-9 rounded border border-slate-700 bg-slate-900 cursor-pointer">
@@ -692,17 +522,18 @@ limitations under the License.
                         </div>
                     </div>
 
-                    <!-- 5. Flag: --model & 6. Flag: --font in a responsive 2-col or stacked layout -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+</div></details>
+<details class="settings-group" open><summary><span>03</span> Model and typography</summary><div class="settings-group-body">                    <!-- 5. Flag: --model & 6. Flag: --font in a responsive 2-col or stacked layout -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <!-- Flag: --model -->
                         <div>
-                            <div class="flex justify-between items-center mb-1.5">
+                            <div class="flex justify-between items-center mb-2">
                                 <label for="modelSelect" class="text-xs font-semibold text-slate-200">AI Model</label>
                             </div>
-                            <div class="flex gap-1.5">
+                            <div class="flex gap-2">
                                 <div class="relative flex-1 min-w-0">
                                     <select id="modelSelect" onchange="onAiModelChange(this.value)"
-                                        class="w-full appearance-none px-3 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-indigo-500 transition pr-7 truncate">
+                                        class="w-full appearance-none px-3 py-3 bg-slate-950/90 border border-slate-800 rounded-xl text-xs font-mono text-slate-100 focus:outline-none focus:border-accent-500 transition pr-7 truncate">
                                         <optgroup id="geminiModelsGroup" label="Gemini">
                                         <option value="gemini-3.8-flash">gemini-3.8-flash</option>
                                         <option value="gemini-4-hydrogen">gemini-4-hydrogen</option>
@@ -721,88 +552,89 @@ limitations under the License.
                                         <option value="deepseek-v4-pro">deepseek-v4-pro</option>
                                         </optgroup>
                                     </select>
-                                    <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 pointer-events-none"></i>
+                                    <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none"></i>
                                 </div>
-                                <button type="button" onclick="toggleCustomModelInput()" class="px-2.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition shrink-0" title="Add custom Model ID">
+                                <button type="button" onclick="toggleCustomModelInput()" class="px-3 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition shrink-0" title="Add custom Model ID">
                                     <i class="fa-solid fa-plus"></i>
                                 </button>
                             </div>
                             <!-- Add custom model input -->
-                            <div id="customModelBox" class="hidden mt-2 flex gap-1.5">
+                            <div id="customModelBox" class="hidden mt-2 flex gap-2">
                                 <input type="text" id="newModelInput" placeholder="Custom model ID..."
                                     onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomModel();}"
-                                    class="flex-1 min-w-0 px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
-                                <button type="button" onclick="addCustomModel()" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium">Add</button>
+                                    class="flex-1 min-w-0 px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-slate-100 focus:outline-none focus:border-accent-500">
+                                <button type="button" onclick="addCustomModel()" class="px-3 py-2 rounded-lg bg-accent-600 hover:bg-accent-500 text-slate-100 text-xs font-medium">Add</button>
                             </div>
                         </div>
 
                         <!-- Flag: --font -->
                         <div>
-                            <div class="flex justify-between items-center mb-1.5">
+                            <div class="flex justify-between items-center mb-2">
                                 <label for="fontSelect" class="text-xs font-semibold text-slate-200">Map Font</label>
                             </div>
-                            <div class="flex gap-1.5">
+                            <div class="flex gap-2">
                                 <div class="relative flex-1 min-w-0">
-                                    <select id="fontSelect" onchange="updateCommandPreview()" 
-                                        class="w-full appearance-none px-3 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-indigo-500 transition pr-7 truncate">
+                                    <select id="fontSelect" onchange="updateCommandPreview()"
+                                        class="w-full appearance-none px-3 py-3 bg-slate-950/90 border border-slate-800 rounded-xl text-xs font-mono text-slate-100 focus:outline-none focus:border-accent-500 transition pr-7 truncate">
                                         <option value="Bips.ttf">Bips.ttf</option>
                                         <option value="DIN Condensed.ttf">DIN Condensed.ttf</option>
                                         <option value="arialroundedmtbold.ttf">arialroundedmtbold.ttf</option>
                                         <option value="kodchasan.ttf">kodchasan.ttf</option>
                                     </select>
-                                    <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 pointer-events-none"></i>
+                                    <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none"></i>
                                 </div>
-                                <button type="button" onclick="fetchFontsFromServer()" class="px-2.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition shrink-0 flex items-center justify-center" title="Refresh font list from resources/fonts">
+                                <button type="button" onclick="fetchFontsFromServer()" class="px-3 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition shrink-0 flex items-center justify-center" title="Refresh font list from resources/fonts">
                                     <i id="fontRefreshIcon" class="fa-solid fa-sync"></i>
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <div id="aiTemperaturePanel" class="p-4 rounded-xl border border-indigo-400/50 bg-gradient-to-br from-indigo-950/90 via-slate-900 to-purple-950/70 shadow-lg shadow-indigo-950/40">
+                    <div id="aiTemperaturePanel" class="p-4 rounded-xl border border-accent-400/50 bg-slate-800 ">
                         <div class="flex justify-between items-center gap-3 mb-3">
-                            <label for="aiTemperature" class="text-sm font-semibold text-indigo-100 flex items-center gap-2">
-                                <i class="fa-solid fa-sliders text-indigo-300" aria-hidden="true"></i>
+                            <label for="aiTemperature" class="text-sm font-semibold text-accent-300 flex items-center gap-2">
+                                <i class="fa-solid fa-sliders text-accent-300" aria-hidden="true"></i>
                                 AI Temperature
                             </label>
-                            <output id="aiTemperatureValue" for="aiTemperature" class="px-3 py-1 rounded-lg border border-indigo-400/40 bg-indigo-500/20 text-base font-semibold font-mono tabular-nums text-indigo-100">0.75</output>
+                            <output id="aiTemperatureValue" for="aiTemperature" class="px-3 py-1 rounded-lg border border-accent-400/40 bg-accent-500/20 text-base font-semibold font-mono tabular-nums text-accent-300">0.75</output>
                         </div>
                         <input id="aiTemperature" type="range" min="0" max="2" step="0.05" value="0.75"
                             aria-describedby="aiTemperatureHint" oninput="updateAiTemperature(this.value)"
-                            class="w-full h-2.5 rounded-full appearance-none cursor-pointer accent-indigo-400">
-                        <div class="flex justify-between text-[11px] text-indigo-200/90 mt-2"><span>0 · More consistent</span><span>2 · More varied</span></div>
-                        <button type="button" onclick="updateAiTemperature(0.75)" class="mt-2 text-xs font-medium text-indigo-300 hover:text-indigo-100 underline underline-offset-2">Reset to 0.75</button>
-                        <p id="aiTemperatureHint" class="text-[11px] text-slate-300 mt-2">Controls response randomness, not factual accuracy. Lower values do not prevent AI hallucinations.</p>
-                        <label class="mt-3 pt-2.5 border-t border-indigo-400/20 flex items-center gap-2 text-xs text-indigo-100 cursor-pointer select-none">
+                            class="w-full h-2.5 rounded-full appearance-none cursor-pointer accent-accent-400">
+                        <div class="flex justify-between text-xs text-accent-300/90 mt-2"><span>0 · More consistent</span><span>2 · More varied</span></div>
+                        <button type="button" onclick="updateAiTemperature(0.75)" class="mt-2 text-xs font-medium text-accent-300 hover:text-accent-300 underline underline-offset-2">Reset to 0.75</button>
+                        <p id="aiTemperatureHint" class="text-xs text-slate-300 mt-2">Controls response randomness, not factual accuracy. Lower values do not prevent AI hallucinations.</p>
+                        <label class="mt-3 pt-2.5 border-t border-accent-400/20 flex items-center gap-2 text-xs text-accent-300 cursor-pointer select-none">
                             <input type="checkbox" id="deepseekWebSearchToggle" onchange="try { localStorage.setItem('automap-deepseek-web-search', this.checked ? '1' : '0'); } catch {}"
-                                class="rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-indigo-500">
-                            <span>DeepSeek Web Search <span class="text-[11px] text-slate-400">(enables/disables API search tool)</span></span>
+                                class="rounded border-slate-700 bg-slate-900 text-accent-500 focus:ring-accent-500">
+                            <span>DeepSeek Web Search <span class="text-xs text-slate-400">(enables/disables API search tool)</span></span>
                         </label>
-                        <div class="mt-2 flex items-center gap-3 text-[11px] text-slate-300">
+                        <div class="mt-2 flex items-center gap-3 text-xs text-slate-300">
                             <label for="deepseekMaxSearchInput" class="shrink-0">Max searches:</label>
                             <input type="range" id="deepseekMaxSearchInput" min="1" max="10" step="1" value="5"
                                 oninput="document.getElementById('deepseekMaxSearchVal').textContent = this.value; try { localStorage.setItem('automap-deepseek-max-search', this.value); } catch {}"
-                                class="flex-1 accent-indigo-500 cursor-pointer">
-                            <span id="deepseekMaxSearchVal" class="font-mono text-indigo-200 w-5 text-right">5</span>
+                                class="flex-1 accent-accent-500 cursor-pointer">
+                            <span id="deepseekMaxSearchVal" class="font-mono text-accent-300 w-5 text-right">5</span>
                         </div>
                     </div>
 
+</div></details>
                     <!-- Color Filling Studio: single entry in the left panel -->
                     <div class="mobile-style-entry p-3 rounded-xl bg-slate-950/75 border border-slate-800/90 flex items-center justify-between gap-3">
                         <div class="min-w-0">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-xs font-semibold text-slate-200">Color &amp; Label Style</span>
-                                <span id="fillingSummaryBadge" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Auto-Detect ON</span>
+                                <span id="fillingSummaryBadge" class="text-xs font-mono px-2 py-1 rounded bg-accent-500/15 text-accent-300 border border-accent-500/30">Auto-Detect ON</span>
                             </div>
-                            <p id="fillingSidebarSubtext" class="text-[11px] text-slate-400 truncate mt-0.5">Auto-detects map numbers/words, palette &amp; text style</p>
+                            <p id="fillingSidebarSubtext" class="text-xs text-slate-400 truncate mt-1">Auto-detects map numbers/words, palette &amp; text style</p>
                         </div>
-                        <div class="flex items-center gap-1.5 shrink-0">
+                        <div class="flex items-center gap-2 shrink-0">
                             <div id="miniSwatchPreview" class="flex -space-x-1.5"></div>
-                            <button type="button" id="quickAutoDetectBtn" onclick="autoDetectMapColorsAndStyle(false)" class="px-2 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition flex items-center gap-1" title="Inspect current map / topic and auto-generate colors &amp; style">
-                                <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i>
+                            <button type="button" id="quickAutoDetectBtn" onclick="autoDetectMapColorsAndStyle(false)" class="px-2 py-2 rounded-lg bg-slate-800 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-medium transition flex items-center gap-1" title="Inspect current map / topic and auto-generate colors &amp; style">
+                                <i class="fa-solid fa-map text-xs"></i>
                                 <span>Auto</span>
                             </button>
-                            <button type="button" id="openFillingStudioBtn" onclick="openFillingStudio()" aria-controls="fillingStudioModal" class="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-indigo-600/20 text-indigo-300 border border-slate-700 hover:border-indigo-500/50 text-xs font-medium transition">
+                            <button type="button" id="openFillingStudioBtn" onclick="openFillingStudio()" aria-controls="fillingStudioModal" class="px-3 py-2 rounded-lg bg-slate-900 hover:bg-accent-600/20 text-accent-300 border border-slate-700 hover:border-accent-500/50 text-xs font-medium transition">
                                 Theme &amp; Style
                             </button>
                         </div>
@@ -811,106 +643,107 @@ limitations under the License.
                     <div class="p-3 rounded-xl bg-slate-950/75 border border-slate-800">
                         <div class="flex items-center justify-between gap-2 mb-2">
                             <label for="labelOffsetX" class="text-xs font-semibold text-slate-200">Global label position</label>
-                            <output id="labelOffsetXValue" for="labelOffsetX" class="text-xs font-mono text-indigo-300">0 px</output>
+                            <output id="labelOffsetXValue" for="labelOffsetX" class="text-xs font-mono text-accent-300">0 px</output>
                         </div>
-                        <input id="labelOffsetX" type="range" min="-500" max="500" step="1" value="0" oninput="updateLabelOffset(this.value)" aria-describedby="labelOffsetXHint" class="w-full accent-indigo-400">
-                        <div class="flex justify-between text-[11px] text-slate-400"><span>← Left</span><button type="button" onclick="updateLabelOffset(0)" class="text-indigo-300 hover:text-indigo-100">Reset</button><span>Right →</span></div>
-                        <p id="labelOffsetXHint" class="text-[11px] text-slate-400 mt-2">Moves every country label horizontally. Click Re-Paint to apply without another AI request.</p>
+                        <input id="labelOffsetX" type="range" min="-500" max="500" step="1" value="0" oninput="updateLabelOffset(this.value)" aria-describedby="labelOffsetXHint" class="w-full accent-accent-400">
+                        <div class="flex justify-between text-xs text-slate-400"><span>← Left</span><button type="button" onclick="updateLabelOffset(0)" class="text-accent-300 hover:text-accent-300">Reset</button><span>Right →</span></div>
+                        <p id="labelOffsetXHint" class="text-xs text-slate-400 mt-2">Moves every country label horizontally. Click Re-Paint to apply without another AI request.</p>
                     </div>
 
-                    <!-- Submit / Generate Button -->
-                    <button type="submit" id="generateBtn" class="relative w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:via-indigo-400 hover:to-purple-500 text-white font-display font-semibold text-sm shadow-xl shadow-indigo-600/30 hover:shadow-indigo-500/45 border border-white/15 transition-all flex items-center justify-center gap-2.5 group overflow-hidden">
-                        <i id="generateBtnIcon" class="fa-solid fa-play transition-transform group-hover:translate-x-0.5"></i>
-                        <span id="generateBtnText">Run CLI &amp; Generate Map</span>
-                    </button>
-                    <button type="button" id="restyleCurrentMapBtn" onclick="restyleCurrentMapFromStudio()" class="w-full justify-center px-3.5 py-2 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/40 text-emerald-200 border border-emerald-500/40 text-xs font-semibold transition flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait">
-                        <i id="mapRepaintIcon" class="fa-solid fa-paintbrush" aria-hidden="true"></i>
-                        <span id="mapRepaintButtonLabel">Apply &amp; Re-Paint Current Map</span>
-                    </button>
-                <div id="mapRepaintStatus" role="status" aria-live="polite" class="hidden w-full text-xs text-emerald-300 flex items-center gap-2">
-                    <i class="fa-solid fa-circle-notch animate-spin" aria-hidden="true"></i>
-                    <span>Re-painting map… Please wait while colors and labels are rendered.</span>
-                </div>
-                    <p id="generationError" role="alert" class="hidden text-xs text-rose-300 bg-rose-950/50 border border-rose-500/30 rounded-xl p-3"></p>
                 </form>
             </div>
 
             <!-- Live CLI Command Builder Preview Card -->
-            <div class="cyber-card border border-slate-800/90 rounded-2xl p-4 shadow-xl">
-                <div class="flex items-center justify-between mb-2.5">
+            <div class="cyber-card border border-slate-800/90 rounded-2xl p-4 ">
+                <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2 text-xs font-semibold text-slate-200">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                        <i class="fa-solid fa-terminal text-emerald-400"></i>
+                        <span class="w-2 h-2 rounded-full bg-slate-800"></span>
+                        <i class="fa-solid fa-terminal text-slate-400"></i>
                         <span>Generated CLI Command</span>
                     </div>
-                    <button type="button" onclick="copyCliCommand()" class="text-xs px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition flex items-center gap-1.5">
+                    <button type="button" onclick="copyCliCommand()" class="text-xs px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition flex items-center gap-2">
                         <i id="copyIcon" class="fa-regular fa-copy"></i>
                         <span id="copyText">Copy</span>
                     </button>
                 </div>
-                <div class="p-3 rounded-xl bg-slate-950/95 border border-slate-800/90 font-mono text-xs text-emerald-400 overflow-x-auto whitespace-nowrap select-all shadow-inner" id="cliCommandDisplay">
+                <div class="p-3 rounded-xl bg-slate-950/95 border border-slate-800/90 font-mono text-xs text-slate-400 overflow-x-auto whitespace-nowrap select-all " id="cliCommandDisplay">
                     python cli.py make "" -m text -mp default -gsm 15 -eop none --model gemini-2.5-flash --font "Bips.ttf"
                 </div>
             </div>
 
             <!-- Video Studio Card -->
-            <div class="cyber-card border border-slate-800/90 rounded-2xl p-5 shadow-xl relative overflow-hidden group">
-                <div class="absolute -right-10 -bottom-10 w-36 h-36 rounded-full bg-rose-500/10 blur-2xl pointer-events-none group-hover:bg-rose-500/20 transition"></div>
+            <div class="cyber-card border border-slate-800/90 rounded-2xl p-5 relative overflow-hidden group">
                 <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
                             <i class="fa-solid fa-clapperboard text-sm"></i>
                         </div>
                         <div>
-                            <h2 class="font-display font-semibold text-sm text-white">Video Production Studio</h2>
-                            <p class="text-[11px] text-slate-400">Audio cutter, soundtrack sync &amp; MP4 renderer</p>
+                            <h2 class="font-display font-semibold text-sm text-slate-100">Video Studio</h2>
+                            <p class="text-xs text-slate-400">Audio cutter, soundtrack sync &amp; MP4 renderer</p>
                         </div>
                     </div>
-                    <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-rose-300 border border-slate-800">/studio</code>
+                    <code class="text-xs font-mono px-2 py-1 rounded bg-slate-900 text-slate-400 border border-slate-800">/studio</code>
                 </div>
-                <a href="/studio" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 text-white font-semibold text-xs shadow-lg shadow-rose-600/25 hover:shadow-rose-600/40 transition-all flex items-center justify-center gap-2">
+                <a href="/studio" class="w-full py-3 px-4 rounded-xl bg-slate-800 text-slate-100 font-semibold text-xs transition-colors flex items-center justify-center gap-2">
                     <i class="fa-solid fa-film"></i>
                     <span>Launch Video Studio</span>
-                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-80"></i>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-xs opacity-80"></i>
                 </a>
             </div>
 
+</div>
+<div class="workspace-actions">                    <!-- Submit / Generate Button -->
+                    <button type="submit" form="cliForm" id="generateBtn" class="relative w-full py-4 px-5 rounded-xl bg-slate-800 text-slate-100 font-display font-semibold text-sm border border-slate-700 transition-colors flex items-center justify-center gap-3 group overflow-hidden">
+                        <i id="generateBtnIcon" class="fa-solid fa-play transition-transform group-hover:translate-x-0.5"></i>
+                        <span id="generateBtnText">Generate map</span>
+                    </button>
+                    <button type="button" id="restyleCurrentMapBtn" onclick="restyleCurrentMapFromStudio()" class="w-full justify-center px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-semibold transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-wait">
+                        <i id="mapRepaintIcon" class="fa-solid fa-paintbrush" aria-hidden="true"></i>
+                        <span id="mapRepaintButtonLabel">Apply &amp; Re-Paint Current Map</span>
+                    </button>
+                <div id="mapRepaintStatus" role="status" aria-live="polite" class="hidden w-full text-xs text-slate-400 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-notch animate-spin" aria-hidden="true"></i>
+                    <span>Re-painting map… Please wait while colors and labels are rendered.</span>
+                </div>
+                    <p id="generationError" role="alert" class="hidden text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-xl p-3"></p>
+</div>
         </section>
 
         <!-- RIGHT COLUMN: MAP VIEWER & TERMINAL OUTPUT (7 or 8 Cols on Desktop) -->
-        <section class="lg:col-span-7 xl:col-span-8 flex flex-col gap-5">
-            
+        <section id="mapPreviewColumn" class="lg:col-span-7 xl:col-span-8 flex flex-col gap-5">
+
             <!-- Interactive Map Canvas Stage Card -->
-            <div id="mapStage" class="cyber-card border border-slate-800/90 rounded-2xl shadow-2xl flex flex-col flex-1 min-h-[520px] overflow-hidden relative">
-                
+            <div id="mapStage" class="cyber-card border border-slate-800/90 rounded-2xl flex flex-col flex-1 min-h-[520px] overflow-hidden relative">
+
                 <!-- Map Viewer Toolbar -->
-                <div class="px-5 py-3.5 border-b border-slate-800/90 flex flex-wrap items-center justify-between gap-3 bg-slate-950/60">
-                    <div class="flex items-center gap-2.5">
-                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399] transition-colors" id="stageStatusDot"></span>
-                        <h2 class="font-display font-semibold text-sm sm:text-base text-white">Cartographic Render Stage</h2>
-                        <span id="mapMetaBadge" class="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-900 text-indigo-300 border border-slate-800">Ready</span>
+                <div class="px-5 py-4 border-b border-slate-800/90 flex flex-wrap items-center justify-between gap-3 bg-slate-950/60">
+                    <div class="flex items-center gap-3">
+                        <span class="w-2.5 h-2.5 rounded-full bg-slate-800 transition-colors" id="stageStatusDot"></span>
+                        <h2 class="font-display font-semibold text-sm sm:text-base text-slate-100">Map preview</h2>
+                        <span id="mapMetaBadge" class="text-xs font-mono px-3 py-1 rounded-md bg-slate-900 text-accent-300 border border-slate-800">Ready</span>
                     </div>
 
                     <!-- Zoom, Pan Reset, Fullscreen & Download Controls -->
                     <div class="flex items-center gap-2">
-                        <div class="flex items-center bg-slate-950/90 border border-slate-800 rounded-xl p-0.5">
-                            <button type="button" onclick="zoomMap(-0.2)" class="p-2 text-slate-400 hover:text-white transition" title="Zoom Out">
+                        <div class="flex items-center bg-slate-950/90 border border-slate-800 rounded-xl p-1">
+                            <button type="button" onclick="zoomMap(-0.2)" class="p-2 text-slate-400 hover:text-slate-100 transition" title="Zoom Out">
                                 <i class="fa-solid fa-magnifying-glass-minus text-xs"></i>
                             </button>
                             <span id="zoomLevelText" class="text-xs font-mono px-2 text-slate-200 min-w-[48px] text-center">100%</span>
-                            <button type="button" onclick="zoomMap(0.2)" class="p-2 text-slate-400 hover:text-white transition" title="Zoom In">
+                            <button type="button" onclick="zoomMap(0.2)" class="p-2 text-slate-400 hover:text-slate-100 transition" title="Zoom In">
                                 <i class="fa-solid fa-magnifying-glass-plus text-xs"></i>
                             </button>
-                            <button type="button" onclick="resetZoom()" class="p-2 text-slate-400 hover:text-white transition border-l border-slate-800" title="Reset Zoom &amp; Pan">
+                            <button type="button" onclick="resetZoom()" class="p-2 text-slate-400 hover:text-slate-100 transition border-l border-slate-800" title="Reset Zoom &amp; Pan">
                                 <i class="fa-solid fa-compress text-xs"></i>
                             </button>
                         </div>
 
-                        <button type="button" onclick="toggleFullscreenMap()" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 transition" title="Toggle Fullscreen">
+                        <button type="button" onclick="toggleFullscreenMap()" class="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 transition" title="Toggle Fullscreen">
                             <i id="fullscreenIcon" class="fa-solid fa-expand text-xs"></i>
                         </button>
 
-                        <button type="button" onclick="downloadCurrentMap()" aria-label="Download PNG" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20 border border-white/10">
+                        <button type="button" onclick="downloadCurrentMap()" aria-label="Download PNG" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-100 text-xs font-semibold transition flex items-center gap-2 border border-slate-700">
                             <i class="fa-solid fa-download"></i>
                             <span class="hidden sm:inline">Download PNG</span>
                         </button>
@@ -919,94 +752,91 @@ limitations under the License.
 
                 <!-- Map Viewport Area -->
                 <div id="mapViewport" class="relative flex-1 bg-slate-950 canvas-grid flex items-center justify-center overflow-hidden select-none p-4 sm:p-8 cursor-grab active:cursor-grabbing">
-                    <div id="mapRepaintOverlay" role="status" aria-live="polite" class="hidden absolute inset-0 z-30 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-6 cursor-wait">
-                        <div class="flex flex-col items-center gap-3 rounded-2xl border border-emerald-500/40 bg-slate-900/95 px-8 py-6 text-center shadow-2xl">
-                            <i class="fa-solid fa-circle-notch animate-spin text-2xl text-emerald-300" aria-hidden="true"></i>
-                            <span class="text-base font-semibold text-white">Re-painting map…</span>
+                    <div id="mapRepaintOverlay" role="status" aria-live="polite" class="hidden absolute inset-0 z-30 bg-slate-950/70 flex items-center justify-center p-6 cursor-wait">
+                        <div class="flex flex-col items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/95 px-8 py-6 text-center ">
+                            <i class="fa-solid fa-circle-notch animate-spin text-2xl text-slate-400" aria-hidden="true"></i>
+                            <span class="text-base font-semibold text-slate-100">Re-painting map…</span>
                             <span class="text-xs text-slate-300">Updating colors and label positions. Please wait.</span>
                         </div>
                     </div>
-                    
+
                     <!-- Subtle Cartographic Coordinate HUD Accents -->
-                    <div class="absolute top-3 left-4 pointer-events-none flex items-center gap-3 text-[10px] font-mono text-slate-500/80">
-                        <span>PROJ: MERCATOR-ATLAS</span>
+                    <div class="absolute top-3 left-4 pointer-events-none flex items-center gap-3 text-xs font-mono text-slate-500/80">
+                        <span>Map extent</span>
                         <span>&bull;</span>
-                        <span id="hudCoordsText">LAT 54.5260° N / LON 15.2551° E</span>
+                        <span id="hudCoordsText">Europe</span>
                     </div>
-                    <div class="absolute top-3 right-4 pointer-events-none hidden sm:flex items-center gap-1.5 text-[10px] font-mono text-slate-500/80">
-                        <i class="fa-regular fa-compass text-indigo-400/70"></i>
+                    <div class="absolute top-3 right-4 pointer-events-none hidden sm:flex items-center gap-2 text-xs font-mono text-slate-500/80">
+                        <i class="fa-regular fa-compass text-accent-300/70"></i>
                         <span>N 000°</span>
                     </div>
 
                     <!-- Multi-Stage Animated Loading Overlay -->
-                    <div id="loadingOverlay" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md z-20 flex flex-col items-center justify-center p-6">
-                        <div class="max-w-md w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center text-center relative overflow-hidden">
-                            <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 animate-pulse"></div>
-                            
+                    <div id="loadingOverlay" class="hidden absolute inset-0 bg-slate-950/90 z-20 flex flex-col items-center justify-center p-6">
+                        <div class="max-w-md w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-6 flex flex-col items-center text-center relative overflow-hidden">
+                            <div class="absolute inset-x-0 top-0 h-1 bg-slate-800 "></div>
+
                             <!-- Orbital Radar Spinner -->
                             <div class="relative w-20 h-20 flex items-center justify-center mb-4">
-                                <div class="absolute inset-0 rounded-full border-2 border-indigo-500/20"></div>
-                                <div class="absolute inset-1 rounded-full border-2 border-dashed border-purple-500/40 radar-spin"></div>
-                                <div class="absolute inset-0 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div>
-                                <div class="w-11 h-11 rounded-full bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center">
-                                    <i class="fa-solid fa-earth-americas text-indigo-400 text-xl animate-pulse"></i>
+                                <div class="absolute inset-0 rounded-full border-2 border-accent-500/20"></div>
+                                <div class="absolute inset-1 rounded-full border-2 border-dashed border-slate-700 radar-spin"></div>
+                                <div class="absolute inset-0 rounded-full border-2 border-accent-500 border-t-transparent animate-spin"></div>
+                                <div class="w-11 h-11 rounded-full bg-accent-500/15 border border-accent-500/30 flex items-center justify-center">
+                                    <i class="fa-solid fa-earth-americas text-accent-300 text-xl "></i>
                                 </div>
                             </div>
 
-                            <div class="text-base font-display font-bold text-white">Synthesizing Cartographic Layer</div>
-                            <div id="loadingStepText" class="text-xs text-indigo-300 mt-1 font-mono">Querying AI model and rendering map</div>
-                            
+                            <div class="text-base font-display font-medium text-slate-100">Synthesizing Cartographic Layer</div>
+                            <div id="loadingStepText" class="text-xs text-accent-300 mt-1 font-mono">Querying AI model and rendering map</div>
+
                             <!-- Multi-stage Step Progress List -->
-                            <div class="w-full mt-4 space-y-2 text-left bg-slate-950/80 p-3.5 rounded-xl border border-slate-800/80 font-mono text-[11px]">
-                                <div id="loadStage1" class="flex items-center justify-between text-indigo-300">
-                                    <span class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin text-[10px]"></i> 1. AI Geospatial Query</span>
-                                    <span class="text-[10px] opacity-75">Running</span>
+                            <div class="w-full mt-4 space-y-2 text-left bg-slate-950/80 p-4 rounded-xl border border-slate-800/80 font-mono text-xs">
+                                <div id="loadStage1" class="flex items-center justify-between text-accent-300">
+                                    <span class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin text-xs"></i> 1. AI Geospatial Query</span>
+                                    <span class="text-xs opacity-75">Running</span>
                                 </div>
                                 <div id="loadStage2" class="flex items-center justify-between text-slate-500">
-                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> 2. Painting Regions &amp; Labels</span>
-                                    <span class="text-[10px] opacity-75">Pending</span>
+                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-xs"></i> 2. Painting Regions &amp; Labels</span>
+                                    <span class="text-xs opacity-75">Pending</span>
                                 </div>
                                 <div id="loadStage3" class="flex items-center justify-between text-slate-500">
-                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> 3. Adding Relief, Borders &amp; Overlays</span>
-                                    <span class="text-[10px] opacity-75">Pending</span>
+                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-xs"></i> 3. Adding Relief, Borders &amp; Overlays</span>
+                                    <span class="text-xs opacity-75">Pending</span>
                                 </div>
                                 <div id="loadStage4" class="flex items-center justify-between text-slate-500">
-                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> 4. Encoding Final PNG</span>
-                                    <span class="text-[10px] opacity-75">Pending</span>
+                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-xs"></i> 4. Encoding Final PNG</span>
+                                    <span class="text-xs opacity-75">Pending</span>
                                 </div>
                             </div>
 
-                            <div class="w-full flex items-center justify-between mt-3 text-[11px] font-mono text-slate-400">
+                            <div class="w-full flex items-center justify-between mt-3 text-xs font-mono text-slate-400">
                                 <span>Elapsed Time</span>
-                                <span id="loadingElapsedTimer" class="text-indigo-300">0.0s</span>
+                                <span id="loadingElapsedTimer" class="text-accent-300">0.0s</span>
                             </div>
                         </div>
                     </div>
 
                     <!-- Interactive Image Container -->
                     <div id="mapCanvasWrapper" class="transition-transform duration-150 ease-out origin-center max-w-full max-h-full flex items-center justify-center">
-                        
+
                         <!-- Server Image (real generated map returned by Flask as a data URL) -->
-                        <img id="serverMapImage" src="" alt="Generated Map" draggable="false" class="hidden max-h-[540px] w-auto rounded-xl shadow-[0_25px_70px_rgba(0,0,0,0.85)] border border-slate-700/80 object-contain">
+                        <img id="serverMapImage" src="" alt="Generated Map" draggable="false" class="hidden max-h-[540px] w-auto rounded-xl border border-slate-700/80 object-contain">
 
                         <!-- Empty-state placeholder shown before the first generation -->
-                        <div id="emptyState" class="w-full max-w-[740px] rounded-2xl border border-dashed border-slate-700/80 bg-slate-900/50 backdrop-blur-sm p-8 flex flex-col items-center justify-center gap-4 text-center">
-                            <div class="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500/15 via-purple-500/10 to-cyan-500/15 border border-indigo-500/25 flex items-center justify-center shadow-inner">
-                                <i class="fa-solid fa-map-location-dot text-indigo-400 text-3xl"></i>
-                                <span class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center shadow">
-                                    <i class="fa-solid fa-wand-magic-sparkles"></i>
-                                </span>
+                        <div id="emptyState" class="w-full max-w-[740px] rounded-2xl border border-dashed border-slate-700/80 bg-slate-900/50 p-8 flex flex-col items-center justify-center gap-4 text-center">
+                            <div class="relative w-20 h-20 rounded-2xl bg-slate-800 border border-accent-500/25 flex items-center justify-center ">
+                                <i class="fa-solid fa-map-location-dot text-accent-300 text-3xl"></i>
                             </div>
-                            <div class="max-w-md space-y-1.5">
-                                <h3 class="font-display font-semibold text-base text-white">Ready to Synthesize Your Map</h3>
+                            <div class="max-w-md space-y-2">
+                                <h3 class="font-display font-semibold text-base text-slate-100">Create your first map</h3>
                                 <p class="text-xs text-slate-400 leading-relaxed">
-                                    Pick a <span class="text-indigo-300 font-medium">Quick Prompt Preset</span> on the left or type any geographic question, then click <span class="text-indigo-300 font-medium">Run CLI &amp; Generate Map</span>.
+                                    Pick a <span class="text-accent-300 font-medium">prompt preset</span> on the left or type any geographic question, then click <span class="text-accent-300 font-medium">Generate map</span>.
                                 </p>
                             </div>
                             <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
-                                <button type="button" onclick="applyPromptPreset('Population of European countries', 'number', 'default', 'show_most_least')" class="text-xs px-3 py-1.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 transition flex items-center gap-1.5">
-                                    <i class="fa-solid fa-bolt text-amber-400 text-[10px]"></i>
-                                    <span>Try Sample: Europe Population</span>
+                                <button type="button" onclick="applyPromptPreset('Population of European countries', 'number', 'default', 'show_most_least')" class="text-xs px-3 py-2 rounded-xl bg-accent-500/15 hover:bg-accent-500/25 text-accent-300 border border-accent-500/30 transition flex items-center gap-2">
+                                    <i class="fa-solid fa-bolt text-slate-400 text-xs"></i>
+                                    <span>Try Europe population</span>
                                 </button>
                             </div>
                         </div>
@@ -1014,11 +844,11 @@ limitations under the License.
                     </div>
 
                     <!-- Applied Flags Watermark Bar -->
-                    <div class="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-                        <div id="activeFlagsBadges" class="flex flex-wrap gap-1.5">
+                    <div id="mapViewportMeta" class="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+                        <div id="activeFlagsBadges" class="flex flex-wrap gap-2">
                             <!-- Populated by JS -->
                         </div>
-                        <div class="text-[11px] font-mono text-slate-400 bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-lg border border-slate-800">
+                        <div class="text-xs font-mono text-slate-400 bg-slate-900/90 px-3 py-1 rounded-lg border border-slate-800">
                             <span class="hidden sm:inline">Scroll to zoom &bull; Drag to pan</span><span class="sm:hidden">Use + / − to zoom</span>
                         </div>
                     </div>
@@ -1026,42 +856,42 @@ limitations under the License.
             </div>
 
             <!-- CLI Console Output & History Tabs -->
-            <div class="cyber-card border border-slate-800/90 rounded-2xl shadow-xl overflow-hidden">
-                <div class="px-4 py-2.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
+            <div class="cyber-card border border-slate-800/90 rounded-2xl overflow-hidden">
+                <div class="px-4 py-3 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
                     <div class="flex items-center gap-5">
-                        <button type="button" onclick="switchBottomTab('console')" id="tabConsoleBtn" class="text-xs font-semibold text-indigo-400 border-b-2 border-indigo-500 pb-2 -mb-2.5 flex items-center gap-1.5 transition">
+                        <button type="button" onclick="switchBottomTab('console')" id="tabConsoleBtn" class="text-xs font-semibold text-accent-300 border-b-2 border-accent-500 pb-2 -mb-2.5 flex items-center gap-2 transition">
                             <i class="fa-solid fa-terminal"></i>
-                            <span>Console Output (stdout / stderr)</span>
+                            <span>Console output</span>
                         </button>
-                        <button type="button" onclick="switchBottomTab('history')" id="tabHistoryBtn" class="text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-1.5 transition">
+                        <button type="button" onclick="switchBottomTab('history')" id="tabHistoryBtn" class="text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-2 transition">
                             <i class="fa-solid fa-clock-rotate-left"></i>
-                            <span>Run History</span>
-                            <span id="historyCountBadge" class="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px]">0</span>
+                            <span>Run history</span>
+                            <span id="historyCountBadge" class="px-2 py-0.2 rounded-full bg-slate-800 text-xs">0</span>
                         </button>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button type="button" id="clearConsoleBtn" onclick="clearConsole()" class="text-[11px] text-slate-400 hover:text-slate-200 transition flex items-center gap-1">
-                            <i class="fa-regular fa-trash-can text-[10px]"></i>
-                            <span>Clear Console</span>
+                        <button type="button" id="clearConsoleBtn" onclick="clearConsole()" class="text-xs text-slate-400 hover:text-slate-200 transition flex items-center gap-1">
+                            <i class="fa-regular fa-trash-can text-xs"></i>
+                            <span>Clear console</span>
                         </button>
-                        <button type="button" id="clearHistoryBtn" onclick="clearHistory()" class="hidden text-[11px] text-slate-400 hover:text-slate-200 transition flex items-center gap-1">
-                            <i class="fa-regular fa-trash-can text-[10px]"></i>
+                        <button type="button" id="clearHistoryBtn" onclick="clearHistory()" class="hidden text-xs text-slate-400 hover:text-slate-200 transition flex items-center gap-1">
+                            <i class="fa-regular fa-trash-can text-xs"></i>
                             <span>Clear History</span>
                         </button>
                     </div>
                 </div>
 
                 <!-- Tab 1: Console Logs -->
-                <div id="consoleTabContent" class="p-4 bg-slate-950/90 font-mono text-xs h-40 overflow-y-auto space-y-1.5">
+                <div id="consoleTabContent" class="p-4 bg-slate-950/90 font-mono text-xs h-40 overflow-y-auto space-y-2">
                     <div class="text-slate-500">[System] AutoMap Studio initialized and ready.</div>
-                    <div class="text-slate-400">[Info] Select your desired flags <span class="text-indigo-400">-m, -mp, -gsm, -eop, --model, --font</span> and click "Run CLI &amp; Generate Map".</div>
+                    <div class="text-slate-400">[Info] Select your desired flags <span class="text-accent-300">-m, -mp, -gsm, -eop, --model, --font</span> and click "Generate map".</div>
                 </div>
 
                 <!-- Tab 2: Generation History (saved locally for 24 hours) -->
                 <div id="historyTabContent" class="hidden p-4 bg-slate-950/90 h-40 overflow-y-auto">
-                    <p id="historyStorageStatus" role="status" class="text-[11px] text-slate-400 mb-2">Saved in this browser · automatically removed after 24 hours.</p>
-                    <div id="historyList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-                        <div class="text-xs text-slate-500 col-span-full text-center py-8">No runs yet. Generate your first map!</div>
+                    <p id="historyStorageStatus" role="status" class="text-xs text-slate-400 mb-2">Saved in this browser · automatically removed after 24 hours.</p>
+                    <div id="historyList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        <div class="text-xs text-slate-500 col-span-full text-center py-8">Generated maps will appear here</div>
                     </div>
                 </div>
             </div>
@@ -1070,53 +900,29 @@ limitations under the License.
     </main>
 
     <!-- Polished Color Filling Studio Modal (`filling_txt` & `filling_num`) -->
-    <div id="fillingStudioModal" onclick="if(event.target===this) closeFillingStudio()" class="fixed inset-0 z-50 hidden items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md transition-opacity">
-        <div class="cyber-card border border-slate-700/80 rounded-2xl max-w-4xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+    <div id="fillingStudioModal" onclick="if(event.target===this) closeFillingStudio()" class="fixed inset-0 z-50 hidden items-center justify-center p-4 sm:p-6 bg-slate-950/80 transition-opacity">
+        <div class="cyber-card border border-slate-700/80 rounded-2xl max-w-4xl w-full max-h-[88vh] flex flex-col overflow-hidden">
             <!-- Modal Header -->
             <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
-                <div class="flex items-center gap-3.5">
+                <div class="flex items-center gap-4">
                     <div class="relative group">
-                        <div class="absolute -inset-1 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-rose-400 opacity-60 blur group-hover:opacity-90 transition duration-300"></div>
-                        <div class="relative w-10 h-10 rounded-xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center shadow-lg border border-indigo-400/30">
+                        <div class="relative w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center border border-accent-400/30">
                             <!-- Custom Stylized AutoMap Color Filling Studio SVG Icon -->
-                            <svg class="w-7 h-7" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="AutoMap Color Filling Studio Logo">
-                                <defs>
-                                    <linearGradient id="amFillStrokeGrad" x1="4" y1="6" x2="36" y2="34" gradientUnits="userSpaceOnUse">
-                                        <stop offset="0%" stop-color="#a5b4fc" />
-                                        <stop offset="50%" stop-color="#c084fc" />
-                                        <stop offset="100%" stop-color="#fb7185" />
-                                    </linearGradient>
-                                    <linearGradient id="amDropGrad" x1="23" y1="7" x2="34" y2="22" gradientUnits="userSpaceOnUse">
-                                        <stop offset="0%" stop-color="#fb7185" />
-                                        <stop offset="50%" stop-color="#c084fc" />
-                                        <stop offset="100%" stop-color="#6366f1" />
-                                    </linearGradient>
-                                </defs>
-                                <!-- Folded AutoMap Panels Filled with Data Swatch Colors -->
-                                <path d="M5.5 12L14 8.5V28L5.5 31.5V12Z" fill="#34d399" fill-opacity="0.28" />
-                                <path d="M14 8.5L24.5 12V31.5L14 28V8.5Z" fill="#6366f1" fill-opacity="0.32" />
-                                <path d="M24.5 12L33.5 8.5V28L24.5 31.5V12Z" fill="#f59e0b" fill-opacity="0.28" />
-                                <path d="M5.5 12L14 8.5L24.5 12L33.5 8.5V28L24.5 31.5L14 28L5.5 31.5V12Z" stroke="url(#amFillStrokeGrad)" stroke-width="1.6" stroke-linejoin="round" />
-                                <path d="M14 8.5V28M24.5 12V31.5" stroke="#a5b4fc" stroke-width="1.15" stroke-opacity="0.55" stroke-dasharray="2 2" />
-                                <!-- Glowing Color Swatch Nodes on Map Regions -->
-                                <circle cx="9.8" cy="20.5" r="2.1" fill="#34d399" stroke="#090e1a" stroke-width="1" />
-                                <circle cx="19.2" cy="21.5" r="2.1" fill="#818cf8" stroke="#090e1a" stroke-width="1" />
-                                <circle cx="29" cy="22" r="2.1" fill="#fbbf24" stroke="#090e1a" stroke-width="1" />
-                                <!-- Stylized Color Droplet / Brush Prism Badge -->
-                                <path d="M28.5 6.5C28.5 6.5 34 12.6 34 16.2C34 19.24 31.54 21.7 28.5 21.7C25.46 21.7 23 19.24 23 16.2C23 12.6 28.5 6.5 28.5 6.5Z" fill="url(#amDropGrad)" stroke="#ffffff" stroke-width="1.15" stroke-linejoin="round" />
-                                <circle cx="27.2" cy="15.5" r="1.2" fill="#ffffff" fill-opacity="0.85" />
-                            </svg>
+                            <svg class="w-7 h-7 automap-mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AutoMap folded map">
+                            <path d="M4 8l8-4 8 4 8-4v20l-8 4-8-4-8 4V8Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                            <path d="M12 4v20M20 8v20" stroke="currentColor" stroke-width="1.5"/>
+                        </svg>
                         </div>
                     </div>
                     <div>
                         <div class="flex items-center gap-2">
-                            <h3 class="font-display font-bold text-base text-white">Color Filling Studio</h3>
-                            <code class="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">map/filling.json</code>
+                            <h3 class="font-display font-medium text-base text-slate-100">Color Filling Studio</h3>
+                            <code class="text-xs font-mono px-2 py-1 rounded bg-accent-500/15 text-accent-300 border border-accent-500/30">map/filling.json</code>
                         </div>
                         <p class="text-xs text-slate-400">Interactive rule editor for <code class="text-slate-300">filling_txt</code> (Text categories) &amp; <code class="text-slate-300">filling_num</code> (Numeric intervals)</p>
                     </div>
                 </div>
-                <button type="button" onclick="closeFillingStudio()" class="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 flex items-center justify-center transition">
+                <button type="button" onclick="closeFillingStudio()" class="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-100 border border-slate-800 flex items-center justify-center transition">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
@@ -1124,26 +930,26 @@ limitations under the License.
             <!-- Modal Body -->
             <div class="p-6 overflow-y-auto flex flex-col gap-5 flex-1">
                 <!-- Smart Map Inspector & Auto-Style Control Bar -->
-                <div id="smartMapInspectorPanel" class="bg-gradient-to-r from-indigo-950/70 via-slate-900/90 to-purple-950/60 border border-indigo-500/35 rounded-xl p-4 space-y-3">
+                <div id="smartMapInspectorPanel" class="bg-slate-800 border border-accent-500/35 rounded-xl p-4 space-y-3">
                     <div class="flex flex-wrap items-center justify-between gap-3">
-                        <label class="flex items-center gap-2.5 cursor-pointer select-none">
-                            <input type="checkbox" id="autoStyleFromMapToggle" checked onchange="onAutoStyleToggleChange()" class="w-4 h-4 rounded accent-indigo-500 cursor-pointer">
+                        <label class="flex items-center gap-3 cursor-pointer select-none">
+                            <input type="checkbox" id="autoStyleFromMapToggle" checked onchange="onAutoStyleToggleChange()" class="w-4 h-4 rounded accent-accent-500 cursor-pointer">
                             <div>
-                                <div class="text-xs font-semibold text-white flex items-center gap-2">
-                                    <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+                                <div class="text-xs font-semibold text-slate-100 flex items-center gap-2">
+                                    <i class="fa-solid fa-map text-slate-400"></i>
                                     <span>Smart Map Inspector: Auto-Detect Numbers/Words, Colors &amp; Label Style</span>
                                 </div>
-                                <p class="text-[11px] text-slate-300">Automatically inspects map numbers, dates, or words to assign a harmonious palette &amp; typography style</p>
+                                <p class="text-xs text-slate-300">Automatically inspects map numbers, dates, or words to assign a harmonious palette &amp; typography style</p>
                             </div>
                         </label>
                         <div class="flex flex-wrap items-center gap-2">
                             <input type="file" id="inspectMapImageInput" accept="image/*" class="hidden" onchange="handleInspectUploadedMapImage(event)">
-                            <button type="button" id="inspectMapImageBtn" onclick="document.getElementById('inspectMapImageInput').click()" class="px-2.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-sky-300 border border-sky-500/35 text-xs font-medium transition flex items-center gap-1.5" title="Upload or pick a map image file to detect its words/numbers and style">
-                                <i class="fa-solid fa-camera-retro text-[11px]"></i>
+                            <button type="button" id="inspectMapImageBtn" onclick="document.getElementById('inspectMapImageInput').click()" class="px-3 py-2 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-medium transition flex items-center gap-2" title="Upload or pick a map image file to detect its words/numbers and style">
+                                <i class="fa-solid fa-camera-retro text-xs"></i>
                                 <span>Inspect Map Image...</span>
                             </button>
-                            <button type="button" id="autoDetectMapBtn" onclick="autoDetectMapColorsAndStyle(true)" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20">
-                                <i id="autoDetectMapIcon" class="fa-solid fa-magnifying-glass-chart text-[11px]"></i>
+                            <button type="button" id="autoDetectMapBtn" onclick="autoDetectMapColorsAndStyle(true)" class="px-3 py-2 rounded-lg bg-slate-800 text-slate-100 text-xs font-semibold transition flex items-center gap-2 ">
+                                <i id="autoDetectMapIcon" class="fa-solid fa-magnifying-glass-chart text-xs"></i>
                                 <span>Detect from Map / Topic</span>
                             </button>
                         </div>
@@ -1151,15 +957,15 @@ limitations under the License.
 
                     <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-1 border-t border-slate-800/80 items-center">
                         <div class="sm:col-span-5">
-                            <label for="fillingPaletteTheme" class="block text-[10px] font-mono uppercase tracking-wider text-slate-400 mb-1">Palette Theme Mode</label>
-                            <select id="fillingPaletteTheme" onchange="onPaletteThemeChange()" class="w-full px-2.5 py-1.5 bg-slate-950/90 border border-slate-700/90 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
-                                <option value="auto">✨ Auto Smart Theme (By Map Data &amp; Topic)</option>
+                            <label for="fillingPaletteTheme" class="block text-xs font-mono text-slate-400 mb-1">Palette Theme Mode</label>
+                            <select id="fillingPaletteTheme" onchange="onPaletteThemeChange()" class="w-full px-3 py-2 bg-slate-950/90 border border-slate-700/90 rounded-lg text-xs font-mono text-slate-100 focus:outline-none focus:border-accent-500">
+                                <option value="auto">Auto Smart Theme (By Map Data &amp; Topic)</option>
                                 <option value="viridis">Viridis (Purple → Teal → Yellow)</option>
-                                <option value="heatmap">🔥 Heatmap (Cobalt → Emerald → Crimson)</option>
-                                <option value="emerald_gold">💎 Economy Emerald-Gold (Coral → Gold → Emerald)</option>
-                                <option value="festive">🎄 Festive &amp; Dates (Royal Blue, Pine, Gold, Crimson)</option>
-                                <option value="oceanic">🌊 Oceanic (Sky → Cobalt → Violet)</option>
-                                <option value="categorical">🎨 High-Contrast Categorical (12 Vivid Swatches)</option>
+                                <option value="heatmap">Heatmap (Cobalt → Emerald → Crimson)</option>
+                                <option value="emerald_gold">Economy Emerald-Gold (Coral → Gold → Emerald)</option>
+                                <option value="festive">Festive &amp; Dates (Royal Blue, Pine, Gold, Crimson)</option>
+                                <option value="oceanic">Oceanic (Sky → Cobalt → Violet)</option>
+                                <option value="categorical">High-Contrast Categorical (12 Vivid Swatches)</option>
                                 <optgroup label="Single Color Gradients">
                                     <option value="greens">Greens</option>
                                     <option value="blues">Blues</option>
@@ -1179,8 +985,8 @@ limitations under the License.
                                 </optgroup>
                             </select>
                         </div>
-                        <div id="detectedMapStatsBar" class="sm:col-span-7 flex flex-wrap items-center gap-1.5 text-[11px] font-mono text-slate-300 bg-slate-950/75 border border-slate-800/90 rounded-lg px-3 py-2 min-h-[42px]">
-                            <span class="text-indigo-300"><i class="fa-solid fa-circle-info mr-1"></i>Click "Detect from Map / Topic" or generate a map to auto-populate rules.</span>
+                        <div id="detectedMapStatsBar" class="sm:col-span-7 flex flex-wrap items-center gap-2 text-xs font-mono text-slate-300 bg-slate-950/75 border border-slate-800/90 rounded-lg px-3 py-2 min-h-[42px]">
+                            <span class="text-accent-300"><i class="fa-solid fa-circle-info mr-1"></i>Click "Detect from Map / Topic" or generate a map to auto-populate rules.</span>
                         </div>
                     </div>
                 </div>
@@ -1192,14 +998,14 @@ limitations under the License.
                         <div class="bg-slate-950/70 border border-slate-800/90 rounded-xl p-4">
                             <div class="flex items-center justify-between mb-3">
                                 <div>
-                                    <h4 class="text-xs font-semibold text-white flex items-center gap-2">
-                                        <i class="fa-solid fa-font text-indigo-400"></i>
-                                        <span>Text Category Rules (<code class="font-mono text-indigo-300">filling_txt</code>)</span>
+                                    <h4 class="text-xs font-semibold text-slate-100 flex items-center gap-2">
+                                        <i class="fa-solid fa-font text-accent-300"></i>
+                                        <span>Text Category Rules (<code class="font-mono text-accent-300">filling_txt</code>)</span>
                                     </h4>
-                                    <p class="text-[11px] text-slate-400">Case-insensitive exact label match -> RGBA fill color</p>
+                                    <p class="text-xs text-slate-400">Case-insensitive exact label match -> RGBA fill color</p>
                                 </div>
-                                <button type="button" onclick="addTextFillingRule()" class="px-2.5 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-medium transition flex items-center gap-1">
-                                    <i class="fa-solid fa-plus text-[10px]"></i>
+                                <button type="button" onclick="addTextFillingRule()" class="px-3 py-1 rounded-lg bg-accent-600/20 hover:bg-accent-600/30 text-accent-300 border border-accent-500/30 text-xs font-medium transition flex items-center gap-1">
+                                    <i class="fa-solid fa-plus text-xs"></i>
                                     <span>Add Label</span>
                                 </button>
                             </div>
@@ -1210,14 +1016,14 @@ limitations under the License.
                         <div class="bg-slate-950/70 border border-slate-800/90 rounded-xl p-4">
                             <div class="flex items-center justify-between mb-3">
                                 <div>
-                                    <h4 class="text-xs font-semibold text-white flex items-center gap-2">
-                                        <i class="fa-solid fa-hashtag text-emerald-400"></i>
-                                        <span>Numeric Range Rules (<code class="font-mono text-emerald-300">filling_num</code>)</span>
+                                    <h4 class="text-xs font-semibold text-slate-100 flex items-center gap-2">
+                                        <i class="fa-solid fa-hashtag text-slate-400"></i>
+                                        <span>Numeric Range Rules (<code class="font-mono text-slate-400">filling_num</code>)</span>
                                     </h4>
-                                    <p class="text-[11px] text-slate-400">Matches <code class="text-slate-300">low &lt; value &lt;= high</code> -> RGBA fill color</p>
+                                    <p class="text-xs text-slate-400">Matches <code class="text-slate-300">low &lt; value &lt;= high</code> -> RGBA fill color</p>
                                 </div>
-                                <button type="button" onclick="addNumFillingRule()" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition flex items-center gap-1">
-                                    <i class="fa-solid fa-plus text-[10px]"></i>
+                                <button type="button" onclick="addNumFillingRule()" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-medium transition flex items-center gap-1">
+                                    <i class="fa-solid fa-plus text-xs"></i>
                                     <span>Add Range</span>
                                 </button>
                             </div>
@@ -1230,76 +1036,76 @@ limitations under the License.
                         <!-- Section C: Auto-Determined Map Label Style -->
                         <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-4 space-y-3">
                             <div class="flex items-center justify-between">
-                                <span class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-spell-check text-amber-400"></i>
+                                <span class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                    <i class="fa-solid fa-spell-check text-slate-400"></i>
                                     <span>Map Label Style (Auto-Tuned)</span>
                                 </span>
-                                <button type="button" id="applyDetectedStyleToFormBtn" onclick="applyRecommendedFontAndSize()" class="text-[10px] px-2 py-0.5 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 font-mono transition" title="Apply recommended font and size modifier to the main form">
+                                <button type="button" id="applyDetectedStyleToFormBtn" onclick="applyRecommendedFontAndSize()" class="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-800 text-slate-400 border border-slate-700 font-mono transition" title="Apply recommended font and size modifier to the main form">
                                     Sync Font/Size
                                 </button>
                             </div>
-                            <div class="grid grid-cols-2 gap-2.5 text-xs">
+                            <div class="grid grid-cols-2 gap-3 text-xs">
                                 <div class="p-2 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                                    <span class="text-[11px] text-slate-400">Text Fill</span>
-                                    <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-slate-400">Text Fill</span>
+                                    <div class="flex items-center gap-2">
                                         <input type="color" id="labelStyleTextColor" value="#ffffff" onchange="updateLabelStyleField('text_color', this.value)" class="w-6 h-6 rounded cursor-pointer">
-                                        <code id="labelStyleTextHex" class="text-[10px] font-mono text-slate-300">#ffffff</code>
+                                        <code id="labelStyleTextHex" class="text-xs font-mono text-slate-300">#ffffff</code>
                                     </div>
                                 </div>
                                 <div class="p-2 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                                    <span class="text-[11px] text-slate-400">Outline</span>
-                                    <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-slate-400">Outline</span>
+                                    <div class="flex items-center gap-2">
                                         <input type="color" id="labelStyleStrokeColor" value="#090d16" onchange="updateLabelStyleField('stroke_color', this.value)" class="w-6 h-6 rounded cursor-pointer">
-                                        <code id="labelStyleStrokeHex" class="text-[10px] font-mono text-slate-300">#090d16</code>
+                                        <code id="labelStyleStrokeHex" class="text-xs font-mono text-slate-300">#090d16</code>
                                     </div>
                                 </div>
                             </div>
-                            <div class="flex items-center justify-between gap-3 text-xs bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-2">
-                                <span class="text-[11px] text-slate-400 shrink-0">Stroke Width</span>
+                            <div class="flex items-center justify-between gap-3 text-xs bg-slate-900/90 border border-slate-800 rounded-lg px-3 py-2">
+                                <span class="text-xs text-slate-400 shrink-0">Stroke Width</span>
                                 <input type="range" id="labelStyleStrokeWidth" min="3" max="22" value="15" oninput="updateLabelStyleField('stroke_width', this.value)" class="flex-1 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
-                                <span id="labelStyleStrokeWidthVal" class="text-[11px] font-mono text-indigo-300 w-9 text-right">15px</span>
+                                <span id="labelStyleStrokeWidthVal" class="text-xs font-mono text-accent-300 w-9 text-right">15px</span>
                             </div>
-                            <div class="flex items-center justify-between gap-2 text-[11px] text-slate-300">
+                            <div class="flex items-center justify-between gap-2 text-xs text-slate-300">
                                 <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" id="labelStyleAutoFit" checked onchange="updateLabelStyleField('auto_fit', this.checked)" class="w-3.5 h-3.5 rounded accent-indigo-500">
+                                    <input type="checkbox" id="labelStyleAutoFit" checked onchange="updateLabelStyleField('auto_fit', this.checked)" class="w-3.5 h-3.5 rounded accent-accent-500">
                                     <span>Auto-fit &amp; center long words inside countries</span>
                                 </label>
-                                <span id="recommendedFontBadge" class="text-[10px] font-mono text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded">Font: Bips.ttf</span>
+                                <span id="recommendedFontBadge" class="text-xs font-mono text-slate-400 bg-slate-800 border border-slate-700 px-2 py-1 rounded">Font: Bips.ttf</span>
                             </div>
                         </div>
 
                         <!-- Live filling.json Output -->
                         <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-4 flex-1 flex flex-col">
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-code text-indigo-400"></i>
+                                <span class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                    <i class="fa-solid fa-code text-accent-300"></i>
                                     <span>Live <code class="font-mono">filling.json</code> Output</span>
                                 </span>
-                                <div class="flex items-center gap-1.5">
-                                    <button type="button" onclick="copyFillingJson()" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition flex items-center gap-1">
+                                <div class="flex items-center gap-2">
+                                    <button type="button" onclick="copyFillingJson()" class="text-xs px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 transition flex items-center gap-1">
                                         <i class="fa-regular fa-copy"></i>
                                         <span>Copy JSON</span>
                                     </button>
-                                    <button type="button" onclick="downloadFillingJson()" class="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-1">
+                                    <button type="button" onclick="downloadFillingJson()" class="text-xs px-3 py-1 rounded-lg bg-accent-600 hover:bg-accent-500 text-slate-100 transition flex items-center gap-1">
                                         <i class="fa-solid fa-download"></i>
                                         <span>Download</span>
                                     </button>
                                 </div>
                             </div>
-                            <pre id="fillingJsonPreview" class="flex-1 p-3 rounded-lg bg-slate-900/90 border border-slate-800 font-mono text-[11px] text-emerald-300 overflow-auto max-h-52 leading-relaxed select-all"></pre>
+                            <pre id="fillingJsonPreview" class="flex-1 p-3 rounded-lg bg-slate-900/90 border border-slate-800 font-mono text-xs text-slate-400 overflow-auto max-h-52 leading-relaxed select-all"></pre>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Modal Footer -->
-            <div class="px-6 py-3.5 border-t border-slate-800 bg-slate-950/80 flex flex-wrap items-center justify-between gap-2">
-                <button type="button" onclick="resetFillingDefaults()" class="text-xs text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5">
+            <div class="px-6 py-4 border-t border-slate-800 bg-slate-950/80 flex flex-wrap items-center justify-between gap-2">
+                <button type="button" onclick="resetFillingDefaults()" class="text-xs text-slate-400 hover:text-slate-200 transition flex items-center gap-2">
                     <i class="fa-solid fa-rotate-left"></i>
                     <span>Restore Default Palette</span>
                 </button>
                 <div class="flex items-center gap-2">
-                    <button type="button" onclick="closeFillingStudio(true)" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
+                    <button type="button" onclick="closeFillingStudio(true)" class="px-4 py-2 rounded-xl bg-accent-600 hover:bg-accent-500 text-slate-100 text-xs font-semibold transition">
                         Done &amp; Save Preview
                     </button>
                 </div>
@@ -1308,8 +1114,8 @@ limitations under the License.
     </div>
 
     <!-- Notification Toast -->
-    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none bg-slate-900/95 backdrop-blur-xl border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-medium">
-        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-colors duration-300 pointer-events-none bg-slate-900/95 border border-slate-700 text-slate-100 px-4 py-3 rounded-xl flex items-center gap-3 text-xs font-medium">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-slate-400 text-base"></i>
         <span id="toastMsg">Operation successful</span>
     </div>
 
@@ -1551,29 +1357,29 @@ limitations under the License.
 
             if (needsKeyNow) {
                 if (statusIndicator) {
-                    statusIndicator.className = 'flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/40 text-xs text-amber-300 transition-all';
+                    statusIndicator.className = 'flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/40 text-xs text-amber-300 transition-colors';
                 }
                 if (headerDot) {
-                    headerDot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse shadow-[0_0_8px_#fbbf24]';
+                    headerDot.className = 'w-2 h-2 rounded-full bg-amber-400  ';
                 }
                 if (headerText) {
                     headerText.textContent = 'API Key Needed';
                 }
                 if (stageDot) {
-                    stageDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shadow-[0_0_10px_#fbbf24] transition-colors';
+                    stageDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400   transition-colors';
                 }
             } else {
                 if (statusIndicator) {
-                    statusIndicator.className = 'flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-emerald-500/30 text-xs text-emerald-300 transition-all';
+                    statusIndicator.className = 'flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 border border-emerald-500/30 text-xs text-emerald-300 transition-colors';
                 }
                 if (headerDot) {
-                    headerDot.className = 'w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]';
+                    headerDot.className = 'w-2 h-2 rounded-full bg-emerald-400 ';
                 }
                 if (headerText) {
                     headerText.textContent = apiKeyRequired ? 'API Key Entered' : 'System Ready';
                 }
                 if (stageDot) {
-                    stageDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399] transition-colors';
+                    stageDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400  transition-colors';
                 }
             }
         }
@@ -1619,7 +1425,7 @@ limitations under the License.
             }
         }
 
-        // --- Quick Prompt Presets ---
+        // --- Prompt presets ---
         function applyPromptPreset(promptText, mode, mapType, extraOption = 'none') {
             const topicInput = document.getElementById('topicInput');
             topicInput.value = promptText;
@@ -1677,7 +1483,7 @@ limitations under the License.
             }
 
             if (btn) btn.disabled = true;
-            if (icon) icon.className = 'fa-solid fa-spinner fa-spin text-[10px]';
+            if (icon) icon.className = 'fa-solid fa-spinner fa-spin text-xs';
             if (textEl) textEl.textContent = 'Thinking...';
 
             try {
@@ -1740,14 +1546,14 @@ limitations under the License.
                 } else {
                     updateCommandPreview();
                     logToConsole(`[Idea] "${result.idea}"`, 'info');
-                    showToast('Generated new map idea!', 'success');
+                    showToast('Generated new map idea', 'success');
                 }
             } catch (error) {
                 logToConsole(`[Idea Error] ${error.message}`, 'error');
                 showToast(error.message || 'Failed to generate idea', 'error');
             } finally {
                 if (btn) btn.disabled = false;
-                if (icon) icon.className = 'fa-solid fa-lightbulb text-[10px]';
+                if (icon) icon.className = 'fa-solid fa-lightbulb text-xs';
                 if (textEl) textEl.textContent = 'Generate idea';
             }
         }
@@ -1831,11 +1637,11 @@ limitations under the License.
             }
             lastBatchResults.forEach((item, idx) => {
                 const row = document.createElement('div');
-                row.className = 'flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 transition';
+                row.className = 'flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-accent-500/50 transition';
 
                 const selectBtn = document.createElement('button');
                 selectBtn.type = 'button';
-                selectBtn.className = 'flex-1 text-left text-[11px] font-mono text-slate-200 hover:text-indigo-300 truncate';
+                selectBtn.className = 'flex-1 text-left text-xs font-mono text-slate-200 hover:text-accent-300 truncate';
                 selectBtn.title = String(item.prompt || '');
                 selectBtn.textContent = `${item.index}. ${item.prompt || ''}`;
                 selectBtn.addEventListener('click', () => selectBatchResult(idx));
@@ -1843,7 +1649,7 @@ limitations under the License.
                 const dlBtn = document.createElement('button');
                 dlBtn.type = 'button';
                 dlBtn.title = `Download ${item.filename || `map_${idx + 1}.png`}`;
-                dlBtn.className = 'text-[10px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-emerald-600/30 text-slate-300 hover:text-emerald-300 transition';
+                dlBtn.className = 'text-xs px-2 py-1 rounded bg-slate-800 hover:bg-emerald-600/30 text-slate-300 hover:text-emerald-300 transition';
                 const icon = document.createElement('i');
                 icon.className = 'fa-solid fa-download';
                 dlBtn.appendChild(icon);
@@ -1852,7 +1658,7 @@ limitations under the License.
                 row.appendChild(selectBtn);
                 if (item.duration_s !== undefined && item.duration_s !== null) {
                     const timeBadge = document.createElement('span');
-                    timeBadge.className = 'text-[10px] font-mono text-slate-400 shrink-0';
+                    timeBadge.className = 'text-xs font-mono text-slate-400 shrink-0';
                     timeBadge.textContent = `${item.duration_s}s`;
                     row.appendChild(timeBadge);
                 }
@@ -1947,7 +1753,7 @@ limitations under the License.
                 a.click();
                 a.remove();
                 URL.revokeObjectURL(url);
-                showToast(`Downloaded ${lastBatchResults.length} maps as ZIP!`, 'success');
+                showToast(`Downloaded ${lastBatchResults.length} maps as ZIP`, 'success');
             } catch (err) {
                 showToast(`ZIP download failed: ${err.message}`, 'error');
             }
@@ -1961,10 +1767,10 @@ limitations under the License.
                 loadedIdeasFile = { filename: '', text: '' };
                 if (badge) {
                     badge.textContent = 'No file';
-                    badge.className = 'text-[10px] font-mono text-slate-500 truncate max-w-[110px]';
+                    badge.className = 'text-xs font-mono text-slate-500 truncate max-w-[110px]';
                     badge.removeAttribute('title');
                 }
-                if (labelText) labelText.textContent = 'Choose or Drop CSV';
+                if (labelText) labelText.textContent = 'Choose CSV';
                 if (btn) btn.disabled = true;
                 return;
             }
@@ -1978,12 +1784,12 @@ limitations under the License.
                 if (badge) {
                     badge.textContent = file.name;
                     badge.title = file.name;
-                    badge.className = 'text-[10px] font-mono text-emerald-400 truncate max-w-[140px]';
+                    badge.className = 'text-xs font-mono text-emerald-400 truncate max-w-[140px]';
                 }
                 if (labelText) labelText.textContent = `Loaded: ${file.name}`;
                 if (btn) btn.disabled = !text.trim();
-                logToConsole(`[Batch] Loaded ideas file "${file.name}" (${text.length} chars). Click "Generate All" to render.`, 'info');
-                showToast(`Loaded "${file.name}" — ready to generate maps!`, 'info');
+                logToConsole(`[Batch] Loaded ideas file "${file.name}" (${text.length} chars). Click "Generate all" to render.`, 'info');
+                showToast(`Loaded "${file.name}" — ready to generate maps`, 'info');
             } catch (err) {
                 showToast(`Failed to read file: ${err.message}`, 'error');
             }
@@ -1997,7 +1803,7 @@ limitations under the License.
             event.preventDefault();
             event.stopPropagation();
             const zone = document.getElementById('csvDropZone');
-            if (zone) zone.classList.add('border-indigo-500', 'bg-indigo-950/30');
+            if (zone) zone.classList.add('border-accent-500', 'bg-accent-950/30');
         }
 
         function handleCsvDragLeave(event) {
@@ -2005,7 +1811,7 @@ limitations under the License.
             event.stopPropagation();
             const zone = document.getElementById('csvDropZone');
             if (zone && !zone.contains(event.relatedTarget)) {
-                zone.classList.remove('border-indigo-500', 'bg-indigo-950/30');
+                zone.classList.remove('border-accent-500', 'bg-accent-950/30');
             }
         }
 
@@ -2013,7 +1819,7 @@ limitations under the License.
             event.preventDefault();
             event.stopPropagation();
             const zone = document.getElementById('csvDropZone');
-            if (zone) zone.classList.remove('border-indigo-500', 'bg-indigo-950/30');
+            if (zone) zone.classList.remove('border-accent-500', 'bg-accent-950/30');
             const file = event.dataTransfer?.files?.[0];
             await loadIdeasFile(file);
         }
@@ -2036,12 +1842,12 @@ limitations under the License.
                 progressWrap.id = 'batchProgressWrap';
                 progressWrap.className = 'w-64 mt-3';
                 progressWrap.innerHTML = `
-                    <div class="flex justify-between text-[11px] font-mono text-slate-300 mb-1">
+                    <div class="flex justify-between text-xs font-mono text-slate-300 mb-1">
                         <span id="batchProgressLabel">Parsing CSV...</span>
                         <span id="batchProgressPct">0%</span>
                     </div>
                     <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                        <div id="batchProgressFill" class="h-full bg-indigo-500 transition-all duration-200" style="width: 0%"></div>
+                        <div id="batchProgressFill" class="h-full bg-accent-500 transition-colors duration-200" style="width: 0%"></div>
                     </div>
                 `;
                 loadingEl.appendChild(progressWrap);
@@ -2107,7 +1913,7 @@ limitations under the License.
                     if (okItems.length > 0) {
                         selectBatchResult(okItems.length - 1);
                     }
-                    showToast(`Generated ${data.succeeded}/${data.total} maps from "${loadedIdeasFile.filename}"!`, 'success');
+                    showToast(`Generated ${data.succeeded}/${data.total} maps from "${loadedIdeasFile.filename}"`, 'success');
                     return;
                 }
 
@@ -2199,7 +2005,7 @@ limitations under the License.
                 if (okItems.length > 0) {
                     selectBatchResult(okItems.length - 1);
                 }
-                showToast(`Generated ${succeeded}/${total} maps from "${loadedIdeasFile.filename}"!`, 'success');
+                showToast(`Generated ${succeeded}/${total} maps from "${loadedIdeasFile.filename}"`, 'success');
             } catch (err) {
                 logToConsole(`[Batch Error] ${err.message}`, 'error');
                 showToast(err.message || 'Batch generation failed', 'error');
@@ -2281,7 +2087,7 @@ limitations under the License.
             };
         }
 
-        // --- Sync Global Size Modifier Slider & Number Input ---
+        // --- Sync Global size modifier Slider & Number Input ---
         function updateAiTemperature(value, persist = true) {
             const parsed = Number(value);
             const temperature = Number.isFinite(parsed) ? Math.max(0, Math.min(2, parsed)) : DEFAULT_AI_TEMPERATURE;
@@ -2289,7 +2095,7 @@ limitations under the License.
             input.value = temperature;
             document.getElementById('aiTemperatureValue').textContent = Number(input.value).toFixed(2);
             const progress = Number(input.value) / 2 * 100;
-            input.style.background = `linear-gradient(to right, #818cf8 ${progress}%, #334155 ${progress}%)`;
+            input.style.background = `linear-gradient(to right, #8fb69a ${progress}%, #39393e ${progress}%)`;
             if (persist) {
                 try { localStorage.setItem(AI_TEMPERATURE_STORAGE_KEY, input.value); } catch {}
                 updateCommandPreview();
@@ -2363,10 +2169,10 @@ limitations under the License.
             const hasMostLeast = String(state.extra_option || '').includes('show_most_least');
             if ((hasMostLeast || state.highlight_extrema) && state.mode === 'text') {
                 hint.textContent = 'Note: Most/Least and Min/Max highlighting only apply in numeric mode.';
-                hint.className = 'text-[11px] text-amber-400/90 mt-1.5 block';
+                hint.className = 'text-xs text-amber-400/90 mt-2 block';
             } else if (hasMostLeast && state.map_type === 'world') {
                 hint.textContent = 'Note: show_most_least overlay is supported on default, flag, and world_countries maps.';
-                hint.className = 'text-[11px] text-amber-400/90 mt-1.5 block';
+                hint.className = 'text-xs text-amber-400/90 mt-2 block';
             } else {
                 hint.className = 'hidden';
             }
@@ -2376,11 +2182,11 @@ limitations under the License.
             const el = document.getElementById('hudCoordsText');
             if (!el) return;
             if (state.map_type === 'world') {
-                el.textContent = 'GLOBAL CONTINENTAL PROJECTION • 0.0000° N / 0.0000° E';
+                el.textContent = 'World · Continents';
             } else if (state.map_type === 'world_countries') {
-                el.textContent = 'GLOBAL COUNTRIES PROJECTION • 0.0000° N / 0.0000° E';
+                el.textContent = 'World · Countries';
             } else {
-                el.textContent = 'EUROPE ATLAS SECTOR • LAT 54.5260° N / LON 15.2551° E';
+                el.textContent = 'Europe';
             }
         }
 
@@ -2389,18 +2195,18 @@ limitations under the License.
         function updateActiveBadges(state) {
             const container = document.getElementById('activeFlagsBadges');
             const badges = [
-                { label: `mode: ${state.mode}`, color: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' },
-                { label: `map: ${state.map_type}`, color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
-                { label: `gsm: ${state.gsm}`, color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
-                { label: `eop: ${state.extra_option}`, color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
-                ...(state.show_legend ? [{ label: 'legend', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' }] : []),
-                ...(state.highlight_extrema ? [{ label: 'highlight min/max', color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' }] : []),
-                { label: state.model, color: 'bg-sky-500/20 text-sky-300 border-sky-500/30' },
-                { label: state.font, color: 'bg-slate-900/90 text-slate-300 border-slate-700' }
+                { label: `mode: ${state.mode}`, color: 'bg-slate-900/90 text-slate-400 border-slate-700' },
+                { label: `map: ${state.map_type}`, color: 'bg-slate-900/90 text-slate-400 border-slate-700' },
+                { label: `gsm: ${state.gsm}`, color: 'bg-slate-900/90 text-slate-400 border-slate-700' },
+                { label: `eop: ${state.extra_option}`, color: 'bg-slate-900/90 text-slate-400 border-slate-700' },
+                ...(state.show_legend ? [{ label: 'legend', color: 'bg-slate-900/90 text-slate-400 border-slate-700' }] : []),
+                ...(state.highlight_extrema ? [{ label: 'highlight min/max', color: 'bg-slate-900/90 text-slate-400 border-slate-700' }] : []),
+                { label: state.model, color: 'bg-slate-900/90 text-slate-400 border-slate-700' },
+                { label: state.font, color: 'bg-slate-900/90 text-slate-400 border-slate-700' }
             ];
 
             const markup = badges.map(b =>
-                `<span class="text-[11px] font-mono px-2.5 py-0.5 rounded-lg border backdrop-blur-md ${b.color}">${escapeHtml(b.label)}</span>`
+                `<span class="text-xs font-mono px-3 py-1 rounded-lg border ${b.color}">${escapeHtml(b.label)}</span>`
             ).join('');
             if (markup !== activeBadgesMarkup) {
                 container.innerHTML = markup;
@@ -2496,13 +2302,13 @@ limitations under the License.
                 el.dataset.state = nextState;
                 if (nextState === 'done') {
                     el.className = 'flex items-center justify-between text-emerald-400';
-                    el.innerHTML = `<span class="flex items-center gap-2"><i class="fa-solid fa-check text-[10px] check-pop"></i> ${title}</span><span class="text-[10px] opacity-75">Done</span>`;
+                    el.innerHTML = `<span class="flex items-center gap-2"><i class="fa-solid fa-check text-xs check-pop"></i> ${title}</span><span class="text-xs opacity-75">Done</span>`;
                 } else if (nextState === 'running') {
-                    el.className = 'flex items-center justify-between text-indigo-300';
-                    el.innerHTML = `<span class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin text-[10px]"></i> ${title}</span><span class="text-[10px] opacity-75">Running</span>`;
+                    el.className = 'flex items-center justify-between text-accent-300';
+                    el.innerHTML = `<span class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin text-xs"></i> ${title}</span><span class="text-xs opacity-75">Running</span>`;
                 } else {
                     el.className = 'flex items-center justify-between text-slate-500';
-                    el.innerHTML = `<span class="flex items-center gap-2"><i class="fa-regular fa-circle text-[10px]"></i> ${title}</span><span class="text-[10px] opacity-75">Pending</span>`;
+                    el.innerHTML = `<span class="flex items-center gap-2"><i class="fa-regular fa-circle text-xs"></i> ${title}</span><span class="text-xs opacity-75">Pending</span>`;
                 }
             }
         }
@@ -2817,7 +2623,7 @@ limitations under the License.
             paletteAnalysisPending = false;
             paletteAnalysisReady = true;
             document.getElementById('restyleCurrentMapBtn').disabled = mapRepaintPending;
-            document.getElementById('autoDetectMapIcon').className = 'fa-solid fa-magnifying-glass-chart text-[11px]';
+            document.getElementById('autoDetectMapIcon').className = 'fa-solid fa-magnifying-glass-chart text-xs';
         }
 
         function useManualFillingRules() {
@@ -2892,12 +2698,12 @@ limitations under the License.
                 const st = analysis.stats || {};
                 const samples = Array.isArray(st.sample_values) ? st.sample_values.slice(0, 6).join(', ') : '';
                 const rangeBadge = (st.min_value !== null && st.min_value !== undefined)
-                    ? `<span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Range: ${escapeHtml(st.min_value)} .. ${escapeHtml(st.max_value)}</span>`
+                    ? `<span class="px-2 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">Range: ${escapeHtml(st.min_value)} .. ${escapeHtml(st.max_value)}</span>`
                     : '';
                 statsBar.innerHTML = `
-                    <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold">Type: ${escapeHtml(analysis.detected_type || 'auto')}</span>
-                    <span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">Theme: ${escapeHtml(analysis.resolved_theme || 'auto')}</span>
-                    <span class="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">${escapeHtml(st.total_regions || 0)} regions (${escapeHtml(st.unique_values || 0)} unique)</span>
+                    <span class="px-2 py-1 rounded bg-accent-500/20 text-accent-300 border border-accent-500/30 font-semibold">Type: ${escapeHtml(analysis.detected_type || 'auto')}</span>
+                    <span class="px-2 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">Theme: ${escapeHtml(analysis.resolved_theme || 'auto')}</span>
+                    <span class="px-2 py-1 rounded bg-slate-900 text-slate-300 border border-slate-700">${escapeHtml(st.total_regions || 0)} regions (${escapeHtml(st.unique_values || 0)} unique)</span>
                     ${rangeBadge}
                     ${samples ? `<span class="text-slate-400 truncate max-w-full">On Map: <strong class="text-slate-200">${escapeHtml(samples)}</strong></span>` : ''}
                 `;
@@ -2924,7 +2730,7 @@ limitations under the License.
             document.getElementById('restyleCurrentMapBtn').disabled = true;
             const state = getFormState();
             const btnIcon = document.getElementById('autoDetectMapIcon');
-            if (btnIcon) btnIcon.className = 'fa-solid fa-circle-notch fa-spin text-[11px]';
+            if (btnIcon) btnIcon.className = 'fa-solid fa-circle-notch fa-spin text-xs';
 
             try {
                 const serverImg = document.getElementById('serverMapImage');
@@ -2966,7 +2772,7 @@ limitations under the License.
                     paletteAnalysisRequest = null;
                     paletteAnalysisPending = false;
                     document.getElementById('restyleCurrentMapBtn').disabled = mapRepaintPending || !paletteAnalysisReady;
-                    if (btnIcon) btnIcon.className = 'fa-solid fa-magnifying-glass-chart text-[11px]';
+                    if (btnIcon) btnIcon.className = 'fa-solid fa-magnifying-glass-chart text-xs';
                 }
             }
         }
@@ -3077,7 +2883,7 @@ limitations under the License.
                 } catch {
                     logToConsole('[Storage] Map was re-painted, but could not be saved for Video Studio.', 'warn');
                 }
-                showToast('Map re-painted with new colors & label style!', 'success');
+                showToast('Map re-painted with new colors & label style', 'success');
                 closeFillingStudio(false);
             } catch (err) {
                 showToast(err.message || 'Could not re-paint map', 'warn');
@@ -3116,14 +2922,14 @@ limitations under the License.
 
             if (txtList) {
                 txtList.innerHTML = fillingTxtRules.map((item, idx) => `
-                    <div class="flex items-center gap-2.5 p-2 rounded-xl bg-slate-900/90 border border-slate-800">
+                    <div class="flex items-center gap-3 p-2 rounded-xl bg-slate-900/90 border border-slate-800">
                         <input type="color" value="${item.hex}" onchange="updateTxtRule(${idx}, 'hex', this.value)"
-                            class="w-7 h-7 rounded-lg cursor-pointer shrink-0" style="box-shadow: 0 0 12px ${item.hex}66">
+                            class="w-7 h-7 rounded-lg cursor-pointer shrink-0">
                         <input type="text" value="${escapeHtml(item.key)}" oninput="updateTxtRule(${idx}, 'key', this.value)"
                             placeholder="Label (e.g. yes)"
-                            class="flex-1 min-w-0 px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-indigo-500">
-                        <span class="text-[10px] font-mono text-slate-400 hidden sm:inline">[${hexToRgbArray(item.hex, item.alpha).join(', ')}]</span>
-                        <button type="button" onclick="removeTxtRule(${idx})" class="text-slate-500 hover:text-rose-400 p-1 transition" title="Remove">
+                            class="flex-1 min-w-0 px-3 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-100 focus:outline-none focus:border-accent-500">
+                        <span class="text-xs font-mono text-slate-400 hidden sm:inline">[${hexToRgbArray(item.hex, item.alpha).join(', ')}]</span>
+                        <button type="button" onclick="removeTxtRule(${idx})" class="text-slate-500 hover:text-slate-400 p-1 transition" title="Remove">
                             <i class="fa-solid fa-trash-can text-xs"></i>
                         </button>
                     </div>
@@ -3134,15 +2940,15 @@ limitations under the License.
                 numList.innerHTML = fillingNumRules.map((item, idx) => `
                     <div class="flex items-center gap-2 p-2 rounded-xl bg-slate-900/90 border border-slate-800">
                         <input type="color" value="${item.hex}" onchange="updateNumRule(${idx}, 'hex', this.value)"
-                            class="w-7 h-7 rounded-lg cursor-pointer shrink-0" style="box-shadow: 0 0 12px ${item.hex}66">
-                        <div class="flex items-center gap-1.5 flex-1 min-w-0">
+                            class="w-7 h-7 rounded-lg cursor-pointer shrink-0">
+                        <div class="flex items-center gap-2 flex-1 min-w-0">
                             <input type="number" step="any" value="${item.low}" oninput="updateNumRule(${idx}, 'low', this.value)"
-                                class="w-20 px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-emerald-500">
+                                class="w-20 px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-100 focus:outline-none focus:border-slate-700">
                             <span class="text-xs text-slate-500 font-mono">to</span>
                             <input type="number" step="any" value="${item.high}" oninput="updateNumRule(${idx}, 'high', this.value)"
-                                class="w-24 px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-emerald-500">
+                                class="w-24 px-2 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-100 focus:outline-none focus:border-slate-700">
                         </div>
-                        <button type="button" onclick="removeNumRule(${idx})" class="text-slate-500 hover:text-rose-400 p-1 transition" title="Remove">
+                        <button type="button" onclick="removeNumRule(${idx})" class="text-slate-500 hover:text-slate-400 p-1 transition" title="Remove">
                             <i class="fa-solid fa-trash-can text-xs"></i>
                         </button>
                     </div>
@@ -3173,7 +2979,7 @@ limitations under the License.
             const allColors = [...fillingTxtRules.map(r => r.hex), ...fillingNumRules.map(r => r.hex)].slice(0, 6);
             if (miniSwatches) {
                 miniSwatches.innerHTML = isFlagMap ? '' : allColors.map(hex =>
-                    `<span class="w-4 h-4 rounded-full border border-slate-950 shadow" style="background:${hex}"></span>`
+                    `<span class="w-4 h-4 rounded-full border border-slate-950 " style="background:${hex}"></span>`
                 ).join('');
             }
             const totalRules = fillingTxtRules.length + fillingNumRules.length;
@@ -3248,7 +3054,7 @@ limitations under the License.
         function copyFillingJson() {
             const text = document.getElementById('fillingJsonPreview').textContent;
             copyTextToClipboard(text, () => {
-                showToast("filling.json copied to clipboard!", "success");
+                showToast("filling.json copied to clipboard", "success");
             });
         }
 
@@ -3283,7 +3089,7 @@ limitations under the License.
             const colorMap = {
                 cmd: 'text-emerald-400 font-semibold',
                 info: 'text-slate-300',
-                success: 'text-indigo-400 font-medium',
+                success: 'text-accent-300 font-medium',
                 warn: 'text-amber-400',
                 error: 'text-rose-400 font-semibold'
             };
@@ -3429,7 +3235,7 @@ limitations under the License.
                 const row = document.createElement('div');
                 row.dataset.historyId = item.id || '';
                 row.style.contain = 'layout style paint';
-                row.className = 'p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/60 cursor-pointer transition flex items-center gap-2.5';
+                row.className = 'p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-accent-500/60 cursor-pointer transition flex items-center gap-3';
                 row.addEventListener('click', () => restoreHistoryItem(idx));
 
                 if (item.image_url || item.thumb_url) {
@@ -3447,9 +3253,9 @@ limitations under the License.
                 const details = document.createElement('div');
                 details.className = 'min-w-0 flex-1 flex flex-col justify-between gap-1';
                 const metadata = document.createElement('div');
-                metadata.className = 'flex items-center justify-between gap-2 text-[11px]';
+                metadata.className = 'flex items-center justify-between gap-2 text-xs';
                 const topicEl = document.createElement('span');
-                topicEl.className = 'text-indigo-300 font-semibold truncate';
+                topicEl.className = 'text-accent-300 font-semibold truncate';
                 topicEl.textContent = (item.state?.topic || '').trim() || 'Untitled map';
                 const time = document.createElement('span');
                 time.className = 'text-slate-500 shrink-0';
@@ -3457,7 +3263,7 @@ limitations under the License.
                 metadata.append(topicEl, time);
 
                 const modeLine = document.createElement('div');
-                modeLine.className = 'text-[11px] font-mono text-slate-400 truncate';
+                modeLine.className = 'text-xs font-mono text-slate-400 truncate';
                 const mapLabel = String(item.state?.map_type || 'default').replace(/_/g, ' ');
                 modeLine.textContent = `${mapLabel} / ${item.state?.mode || 'text'}`;
                 details.append(metadata, modeLine);
@@ -3532,15 +3338,15 @@ limitations under the License.
             if (tab === 'console') {
                 consoleTab.classList.remove('hidden');
                 historyTab.classList.add('hidden');
-                consoleBtn.className = "text-xs font-semibold text-indigo-400 border-b-2 border-indigo-500 pb-2 -mb-2.5 flex items-center gap-1.5 transition";
-                historyBtn.className = "text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-1.5 transition";
+                consoleBtn.className = "text-xs font-semibold text-accent-300 border-b-2 border-accent-500 pb-2 -mb-2.5 flex items-center gap-2 transition";
+                historyBtn.className = "text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-2 transition";
                 if (clearConsoleBtn) clearConsoleBtn.classList.remove('hidden');
                 if (clearHistoryBtn) clearHistoryBtn.classList.add('hidden');
             } else {
                 consoleTab.classList.add('hidden');
                 historyTab.classList.remove('hidden');
-                historyBtn.className = "text-xs font-semibold text-indigo-400 border-b-2 border-indigo-500 pb-2 -mb-2.5 flex items-center gap-1.5 transition";
-                consoleBtn.className = "text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-1.5 transition";
+                historyBtn.className = "text-xs font-semibold text-accent-300 border-b-2 border-accent-500 pb-2 -mb-2.5 flex items-center gap-2 transition";
+                consoleBtn.className = "text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-2 transition";
                 if (clearConsoleBtn) clearConsoleBtn.classList.add('hidden');
                 if (clearHistoryBtn) clearHistoryBtn.classList.remove('hidden');
             }
@@ -3603,7 +3409,7 @@ limitations under the License.
                 const icon = document.getElementById('copyIcon');
                 const txt = document.getElementById('copyText');
                 icon.className = "fa-solid fa-check text-emerald-400";
-                txt.textContent = "Copied!";
+                txt.textContent = "Copied";
                 showToast("CLI command copied to clipboard", "success");
                 setTimeout(() => {
                     icon.className = "fa-regular fa-copy";
@@ -3621,8 +3427,8 @@ limitations under the License.
             msg.textContent = message;
             if (type === 'success') icon.className = "fa-solid fa-circle-check text-emerald-400 text-base";
             else if (type === 'warn') icon.className = "fa-solid fa-triangle-exclamation text-amber-400 text-base";
-            else if (type === 'error') icon.className = "fa-solid fa-circle-xmark text-rose-400 text-base";
-            else icon.className = "fa-solid fa-circle-info text-indigo-400 text-base";
+            else if (type === 'error') icon.className = "fa-solid fa-circle-xmark text-slate-400 text-base";
+            else icon.className = "fa-solid fa-circle-info text-accent-300 text-base";
 
             toast.classList.remove('translate-y-20', 'opacity-0');
             clearTimeout(window.toastTimeout);
