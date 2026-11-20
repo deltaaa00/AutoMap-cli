@@ -22,6 +22,7 @@ reports it and the UI uses that provider's browser-saved key for the request.
 
 import base64
 import io
+import json
 import math
 import os
 import re
@@ -283,6 +284,9 @@ def _auto_map_with_ai_cache(*, refresh: bool, provider: str, api_key, **kwargs):
     reuse the answer. API keys only contribute a hash to the user scope.
     Returns (buffer, cache_hit).
     """
+    if kwargs.get('ai_answer_override') is not None:
+        return auto_map(api_key=api_key, **kwargs), False
+
     temperature = kwargs.get('temperature')
     identity = ''
     try:
@@ -636,6 +640,10 @@ def generate():
         command += " --legend"
     if highlight_extrema:
         command += " --highlight-extrema"
+    label_suffix = str(data.get("label_suffix") or "").replace("\r", "").replace("\n", "")[:16]
+    if label_suffix:
+        escaped_suffix = label_suffix.replace('"', '\\"')
+        command += f' --suffix "{escaped_suffix}"'
 
     progress_id = str(data.get("progress_id") or "").strip()[:64]
     if progress_id:
@@ -650,6 +658,12 @@ def generate():
             style_kwargs["highlight_high_color"] = str(data.get("highlight_high_color") or "#00e5ff")
         if "highlight_low_color" in data:
             style_kwargs["highlight_low_color"] = str(data.get("highlight_low_color") or "#ff2daa")
+    if label_suffix:
+        style_kwargs["label_suffix"] = label_suffix
+    if isinstance(data.get("skip_label_countries"), list):
+        style_kwargs["skip_label_countries"] = [str(c) for c in data["skip_label_countries"] if str(c).strip()]
+    if isinstance(data.get("ai_answer_override"), dict):
+        style_kwargs["ai_answer_override"] = data["ai_answer_override"]
     if progress_id:
         style_kwargs["progress_callback"] = lambda stage, label: _set_map_progress(progress_id, stage, label)
     for style_key, kw_name in (
@@ -756,6 +770,8 @@ def api_generate_idea():
 
     raw_avoid = data.get("avoid_ideas")
     avoid_ideas = [str(item).strip() for item in raw_avoid if str(item).strip()][:30] if isinstance(raw_avoid, list) else []
+    raw_top = data.get("top_channel_topics")
+    top_channel_topics = [str(item).strip() for item in raw_top if str(item).strip()][:10] if isinstance(raw_top, list) else []
 
     try:
         result = generate_map_idea(
@@ -766,6 +782,7 @@ def api_generate_idea():
             available_fonts=_available_fonts(),
             temperature=temperature,
             avoid_ideas=avoid_ideas,
+            top_channel_topics=top_channel_topics,
         )
     except AIServiceError as error:
         return jsonify(status='error', error=str(error)), error.status_code
@@ -968,6 +985,11 @@ def generate_batch():
         ("label_style", "label_style"),
         ("auto_style", "auto_style"),
         ("palette_theme", "palette_theme"),
+        ("label_suffix", "label_suffix"),
+        ("show_legend", "show_legend"),
+        ("highlight_extrema", "highlight_extrema"),
+        ("highlight_high_color", "highlight_high_color"),
+        ("highlight_low_color", "highlight_low_color"),
     ):
         if style_key in data:
             base_style_kwargs[kw_name] = data[style_key]
@@ -1053,6 +1075,11 @@ def generate_batch():
             "provider": item_provider,
             "font": item_font,
             "palette_theme": item_style_kwargs.get("palette_theme", "auto"),
+            "label_suffix": item_style_kwargs.get("label_suffix", ""),
+            "show_legend": item_style_kwargs.get("show_legend", False),
+            "highlight_extrema": item_style_kwargs.get("highlight_extrema", False),
+            "highlight_high_color": item_style_kwargs.get("highlight_high_color", "#00e5ff"),
+            "highlight_low_color": item_style_kwargs.get("highlight_low_color", "#ff2daa"),
         }
         if temperature_options:
             item_payload["temperature"] = temperature_options["temperature"]
@@ -1124,6 +1151,7 @@ def api_restyle_map():
             highlight_extrema=bool(data.get("highlight_extrema", False)),
             highlight_high_color=str(data.get("highlight_high_color") or "#00e5ff"),
             highlight_low_color=str(data.get("highlight_low_color") or "#ff2daa"),
+            label_suffix=str(data.get("label_suffix") or "").replace("\r", "").replace("\n", "")[:16],
         )
     except Exception as e:  # noqa: BLE001
         return jsonify({"status": "error", "error": str(e)}), 500
@@ -1347,7 +1375,6 @@ def _render_video_request_data():
     """
     if not request.files and 'payload' not in request.form:
         return request.get_json(silent=True) or {}
-    import json
     try:
         data = json.loads(request.form.get('payload') or '{}')
     except ValueError:
@@ -1768,6 +1795,7 @@ def make_video() -> tuple[object, int]:
                 "reveal_time": reveal_time,
                 "reveal_color": str(data.get('reveal_color') or '#000000').strip(),
                 "reveal_mask": reveal_mask,
+                "reveal_clean_map_file": data.get('reveal_clean_map_file', '') if reveal_mask else '',
                 **({'render_id': data['render_id']} if data.get('render_id') is not None else {}),
             },
             # Video rendering (moviepy/ffmpeg) can take a while - allow more time.
@@ -1872,6 +1900,11 @@ def download_video():
     )
     response.call_on_close(upstream.close)
     return response
+
+
+@app.context_processor
+def _inject_agent_url() -> dict[str, str]:
+    return {"agent_url": (os.environ.get("AGENT_URL") or "http://localhost:4000").strip().rstrip("/")}
 
 
 if __name__ == "__main__":
