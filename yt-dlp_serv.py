@@ -758,6 +758,7 @@ def _build_reveal_map_clip(
     zoom_duration: float,
     reveal_time_raw: object,
     reveal_color: object = "#000000",
+    cover_map_pil=None,
 ):
     """Build a dynamic RGB + mask ``VideoClip`` for the country reveal animation."""
     import numpy as np
@@ -768,12 +769,19 @@ def _build_reveal_map_clip(
         base_pil = raw_map.convert('RGBA').resize((box_w, box_h), Image.Resampling.LANCZOS)
     base_rgba = np.array(base_pil, dtype=np.uint8)
 
+    if cover_map_pil is not None:
+        cover_resized = cover_map_pil.convert('RGBA').resize((box_w, box_h), Image.Resampling.LANCZOS)
+        cover_rgba = np.array(cover_resized, dtype=np.uint8)
+    else:
+        cover_rgba = base_rgba
+
     cover_r, cover_g, cover_b = _parse_reveal_color(reveal_color)
-    map_visible = (base_rgba[:, :, 3:4] > 0).astype(np.float32)
+    map_visible = (cover_rgba[:, :, 3:4] > 0).astype(np.float32)
     eff_mask = mask_f * map_visible
     black_pixel = np.array([float(cover_r), float(cover_g), float(cover_b), 255.0], dtype=np.float32).reshape(1, 1, 4)
     base_f = base_rgba.astype(np.float32)
-    black_f = base_f * (1.0 - eff_mask) + black_pixel * eff_mask
+    cover_f = cover_rgba.astype(np.float32)
+    black_f = cover_f * (1.0 - eff_mask) + black_pixel * eff_mask
     delta_f = black_f - base_f
     black_rgba = np.clip(np.rint(black_f), 0, 255).astype(np.uint8)
 
@@ -951,6 +959,7 @@ def make_video() -> tuple[object, int]:
         watermark_stars_custom_img = _decode_optional_image('watermark_stars_image', 'Watermark stars')
         top_left_custom_img = _decode_optional_image('top_left_sticker_image', 'Top-left sticker')
         top_right_custom_img = _decode_optional_image('top_right_sticker_image', 'Top-right sticker')
+        reveal_clean_map_img = _decode_optional_image('reveal_clean_map_file', 'Reveal clean map')
     except ValueError as ve:
         return jsonify({"status": "error", "error": str(ve)}), 400
 
@@ -1102,15 +1111,26 @@ def make_video() -> tuple[object, int]:
             else:
                 sub_arr = _subscribe_badge_image(subscribe_text, font_path, effects)
             subscribe_clip = ImageClip(sub_arr).with_duration(bg_duration)
-            if subscribe_clip.w > 728:
-                subscribe_clip = subscribe_clip.resized(width=728)
-            fade_start = min(subscribe_delay, max(0.0, bg_duration - 0.5)) if bg_duration > 1.0 else 0.0
-            fade_dur = min(0.6, max(0.15, bg_duration - fade_start)) if bg_duration > 0.4 else 0.0
-            subscribe_clip = _apply_clip_fade_in(subscribe_clip, bg_duration, fade_start=fade_start, fade_duration=fade_dur)
-            subscribe_clip = subscribe_clip.with_position(('center', accent_top))
-            dynamic_layers.add(id(subscribe_clip))
-            dynamic_fade_timing[id(subscribe_clip)] = (float(fade_start), float(fade_dur))
-            accent_height = max(accent_height, subscribe_clip.h)
+            if has_top_stickers:
+                if subscribe_clip.w > 460:
+                    subscribe_clip = subscribe_clip.resized(width=460)
+                sub_y = max(20, 20 + (140 - subscribe_clip.h) // 2)
+                fade_start = min(subscribe_delay, max(0.0, bg_duration - 0.5)) if bg_duration > 1.0 else 0.0
+                fade_dur = min(0.6, max(0.15, bg_duration - fade_start)) if bg_duration > 0.4 else 0.0
+                subscribe_clip = _apply_clip_fade_in(subscribe_clip, bg_duration, fade_start=fade_start, fade_duration=fade_dur)
+                subscribe_clip = subscribe_clip.with_position(('center', sub_y))
+                dynamic_layers.add(id(subscribe_clip))
+                dynamic_fade_timing[id(subscribe_clip)] = (float(fade_start), float(fade_dur))
+            else:
+                if subscribe_clip.w > 728:
+                    subscribe_clip = subscribe_clip.resized(width=728)
+                fade_start = min(subscribe_delay, max(0.0, bg_duration - 0.5)) if bg_duration > 1.0 else 0.0
+                fade_dur = min(0.6, max(0.15, bg_duration - fade_start)) if bg_duration > 0.4 else 0.0
+                subscribe_clip = _apply_clip_fade_in(subscribe_clip, bg_duration, fade_start=fade_start, fade_duration=fade_dur)
+                subscribe_clip = subscribe_clip.with_position(('center', accent_top))
+                dynamic_layers.add(id(subscribe_clip))
+                dynamic_fade_timing[id(subscribe_clip)] = (float(fade_start), float(fade_dur))
+                accent_height = max(accent_height, subscribe_clip.h)
         map_top = accent_top + accent_height + gap if accent_height else accent_top
 
         branded = bool(watermark_image is not None or watermark_text or has_stars)
@@ -1159,6 +1179,7 @@ def make_video() -> tuple[object, int]:
                 zoom_duration,
                 data.get('reveal_time'),
                 data.get('reveal_color', '#000000'),
+                cover_map_pil=reveal_clean_map_img,
             )
             if effects:
                 map_y -= 24
