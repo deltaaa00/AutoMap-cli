@@ -516,10 +516,21 @@ def generate_map_idea(
     available_fonts: list[str] | tuple[str, ...] | None = None,
     temperature: float | None = None,
     avoid_ideas: list[str] | tuple[str, ...] | None = None,
+    top_channel_topics: list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, object]:
     """Generate a single map idea (and optionally matching map parameters) via the selected AI model."""
     sampled_examples = random.sample(IDEA_EXAMPLES, min(6, len(IDEA_EXAMPLES)))
     examples_block = "\n".join(f'- "{ex}"' for ex in sampled_examples)
+    cleaned_top = [str(item).strip() for item in (top_channel_topics or ()) if str(item).strip()][:10]
+    top_block = ""
+    if cleaned_top:
+        top_lines = "\n".join(f'- "{item}"' for item in cleaned_top)
+        top_block = (
+            "\n\nCHANNEL PERFORMANCE CONTEXT — These topics got the MOST views on this YouTube channel. "
+            "Use them as inspiration for curiosity, vibe, and audience appeal, and generate a NEW topic "
+            "that fits what this audience loves:\n"
+            f"{top_lines}"
+        )
     cleaned_avoid = [str(item).strip() for item in (avoid_ideas or ()) if str(item).strip()][:30]
     avoid_keys = {_normalize_idea_key(item) for item in cleaned_avoid}
     avoid_block = ""
@@ -547,6 +558,7 @@ def generate_map_idea(
                 f"Generate 1 fresh, creative map topic idea focused on: {focus_category} (variation #{nonce}).\n"
                 "Match the concise style of these examples without copying them:\n"
                 f"{examples_block}"
+                f"{top_block}"
                 f"{avoid_block}"
                 f"{retry_note}\n\n"
                 "Return only the idea text."
@@ -582,6 +594,7 @@ def generate_map_idea(
             f"Generate 1 fresh, creative map topic idea focused on: {focus_category} (variation #{nonce}).\n"
             "Match the concise style of these examples without copying them:\n"
             f"{examples_block}"
+            f"{top_block}"
             f"{avoid_block}"
             f"{retry_note}\n\n"
             "Return a JSON object with these exact keys:\n"

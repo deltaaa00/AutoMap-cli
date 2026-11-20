@@ -107,7 +107,9 @@ def main():
 @click.option("--temperature", type=click.FloatRange(0, 2), default=None,
               help="AI sampling randomness, from 0 to 2. Omit to use the model default.")
 @click.option("--legend", "show_legend", is_flag=True, help="Draw a color legend on the map.")
-def make(prompt, mode, map_type, size_mod, optional_feature, model, font_name, show_result, verbose, api_key, temperature, show_legend):
+@click.option("--highlight-extrema", is_flag=True, help="Highlight the highest and lowest map values.")
+@click.option("--suffix", "label_suffix", default="", help="Optional suffix appended to each country label (e.g. m, %, km).")
+def make(prompt, mode, map_type, size_mod, optional_feature, model, font_name, show_result, verbose, api_key, temperature, show_legend, highlight_extrema, label_suffix):
     """Generate a map from PROMPT and save it as result.png.
 
     Example:
@@ -122,6 +124,10 @@ def make(prompt, mode, map_type, size_mod, optional_feature, model, font_name, s
     ai_options = {}
     if show_legend:
         ai_options["show_legend"] = True
+    if highlight_extrema:
+        ai_options["highlight_extrema"] = True
+    if label_suffix:
+        ai_options["label_suffix"] = label_suffix
     if temperature is not None:
         from map.functions import validate_temperature
         try:

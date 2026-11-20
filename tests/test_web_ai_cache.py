@@ -133,6 +133,22 @@ def test_render_video_accepts_binary_multipart(monkeypatch):
     assert sent['video_title'] == 'T' and sent['duration'] == 8
 
 
+def test_explicit_map_values_bypass_cache_without_replacing_it(monkeypatch):
+    original = {'france': 10}
+    supplied = {'france': 20}
+    render = Mock(side_effect=lambda **kw: _buffer(kw.get('ai_answer_override', original)))
+    monkeypatch.setattr(web, 'auto_map', render)
+    client = web.app.test_client()
+
+    assert client.post('/api/generate', json=_body()).json['map_values'] == original
+    response = client.post('/api/generate', json=_body(ai_answer_override=supplied))
+    assert response.json['map_values'] == supplied
+    assert response.json['ai_cached'] is False
+    cached = client.post('/api/generate', json=_body()).json
+    assert cached['map_values'] == original
+    assert cached['ai_cached'] is True
+
+
 def test_combined_features_keep_precision_across_cached_requests_and_repaint(monkeypatch):
     calls = []
     raw = {'france': 1001, 'germany': 1049}

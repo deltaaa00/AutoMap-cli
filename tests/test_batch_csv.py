@@ -111,6 +111,9 @@ def test_generate_batch_forwards_temperature_zero_and_row_overrides_and_partial_
                 "ideas_text": csv_text,
                 "temperature": 0,
                 "api_key": "test-key",
+                "label_suffix": "%",
+                "show_legend": True,
+                "highlight_extrema": True,
             },
         )
 
@@ -127,6 +130,8 @@ def test_generate_batch_forwards_temperature_zero_and_row_overrides_and_partial_
     assert first_call["size_mod"] == 22
     assert first_call["optional_feature"] == "show_most_least"
     assert first_call["palette_theme"] == "ocean"
+    assert first_call["label_suffix"] == "%"
+    assert first_call["show_legend"] and first_call["highlight_extrema"]
 
     ok_item = data["results"][0]
     assert ok_item["status"] == "success"
@@ -134,6 +139,8 @@ def test_generate_batch_forwards_temperature_zero_and_row_overrides_and_partial_
     assert ok_item["map_type"] == "world"
     assert ok_item["gsm"] == 22
     assert ok_item["temperature"] == 0.0
+    assert ok_item["label_suffix"] == "%"
+    assert ok_item["show_legend"] and ok_item["highlight_extrema"]
 
     err_item = data["results"][1]
     assert err_item["status"] == "error"

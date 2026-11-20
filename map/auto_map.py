@@ -819,6 +819,8 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
              highlight_extrema: bool = False,
              highlight_high_color: str = "#00e5ff",
              highlight_low_color: str = "#ff2daa",
+             label_suffix: str = "",
+             skip_label_countries: set[str] | list[str] | tuple[str, ...] | None = None,
              progress_callback=None):
     """Create a map from an AI query and save it as ``result.png``.
 
@@ -1076,6 +1078,15 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
     region_colors: dict[int, tuple[int, int, int, int]] = {}
     numeric_region_values: dict[int, float] = {}
 
+    clean_suffix = str(label_suffix or "").replace("\r", "").replace("\n", "")[:16]
+    skip_labels_ci: set[str] = set()
+    for item in (skip_label_countries or ()):
+        s = str(item or "").strip().lower()
+        if s:
+            skip_labels_ci.add(s)
+            skip_labels_ci.add(s.replace("_", " "))
+            skip_labels_ci.add(s.replace(" ", "_"))
+
     for index, (name, points) in enumerate(dict_.items(), start=1):
         name_key = (
             _country_key(name)
@@ -1162,11 +1173,16 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         if not points:
             continue
 
+        if name_key in skip_labels_ci or str(name).strip().lower() in skip_labels_ci:
+            continue
+
         # The first fill seed also anchors the region's single label.
         x, y = points[0]
         x += label_offset_x
 
         info = str(info)
+        if clean_suffix and not info.endswith(clean_suffix):
+            info = f"{info}{clean_suffix}"
 
         if map_type == 'flag' or map_type == 'default':
             if len(info) >= 4:
@@ -1249,6 +1265,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         "raw_ai_answer": raw_ai_answer,
         "mode": mode,
         "resolved_theme": resolved_theme,
+        "label_suffix": clean_suffix,
         "filling_txt": {str(k): list(v) for k, v in effective_txt.items()},
         "filling_num": {f"({lo}, {hi})": list(v) for (lo, hi), v in effective_num.items()},
         "used_txt": {str(k): list(v) for k, v in (used_txt_rules or effective_txt).items()},
