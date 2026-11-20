@@ -1782,6 +1782,8 @@ def make_video() -> tuple[object, int]:
                 "subscribe_text": data.get('subscribe_text', 'Subscribe!'),
                 "subscribe_delay": data.get('subscribe_delay', 2.5),
                 "intro_fade": data.get('intro_fade', False),
+                "map_scale": data.get('map_scale', 1.0),
+                "map_offset_x": data.get('map_offset_x', 0.0),
                 "zoom_enabled": zoom_enabled,
                 "zoom_x": data.get('zoom_x', 0.80),
                 "zoom_y": data.get('zoom_y', 0.35),

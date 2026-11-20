@@ -1140,10 +1140,13 @@ def make_video() -> tuple[object, int]:
         scale = min(canvas_w / map_clip.w, map_area_height / map_clip.h)
         if map_clip.w >= map_clip.h:
             scale = max(canvas_w / map_clip.w, scale)
+        portrait_map = map_clip.w < map_clip.h
+        scale *= max(0.25, min(2.0, _parse_finite_float(data.get('map_scale'), 1.0)))
         map_clip = map_clip.resized(scale)
         box_w, box_h = int(map_clip.w), int(map_clip.h)
         map_y = map_top + (map_area_height - box_h) / 2
-        map_x = float(canvas_w - box_w) if box_w < canvas_w else (canvas_w - box_w) / 2.0
+        map_x = float(canvas_w - box_w) if portrait_map else (canvas_w - box_w) / 2.0
+        map_x += canvas_w * max(-1.0, min(1.0, _parse_finite_float(data.get('map_offset_x'), 0.0)))
         map_clip_x = map_x - (24 if effects else 0)
 
         zoom_enabled = bool(data.get('zoom_enabled', False))

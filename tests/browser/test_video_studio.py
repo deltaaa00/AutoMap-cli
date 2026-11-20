@@ -291,6 +291,33 @@ def test_map_fit_replacement_and_removal_release_blob_urls(studio, tmp_path):
     assert page.evaluate('window.revokedUrls.length') == 2
 
 
+def test_map_size_and_horizontal_position(studio, tmp_path):
+    page, _ = studio
+    image = tmp_path / 'map.png'
+    Image.new('RGB', (800, 400), 'green').save(image)
+    page.locator('#mapFileInput').set_input_files(str(image))
+    page.wait_for_function("document.querySelector('#stageMapPreview').naturalWidth > 0")
+    page.locator('#mapSize').fill('150')
+    page.locator('#mapOffsetX').fill('-25')
+    layout = page.evaluate('''() => {
+        const map = document.querySelector('#stageMapPreview');
+        const area = document.querySelector('#stageMapArea');
+        return {width: parseFloat(map.style.width) / area.clientWidth,
+                left: parseFloat(map.style.left) / area.clientWidth,
+                settings: titleSettings(),
+                saved: JSON.parse(localStorage.getItem(VIDEO_SETTINGS_KEY))};
+    }''')
+    assert layout['width'] == pytest.approx(1.5)
+    assert layout['left'] == pytest.approx(-.25)
+    assert layout['settings']['map_scale'] == 1.5
+    assert layout['settings']['map_offset_x'] == -.25
+    assert layout['saved']['mapSize'] == '150'
+    assert layout['saved']['mapOffsetX'] == '-25'
+    page.get_by_role('button', name='Reset map size and position').click()
+    assert page.locator('#mapSize').input_value() == '100'
+    assert page.locator('#mapOffsetX').input_value() == '0'
+
+
 def test_title_color_pickers_preview_and_reset(studio):
     page, previews = studio
     assert page.locator('#titleFirstLineColor').input_value() == '#ffffff'

@@ -162,7 +162,7 @@ limitations under the License.
             align-items: center;
             justify-content: center;
         }
-        #stageMapPreview { flex: none; max-width: none; max-height: none; }
+        #stageMapPreview { position: relative; flex: none; max-width: none; max-height: none; }
         #stageEmptyPlaceholder { align-self: center; margin-inline: auto; transform: scale(3); max-width: 260px; }
 
         /* Custom Audio Control Styling */
@@ -745,6 +745,15 @@ limitations under the License.
                                 <input id="introFadeToggle" type="checkbox" onchange="saveVideoSettings()" class="accent-emerald-400">
                                 Smooth intro fade-in from black (0.0s &rarr; 0.8s)
                             </label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label for="mapSize" class="text-xs text-slate-300">Map size · <output id="mapSizeValue">100%</output>
+                                    <input id="mapSize" type="range" min="25" max="200" step="1" value="100" oninput="updateMapLayout()" class="mt-3 w-full accent-emerald-400">
+                                </label>
+                                <label for="mapOffsetX" class="text-xs text-slate-300">Move left / right · <output id="mapOffsetXValue">0%</output>
+                                    <input id="mapOffsetX" type="range" min="-100" max="100" step="1" value="0" oninput="updateMapLayout()" class="mt-3 w-full accent-emerald-400">
+                                </label>
+                            </div>
+                            <button type="button" onclick="resetMapLayout()" class="text-xs text-left text-slate-400 hover:text-slate-200">Reset map size and position</button>
                             <label class="flex items-center gap-2 text-xs text-slate-300">
                                 <input id="mapZoomToggle" type="checkbox" onchange="updateMapZoomUI(true); saveVideoSettings()" class="accent-emerald-400">
                                 Camera zoom to point on map
@@ -1374,7 +1383,7 @@ limitations under the License.
         const VIDEO_SETTING_IDS = ['musicUrlInput', 'musicCookiesInput', 'cutStartInput', 'cutDurationInput',
             'videoTitleInput', 'titleFontSelect', 'titleFontSize', 'titleFirstLineColor',
             'titleOtherLinesColor', 'titleUppercase', 'visualEffects', 'introFadeToggle',
-            'mapZoomToggle', 'mapZoomX', 'mapZoomY', 'mapZoomCountry', 'mapZoomCountryKey',
+            'mapSize', 'mapOffsetX', 'mapZoomToggle', 'mapZoomX', 'mapZoomY', 'mapZoomCountry', 'mapZoomCountryKey',
             'mapZoomScale', 'mapZoomStart', 'mapZoomDuration', 'mapZoomOutToggle', 'mapZoomOutDuration', 'revealCountryToggle', 'revealTimeInput', 'revealColorInput',
             'topLeftStickerSelect', 'topRightStickerSelect', 'subscribeBadgeToggle',
             'subscribeTextInput', 'subscribeDelayInput', 'watermarkTextInput',
@@ -1443,6 +1452,7 @@ limitations under the License.
                 // Invalid or unavailable saved settings should not prevent opening the studio.
             }
             videoSettingsReady = true;
+            updateMapLayout();
             if (isDynamicStickerValue(document.getElementById('topLeftStickerSelect').value) ||
                 isDynamicStickerValue(document.getElementById('topRightStickerSelect').value)) {
                 document.getElementById('autoStickerVariantsBox').classList.remove('hidden');
@@ -2183,6 +2193,8 @@ limitations under the License.
                 title_uppercase: document.getElementById('titleUppercase').checked,
                 visual_effects: document.getElementById('visualEffects').checked,
                 intro_fade: document.getElementById('introFadeToggle').checked,
+                map_scale: Number(document.getElementById('mapSize').value) / 100,
+                map_offset_x: Number(document.getElementById('mapOffsetX').value) / 100,
                 zoom_enabled: document.getElementById('mapZoomToggle').checked,
                 zoom_x: Number(document.getElementById('mapZoomX').value || 0.80),
                 zoom_y: Number(document.getElementById('mapZoomY').value || 0.35),
@@ -2383,12 +2395,28 @@ limitations under the License.
             });
         }
 
+        function updateMapLayout() {
+            document.getElementById('mapSizeValue').textContent = `${document.getElementById('mapSize').value}%`;
+            document.getElementById('mapOffsetXValue').textContent = `${document.getElementById('mapOffsetX').value}%`;
+            fitStageMap();
+            renderPreviewFrame(previewAnimTime);
+            saveVideoSettings();
+        }
+
+        function resetMapLayout() {
+            document.getElementById('mapSize').value = '100';
+            document.getElementById('mapOffsetX').value = '0';
+            updateMapLayout();
+        }
+
         function fitStageMap() {
             const map = document.getElementById('stageMapPreview');
             const area = document.getElementById('stageMapArea');
             if (!map.naturalWidth || !map.naturalHeight) return;
             area.style.justifyContent = map.naturalWidth < map.naturalHeight ? 'flex-end' : 'center';
-            const scale = Math.min(area.clientWidth / map.naturalWidth, area.clientHeight / map.naturalHeight);
+            const scale = Math.min(area.clientWidth / map.naturalWidth, area.clientHeight / map.naturalHeight)
+                * Number(document.getElementById('mapSize').value) / 100;
+            map.style.left = `${area.clientWidth * Number(document.getElementById('mapOffsetX').value) / 100}px`;
             map.style.width = `${map.naturalWidth * scale}px`;
             map.style.height = `${map.naturalHeight * scale}px`;
         }
