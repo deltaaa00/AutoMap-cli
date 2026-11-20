@@ -1,0 +1,10 @@
+.env
+instance/
+__pycache__/
+*.pyc
+agent_media/backgrounds/*.mp4
+agent_media/backgrounds/*.mov
+agent_media/backgrounds/*.webm
+agent_media/music/*.mp3
+agent_media/music/*.wav
+agent_media/music/*.m4a

@@ -75,3 +75,10 @@ client_secrets*.json
 /backups/
 /storage/
 /operations/
+
+# Standalone AutoMap-agent runtime data, tokens, and media pool
+AutoMap-agent/instance/
+AutoMap-agent/agent_media/
+AutoMap-agent/.env
+AutoMap-agent/*.db
+AutoMap-agent/*token*.json

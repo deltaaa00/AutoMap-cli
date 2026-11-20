@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoMap Agent — Autonomous YouTube Shorts Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <style>
+        body { background: radial-gradient(circle at top, #0f172a 0%, #020617 65%); color: #e2e8f0; }
+        .glass { background: rgba(15, 23, 42, 0.78); backdrop-filter: blur(14px); border: 1px solid rgba(148, 163, 184, 0.14); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans antialiased">
+    <header class="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3.5">
+                <div class="relative group">
+                    <div class="absolute -inset-1 rounded-xl bg-gradient-to-r from-emerald-500 via-cyan-400 to-indigo-500 opacity-60 blur group-hover:opacity-90 transition duration-300"></div>
+                    <div class="relative w-10 h-10 rounded-xl bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 flex items-center justify-center shadow-lg border border-emerald-400/30 text-emerald-300">
+                        <i class="fa-solid fa-robot text-base"></i>
+                    </div>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold text-white leading-tight">AutoMap Agent</h1>
+                    <p class="text-[11px] text-slate-400">Autonomous YouTube Shorts Pipeline &bull; 2 videos/day &bull; A/B Learning</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <span id="agentHeartbeatBadge" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-300">Checking agent…</span>
+                <a id="mapStudioLink" href="{{ automap_public_url }}/" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                    <i class="fa-solid fa-map text-indigo-400"></i> Map Studio
+                </a>
+                <a id="videoStudioLink" href="{{ automap_public_url }}/studio" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-600/90 to-orange-600/90 hover:from-rose-500 hover:to-orange-500 text-xs font-semibold text-white flex items-center gap-1.5">
+                    <i class="fa-solid fa-clapperboard"></i> Video Studio
+                </a>
+                {% if auth_enabled %}
+                <form method="POST" action="/logout">
+                    <button type="submit" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300">
+                        Sign Out
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl w-full mx-auto px-4 py-6 space-y-6 flex-1">
+        <div id="agentToast" class="hidden fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-xl bg-slate-900 border border-emerald-500/40 text-xs font-medium text-emerald-200 shadow-2xl"></div>
+
+        <!-- Top Status + Quick Actions -->
+        <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="glass rounded-2xl p-4">
+                <div class="text-[11px] text-slate-400 uppercase tracking-wider">Pending Approval</div>
+                <div id="statPending" class="text-2xl font-bold text-amber-300 mt-1">0</div>
+                <div class="text-[11px] text-slate-500 mt-0.5">Waiting for 1-click decision</div>
+            </div>
+            <div class="glass rounded-2xl p-4">
+                <div class="text-[11px] text-slate-400 uppercase tracking-wider">Optimal Slots</div>
+                <div id="statHours" class="text-2xl font-bold text-sky-300 mt-1">14:00, 20:00</div>
+                <div id="statTz" class="text-[11px] text-slate-500 mt-0.5">Europe/Kyiv</div>
+            </div>
+            <div class="glass rounded-2xl p-4">
+                <div class="text-[11px] text-slate-400 uppercase tracking-wider">Current Series (&times;4)</div>
+                <div id="statSeries" class="text-sm font-semibold text-emerald-300 mt-1.5 truncate">—</div>
+                <div id="statPoolCounts" class="text-[11px] text-slate-500 mt-1">Backgrounds: 0 &bull; Music: 0</div>
+            </div>
+            <div class="glass rounded-2xl p-4 flex flex-col justify-between gap-2">
+                <div class="flex items-center justify-between text-[11px]">
+                    <span id="tgStatusPill" class="text-slate-400">Telegram: —</span>
+                    <span id="ytApiPill" class="text-slate-400">YT API: —</span>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="triggerGenerate()" class="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Generate Video
+                    </button>
+                    <button type="button" onclick="triggerSync()" class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition" title="Sync competitors and analytics">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Connections (Telegram + YouTube API + YouTube OAuth) & Media Pool Upload -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <section class="lg:col-span-6 glass rounded-2xl p-5 space-y-4">
+                <div class="flex items-center justify-between gap-2">
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-key text-amber-400"></i>
+                        Connections (Telegram &amp; YouTube)
+                    </h2>
+                    <span id="ytOauthBadge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-amber-300">OAuth: —</span>
+                </div>
+                <div class="space-y-2.5 text-xs">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <label class="block">
+                            <span class="text-slate-400 flex items-center justify-between">
+                                <span>Telegram Bot Token</span>
+                                <span id="secTgTokenBadge" class="hidden text-[10px] font-mono text-emerald-400">Saved</span>
+                            </span>
+                            <div class="relative mt-1">
+                                <input id="secTgToken" type="password" autocomplete="off" placeholder="123456:ABC-DEF…"
+                                    class="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                                <button type="button" onclick="toggleSecretVisibility('secTgToken', 'secTgTokenEye')"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" title="Show / hide">
+                                    <i id="secTgTokenEye" class="fa-solid fa-eye text-xs"></i>
+                                </button>
+                            </div>
+                        </label>
+                        <label class="block">
+                            <span class="text-slate-400 flex items-center justify-between">
+                                <span>Telegram Chat ID</span>
+                                <span id="secTgChatIdBadge" class="hidden text-[10px] font-mono text-emerald-400">Saved</span>
+                            </span>
+                            <div class="relative mt-1">
+                                <input id="secTgChatId" type="password" autocomplete="off" placeholder="Your numeric ID from @userinfobot"
+                                    class="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                                <button type="button" onclick="toggleSecretVisibility('secTgChatId', 'secTgChatIdEye')"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" title="Show / hide">
+                                    <i id="secTgChatIdEye" class="fa-solid fa-eye text-xs"></i>
+                                </button>
+                            </div>
+                        </label>
+                    </div>
+                    <label class="block">
+                        <span class="text-slate-400 flex items-center justify-between">
+                            <span>YouTube Data API Key (for competitors &amp; stats)</span>
+                            <span id="secYtApiKeyBadge" class="hidden text-[10px] font-mono text-emerald-400">Saved</span>
+                        </span>
+                        <div class="relative mt-1">
+                            <input id="secYtApiKey" type="password" autocomplete="off" placeholder="AIza…"
+                                class="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                            <button type="button" onclick="toggleSecretVisibility('secYtApiKey', 'secYtApiKeyEye')"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" title="Show / hide">
+                                <i id="secYtApiKeyEye" class="fa-solid fa-eye text-xs"></i>
+                            </button>
+                        </div>
+                    </label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <label class="block">
+                            <span class="text-slate-400 flex items-center justify-between">
+                                <span>Gemini API Key (AI maps)</span>
+                                <span id="secGeminiApiKeyBadge" class="hidden text-[10px] font-mono text-emerald-400">Saved</span>
+                            </span>
+                            <div class="relative mt-1">
+                                <input id="secGeminiApiKey" type="password" autocomplete="off" placeholder="AIza…"
+                                    class="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                                <button type="button" onclick="toggleSecretVisibility('secGeminiApiKey', 'secGeminiApiKeyEye')"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" title="Show / hide">
+                                    <i id="secGeminiApiKeyEye" class="fa-solid fa-eye text-xs"></i>
+                                </button>
+                            </div>
+                        </label>
+                        <label class="block">
+                            <span class="text-slate-400 flex items-center justify-between">
+                                <span>DeepSeek API Key (optional)</span>
+                                <span id="secDeepseekApiKeyBadge" class="hidden text-[10px] font-mono text-emerald-400">Saved</span>
+                            </span>
+                            <div class="relative mt-1">
+                                <input id="secDeepseekApiKey" type="password" autocomplete="off" placeholder="sk-…"
+                                    class="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                                <button type="button" onclick="toggleSecretVisibility('secDeepseekApiKey', 'secDeepseekApiKeyEye')"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" title="Show / hide">
+                                    <i id="secDeepseekApiKeyEye" class="fa-solid fa-eye text-xs"></i>
+                                </button>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" onclick="saveSecrets()" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition">
+                            Save Keys
+                        </button>
+                        <button type="button" onclick="testTelegram()" class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 font-semibold transition">
+                            <i class="fa-brands fa-telegram mr-1"></i> Test Telegram
+                        </button>
+                    </div>
+                </div>
+                <div class="pt-3 border-t border-slate-800/80 space-y-2.5 text-xs">
+                    <div class="font-semibold text-rose-300 flex items-center gap-1.5">
+                        <i class="fa-brands fa-youtube"></i> Agent YouTube OAuth (Upload + Analytics)
+                    </div>
+                    <p class="text-[11px] text-slate-400 break-all">
+                        Web Redirect URI: <code id="agentRedirectUri" class="text-slate-200">…</code>
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input id="agentYtSecretFile" type="file" accept=".json,application/json" class="text-[11px] text-slate-300 flex-1 min-w-0">
+                        <button type="button" onclick="connectAgentYouTube()" class="px-3 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white font-semibold transition">
+                            Connect YouTube
+                        </button>
+                        <button type="button" id="agentYtDisconnectBtn" onclick="disconnectAgentYouTube()" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold">
+                            Disconnect
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="lg:col-span-6 glass rounded-2xl p-5 space-y-4">
+                <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-film text-purple-400"></i>
+                    Media Pool (4-video series)
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-3 space-y-2">
+                        <div class="font-semibold text-slate-200">Background Videos (.mp4/.mov/.webm, &le;15 MB)</div>
+                        <input id="bgUploadInput" type="file" accept=".mp4,.mov,.webm,video/*" multiple class="block w-full text-[11px] text-slate-300">
+                        <button type="button" onclick="uploadMedia('background')" class="w-full py-1.5 rounded-lg bg-indigo-600/85 hover:bg-indigo-500 text-white font-semibold">
+                            Upload Backgrounds
+                        </button>
+                        <ul id="bgFilesList" class="space-y-1 max-h-28 overflow-y-auto text-[11px] font-mono text-slate-300"></ul>
+                    </div>
+                    <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-3 space-y-2">
+                        <div class="font-semibold text-slate-200">Music Tracks (.mp3/.wav/.m4a, &le;15 MB)</div>
+                        <input id="musicUploadInput" type="file" accept=".mp3,.wav,.m4a,.aac,.ogg,.flac,audio/*" multiple class="block w-full text-[11px] text-slate-300">
+                        <button type="button" onclick="uploadMedia('music')" class="w-full py-1.5 rounded-lg bg-emerald-600/85 hover:bg-emerald-500 text-white font-semibold">
+                            Upload Music
+                        </button>
+                        <ul id="musicFilesList" class="space-y-1 max-h-28 overflow-y-auto text-[11px] font-mono text-slate-300"></ul>
+                    </div>
+                </div>
+                <div class="flex gap-2 text-xs">
+                    <input id="musicUrlInput" type="url" placeholder="Or paste a YouTube URL to import a track into the music pool…"
+                        class="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white">
+                    <button type="button" onclick="importMusicByUrl()" class="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold shrink-0">
+                        <i class="fa-solid fa-music mr-1"></i> Import
+                    </button>
+                </div>
+            </section>
+        </div>
+
+        <!-- Pending Approval Queue -->
+        <section class="glass rounded-2xl p-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-circle-check text-amber-400"></i>
+                    Approval Queue (1-Click)
+                </h2>
+                <button type="button" onclick="loadOverview()" class="text-xs text-slate-400 hover:text-white"><i class="fa-solid fa-arrows-rotate mr-1"></i>Refresh</button>
+            </div>
+            <div id="pendingQueueContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <p class="text-xs text-slate-500">Loading…</p>
+            </div>
+        </section>
+
+        <!-- A/B Leaderboard + Settings -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <section class="lg:col-span-7 glass rounded-2xl p-5 space-y-3">
+                <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-flask text-emerald-400"></i>
+                    A/B Effect Leaderboard
+                </h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="text-slate-400 border-b border-slate-800">
+                            <tr>
+                                <th class="py-2 pr-3">Effect Preset</th>
+                                <th class="py-2 px-2">Runs</th>
+                                <th class="py-2 px-2">Avg Views</th>
+                                <th class="py-2 px-2">Retention / Watch</th>
+                                <th class="py-2 px-2">Engagement</th>
+                                <th class="py-2 pl-2">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardBody" class="divide-y divide-slate-800/70"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="lg:col-span-5 glass rounded-2xl p-5 space-y-3">
+                <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-sky-400"></i>
+                    Agent Settings
+                </h2>
+                <div class="space-y-3 text-xs">
+                    <label class="block">
+                        <span class="text-slate-400">Competitor Channels (@handle or UC… comma/newline separated)</span>
+                        <textarea id="cfgCompetitors" rows="3" placeholder="@terramapper, @examplemaps"
+                            class="mt-1 w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs"></textarea>
+                    </label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="block">
+                            <span class="text-slate-400">Videos/Day</span>
+                            <input id="cfgPostsPerDay" type="number" min="1" max="6" value="2"
+                                class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                        </label>
+                        <label class="block">
+                            <span class="text-slate-400">Series Size</span>
+                            <input id="cfgSeriesSize" type="number" min="1" max="20" value="4"
+                                class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                        </label>
+                        <label class="block">
+                            <span class="text-slate-400">Timezone</span>
+                            <input id="cfgTimezone" type="text" value="Europe/Kyiv"
+                                class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="block">
+                            <span class="text-slate-400">AI Model</span>
+                            <select id="cfgModel"
+                                class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                                <option value="gemini-3.8-flash">gemini-3.8-flash</option>
+                            </select>
+                        </label>
+                        <label class="block">
+                            <span class="text-slate-400">Watermark</span>
+                            <input id="cfgWatermark" type="text" value="TERRAMAPPER"
+                                class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                        </label>
+                    </div>
+                    <label class="block">
+                        <span class="text-slate-400">AutoMap Server URL (leave blank for local Docker)</span>
+                        <input id="cfgAutomapUrl" type="url" placeholder="https://your-automap-server.com"
+                            class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                    </label>
+                    <label class="block">
+                        <span class="text-slate-400">YouTube Description Template (<code class="text-sky-300">{topic}</code> &amp; <code class="text-sky-300">{hashtags}</code>)</span>
+                        <textarea id="cfgDescTemplate" rows="3" placeholder="{topic}&#10;&#10;Subscribe for daily map shorts!&#10;&#10;{hashtags}"
+                            class="mt-1 w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs"></textarea>
+                    </label>
+                    <button type="button" onclick="saveAgentConfig()" class="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition">
+                        Save Settings
+                    </button>
+                </div>
+            </section>
+        </div>
+
+        <!-- Competitor Outliers & Music Suggestions -->
+        <section class="glass rounded-2xl p-5 space-y-3">
+            <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-fire text-rose-400"></i>
+                Competitor Viral Outliers &amp; Music Suggestions
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="text-slate-400 border-b border-slate-800">
+                        <tr>
+                            <th class="py-2 pr-3">Channel</th>
+                            <th class="py-2 px-2">Title / Idea</th>
+                            <th class="py-2 px-2">Views</th>
+                            <th class="py-2 px-2">Outlier</th>
+                            <th class="py-2 px-2">Music</th>
+                            <th class="py-2 pl-2 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="competitorsBody" class="divide-y divide-slate-800/70"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Own Channel Video Analytics -->
+        <section class="glass rounded-2xl p-5 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line text-sky-400"></i>
+                    Own Channel Video Analytics (Retention &amp; Engagement)
+                </h2>
+                <span id="ownAnalyticsSyncedAt" class="text-[11px] font-mono text-slate-400">Not synced yet</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="text-slate-400 border-b border-slate-800">
+                        <tr>
+                            <th class="py-2 pr-3">Video</th>
+                            <th class="py-2 px-2">Views</th>
+                            <th class="py-2 px-2">Retention &amp; Watch</th>
+                            <th class="py-2 px-2">Hook &rarr; End</th>
+                            <th class="py-2 px-2">Engagement</th>
+                            <th class="py-2 pl-2 text-right">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ownVideosBody" class="divide-y divide-slate-800/70"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Full Experiments History -->
+        <section class="glass rounded-2xl p-5 space-y-3">
+            <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-clock-rotate-left text-indigo-400"></i>
+                Experiment History
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="text-slate-400 border-b border-slate-800">
+                        <tr>
+                            <th class="py-2 pr-2">#</th>
+                            <th class="py-2 px-2">Topic</th>
+                            <th class="py-2 px-2">Effect</th>
+                            <th class="py-2 px-2">Status</th>
+                            <th class="py-2 px-2">Views (24h/72h)</th>
+                            <th class="py-2 px-2">Retention / Watch</th>
+                            <th class="py-2 px-2">Engagement</th>
+                            <th class="py-2 pl-2 text-right">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBody" class="divide-y divide-slate-800/70"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        function esc(str) {
+            return String(str ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+        }
+        function showAgentToast(msg, isErr = false) {
+            const el = document.getElementById('agentToast');
+            el.textContent = msg;
+            el.className = `fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-xl bg-slate-900 text-xs font-medium shadow-2xl border ${isErr ? 'border-rose-500/50 text-rose-200' : 'border-emerald-500/50 text-emerald-200'}`;
+            clearTimeout(window._agentToastTimer);
+            window._agentToastTimer = setTimeout(() => el.classList.add('hidden'), 4000);
+        }
+
+        async function loadOverview() {
+            const res = await fetch('/api/agent/overview', {cache: 'no-store'});
+            const data = await res.json();
+            if (!res.ok) { showAgentToast(data.error || 'Failed to load overview', true); return; }
+
+            const cfg = data.config || {};
+            const pool = data.media_pool || {};
+            document.getElementById('statPending').textContent = (data.pending_queue || []).length;
+            document.getElementById('statHours').textContent = (data.recommended_hours || [14, 20]).map(h => `${String(h).padStart(2,'0')}:00`).join(', ');
+            document.getElementById('statTz').textContent = cfg.timezone || 'Europe/Kyiv';
+            document.getElementById('statSeries').textContent = pool.current_background
+                ? `#${pool.series_index} (${pool.slot_in_series}/${pool.series_size}): ${pool.current_background}`
+                : 'Upload backgrounds to Media Pool';
+            document.getElementById('statPoolCounts').textContent = `Backgrounds: ${(pool.backgrounds || []).length} • Music: ${(pool.music || []).length}`;
+            document.getElementById('tgStatusPill').textContent = `Telegram: ${data.telegram_configured ? 'OK' : 'not set'}`;
+            document.getElementById('ytApiPill').textContent = `YT API: ${data.youtube_api_configured ? 'OK' : 'missing'}`;
+            document.getElementById('ytOauthBadge').textContent = data.youtube_oauth_connected ? 'OAuth: Connected' : 'OAuth: Not connected';
+            document.getElementById('ytOauthBadge').className = `text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 ${data.youtube_oauth_connected ? 'text-emerald-300' : 'text-amber-300'}`;
+            document.getElementById('agentYtDisconnectBtn').classList.toggle('hidden', !data.youtube_oauth_connected);
+            document.getElementById('agentRedirectUri').textContent = data.agent_redirect_uri || '';
+            document.getElementById('secTgTokenBadge').classList.toggle('hidden', !data.telegram_token_set);
+            document.getElementById('secTgChatIdBadge').classList.toggle('hidden', !data.telegram_chat_id);
+            document.getElementById('secYtApiKeyBadge').classList.toggle('hidden', !data.youtube_api_configured);
+            document.getElementById('secGeminiApiKeyBadge').classList.toggle('hidden', !data.gemini_api_configured);
+            document.getElementById('secDeepseekApiKeyBadge').classList.toggle('hidden', !data.deepseek_api_configured);
+            if (document.activeElement?.id !== 'secTgChatId' && data.telegram_chat_id && !document.getElementById('secTgChatId').value) {
+                document.getElementById('secTgChatId').value = data.telegram_chat_id;
+                saveLocalSecret('secTgChatId', data.telegram_chat_id);
+            }
+            const renderFileList = (elId, kind, list) => {
+                const el = document.getElementById(elId);
+                if (!el) return;
+                el.innerHTML = (list && list.length)
+                    ? list.map(name => `<li class="flex items-center justify-between gap-1 bg-slate-900/70 px-2 py-1 rounded"><span class="truncate">${esc(name)}</span><button type="button" onclick="deleteMedia('${kind}', '${esc(name)}')" class="text-rose-400 hover:text-rose-200 px-1">&times;</button></li>`).join('')
+                    : '<li class="text-slate-500">Empty</li>';
+            };
+            renderFileList('bgFilesList', 'background', pool.backgrounds || []);
+            renderFileList('musicFilesList', 'music', pool.music || []);
+            document.getElementById('agentHeartbeatBadge').textContent = cfg.last_heartbeat_at
+                ? `Agent Active (${cfg.last_heartbeat_at.slice(11, 19)} UTC)`
+                : 'Agent not reported yet';
+
+            if (document.activeElement?.tagName !== 'TEXTAREA' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'SELECT') {
+                document.getElementById('cfgCompetitors').value = (cfg.competitor_channels || []).join(', ');
+                document.getElementById('cfgPostsPerDay').value = cfg.posts_per_day || 2;
+                document.getElementById('cfgSeriesSize').value = cfg.series_size || 4;
+                document.getElementById('cfgTimezone').value = cfg.timezone || 'Europe/Kyiv';
+                const modelSel = document.getElementById('cfgModel');
+                const models = Array.isArray(data.available_models) && data.available_models.length
+                    ? [...data.available_models]
+                    : ['gemini-3.8-flash'];
+                const currentModel = cfg.ai_model || models[0];
+                if (currentModel && !models.includes(currentModel)) {
+                    models.unshift(currentModel);
+                }
+                modelSel.innerHTML = models
+                    .map(m => `<option value="${esc(m)}">${esc(m)}</option>`)
+                    .join('');
+                modelSel.value = currentModel;
+                document.getElementById('cfgWatermark').value = cfg.watermark_text || '';
+                document.getElementById('cfgAutomapUrl').value = cfg.automap_url || '';
+                document.getElementById('cfgDescTemplate').value = cfg.description_template || '{topic}\n\n{hashtags}';
+            }
+            if (data.automap_public_url) {
+                document.getElementById('mapStudioLink').href = `${data.automap_public_url}/`;
+                document.getElementById('videoStudioLink').href = `${data.automap_public_url}/studio`;
+            }
+
+            // Pending queue
+            const qBox = document.getElementById('pendingQueueContainer');
+            const queue = data.pending_queue || [];
+            if (!queue.length) {
+                qBox.innerHTML = '<p class="text-xs text-slate-500">Queue is empty — click "Generate Video" or wait for the next scheduled slot.</p>';
+            } else {
+                qBox.innerHTML = queue.map(exp => `
+                    <div class="rounded-xl bg-slate-950/80 border border-slate-800 p-4 flex flex-col sm:flex-row gap-4">
+                        <video controls playsinline class="w-full sm:w-36 aspect-[9/16] rounded-lg bg-black object-contain shrink-0" src="/api/agent/video/${exp.id}"></video>
+                        <div class="flex-1 min-w-0 flex flex-col justify-between gap-3">
+                            <div class="space-y-1">
+                                <div class="text-[11px] font-mono text-amber-300">Short #${exp.id} • ${esc(exp.arm)}</div>
+                                <div class="text-sm font-semibold text-white">${esc(exp.topic)}</div>
+                                <p class="text-[11px] text-slate-400">${esc(exp.rationale)}</p>
+                                <div class="text-[10px] font-mono text-slate-500">
+                                    BG: ${esc(exp.params?.background_file || '—')} • Music: ${esc(exp.params?.music_file || 'none')}
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap gap-1.5">
+                                <button onclick="expAction(${exp.id}, 'publish')" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold">✅ Publish</button>
+                                <button onclick="expAction(${exp.id}, 'schedule')" class="px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-[11px] font-semibold">🕒 Schedule</button>
+                                <button onclick="expAction(${exp.id}, 'private')" class="px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-semibold">🔒 Private</button>
+                                <button onclick="expAction(${exp.id}, 'regenerate')" class="px-2.5 py-1.5 rounded-lg bg-amber-600/80 hover:bg-amber-500 text-white text-[11px] font-semibold">🔄 Regenerate</button>
+                                <button onclick="expAction(${exp.id}, 'reject')" class="px-2.5 py-1.5 rounded-lg bg-rose-900/70 hover:bg-rose-800 text-rose-200 text-[11px] font-semibold">❌ Reject</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Leaderboard
+            const lb = data.leaderboard || [];
+            document.getElementById('leaderboardBody').innerHTML = lb.length
+                ? lb.map(r => {
+                    const retParts = [];
+                    if (r.avg_retention != null) retParts.push(`${r.avg_retention.toFixed(1)}%`);
+                    if (r.avg_watch_sec != null) retParts.push(`${r.avg_watch_sec.toFixed(1)}s`);
+                    if (r.avg_hook_retention != null) retParts.push(`hook ${r.avg_hook_retention.toFixed(0)}%`);
+                    const engParts = [];
+                    if (r.avg_likes != null) engParts.push(`👍${Math.round(r.avg_likes)}`);
+                    if (r.avg_comments != null) engParts.push(`💬${Math.round(r.avg_comments)}`);
+                    if (r.avg_shares != null) engParts.push(`🔁${Math.round(r.avg_shares)}`);
+                    if (r.avg_subs_gained != null) engParts.push(`+${Math.round(r.avg_subs_gained)}`);
+                    return `
+                    <tr>
+                        <td class="py-2 pr-3 font-mono text-slate-200">${esc(r.arm)}</td>
+                        <td class="py-2 px-2 text-slate-300">${r.total_runs} (${r.measured_runs || 0} measured)</td>
+                        <td class="py-2 px-2 text-slate-300">${r.avg_views != null ? Math.round(r.avg_views).toLocaleString() : '—'}</td>
+                        <td class="py-2 px-2 font-mono text-slate-300">${retParts.length ? retParts.join(' • ') : '—'}</td>
+                        <td class="py-2 px-2 font-mono text-slate-300">${engParts.length ? engParts.join(' ') : '—'}</td>
+                        <td class="py-2 pl-2 font-mono text-emerald-300">${r.avg_score != null ? r.avg_score.toFixed(1) : '—'}</td>
+                    </tr>`;
+                }).join('')
+                : '<tr><td colspan="6" class="py-4 text-slate-500">No completed experiments yet.</td></tr>';
+
+            // Own Channel Video Analytics
+            const ownSynced = cfg.own_analytics_synced_at;
+            document.getElementById('ownAnalyticsSyncedAt').textContent = ownSynced
+                ? `Synced: ${ownSynced.replace('T', ' ').slice(0, 16)} UTC`
+                : 'Not synced yet';
+            const ownVideos = Array.isArray(cfg.own_top_topics) ? cfg.own_top_topics : [];
+            document.getElementById('ownVideosBody').innerHTML = ownVideos.length
+                ? ownVideos.map(v => {
+                    const retStr = v.avg_view_pct != null ? `${Number(v.avg_view_pct).toFixed(1)}%` : '—';
+                    const watchStr = v.avg_view_duration_sec != null
+                        ? `${Number(v.avg_view_duration_sec).toFixed(1)}s${v.duration_sec ? '/' + v.duration_sec + 's' : ''}`
+                        : (v.duration_sec ? `${v.duration_sec}s` : '');
+                    const hookEnd = (v.hook_retention_pct != null || v.end_retention_pct != null)
+                        ? `${v.hook_retention_pct ?? '—'}% &rarr; ${v.end_retention_pct ?? '—'}%${v.relative_retention != null ? ` (${v.relative_retention}x)` : ''}`
+                        : '—';
+                    const netSubs = (v.subscribers_gained || 0) - (v.subscribers_lost || 0);
+                    const engStr = [
+                        `👍 ${Number(v.likes || 0).toLocaleString()}`,
+                        `💬 ${Number(v.comments || 0).toLocaleString()}`,
+                        `🔁 ${Number(v.shares || 0).toLocaleString()}`,
+                        `${netSubs >= 0 ? '+' : ''}${netSubs} subs`,
+                        v.engagement_rate != null ? `${v.engagement_rate}% ER` : '',
+                    ].filter(Boolean).join(' &bull; ');
+                    return `
+                    <tr>
+                        <td class="py-2 pr-3 text-white max-w-xs truncate"><a class="text-sky-300 hover:underline" target="_blank" rel="noopener noreferrer" href="https://youtube.com/shorts/${esc(v.video_id)}">${esc(v.title)}</a></td>
+                        <td class="py-2 px-2 font-mono text-slate-200">${Number(v.views || 0).toLocaleString()}</td>
+                        <td class="py-2 px-2 font-mono text-slate-300">${retStr}${watchStr ? ` <span class="text-slate-500">(${watchStr})</span>` : ''}</td>
+                        <td class="py-2 px-2 font-mono text-slate-300">${hookEnd}</td>
+                        <td class="py-2 px-2 font-mono text-slate-300 text-[11px]">${engStr}</td>
+                        <td class="py-2 pl-2 text-right font-mono text-emerald-300">${v.score != null ? Number(v.score).toFixed(0) : '—'}</td>
+                    </tr>`;
+                }).join('')
+                : '<tr><td colspan="6" class="py-4 text-slate-500">Connect YouTube OAuth and click Sync to load your channel video analytics.</td></tr>';
+
+            // Competitors
+            const comps = data.competitors || [];
+            document.getElementById('competitorsBody').innerHTML = comps.length
+                ? comps.map(c => `
+                    <tr>
+                        <td class="py-2 pr-3 text-slate-300">${esc(c.channel_title || c.channel_id)}</td>
+                        <td class="py-2 px-2 text-white"><a class="hover:underline" target="_blank" rel="noopener noreferrer" href="https://youtube.com/shorts/${esc(c.video_id)}">${esc(c.title)}</a></td>
+                        <td class="py-2 px-2 font-mono text-slate-300">${Number(c.views || 0).toLocaleString()}</td>
+                        <td class="py-2 px-2 font-mono ${c.outlier_ratio >= 2 ? 'text-amber-300 font-bold' : 'text-slate-400'}">${c.outlier_ratio}x</td>
+                        <td class="py-2 px-2 text-slate-400">${esc(c.music_hint || '—')}</td>
+                        <td class="py-2 pl-2 text-right">
+                            ${c.music_imported
+                                ? '<span class="text-emerald-400 font-mono">In pool</span>'
+                                : `<button onclick="importMusic(${c.id})" class="px-2.5 py-1 rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white text-[11px] font-semibold">🎵 Add Track</button>`}
+                        </td>
+                    </tr>`).join('')
+                : '<tr><td colspan="6" class="py-4 text-slate-500">Add competitor channels on the right and click refresh.</td></tr>';
+
+            // History
+            const hist = data.experiments || [];
+            document.getElementById('historyBody').innerHTML = hist.length
+                ? hist.map(e => {
+                    const retParts = [];
+                    if (e.avg_view_pct != null) retParts.push(`${e.avg_view_pct}%`);
+                    if (e.avg_view_duration_sec != null) retParts.push(`${e.avg_view_duration_sec}s${e.duration_sec ? '/' + e.duration_sec + 's' : ''}`);
+                    if (e.hook_retention_pct != null || e.end_retention_pct != null) {
+                        retParts.push(`hook ${e.hook_retention_pct ?? '—'}%&rarr;${e.end_retention_pct ?? '—'}%`);
+                    }
+                    const engParts = [];
+                    if (e.likes_72h != null) engParts.push(`👍${e.likes_72h}`);
+                    if (e.comments_72h != null) engParts.push(`💬${e.comments_72h}`);
+                    if (e.shares_72h != null) engParts.push(`🔁${e.shares_72h}`);
+                    if (e.subscribers_gained != null || e.subscribers_lost != null) {
+                        const net = (e.subscribers_gained || 0) - (e.subscribers_lost || 0);
+                        engParts.push(`${net >= 0 ? '+' : ''}${net} subs`);
+                    }
+                    return `
+                    <tr>
+                        <td class="py-2 pr-2 font-mono text-slate-400">#${e.id}</td>
+                        <td class="py-2 px-2 text-white">${e.youtube_url ? `<a class="text-sky-300 hover:underline" target="_blank" rel="noopener noreferrer" href="${esc(e.youtube_url)}">${esc(e.topic)}</a>` : esc(e.topic)}</td>
+                        <td class="py-2 px-2 font-mono text-slate-300">${esc(e.arm)}</td>
+                        <td class="py-2 px-2 font-mono text-slate-300">${esc(e.status)}</td>
+                        <td class="py-2 px-2 font-mono text-slate-300">${e.views_24h ?? '—'} / ${e.views_72h ?? '—'}</td>
+                        <td class="py-2 px-2 font-mono text-slate-300">${retParts.length ? retParts.join(' • ') : '—'}</td>
+                        <td class="py-2 px-2 font-mono text-slate-300 text-[11px]">${engParts.length ? engParts.join(' ') : '—'}</td>
+                        <td class="py-2 pl-2 text-right font-mono text-emerald-300">${e.score != null ? Number(e.score).toFixed(0) : '—'}</td>
+                    </tr>`;
+                }).join('')
+                : '<tr><td colspan="8" class="py-4 text-slate-500">History is empty.</td></tr>';
+        }
+
+        async function expAction(expId, action) {
+            const res = await fetch(`/api/agent/action/${expId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action}),
+            });
+            const data = await res.json();
+            showAgentToast(data.message || data.error || 'Done', !res.ok);
+            loadOverview();
+        }
+
+        async function triggerGenerate() {
+            const res = await fetch('/api/agent/trigger', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({}),
+            });
+            const data = await res.json();
+            showAgentToast(data.message || data.error, !res.ok);
+            loadOverview();
+        }
+
+        async function triggerSync() {
+            const res = await fetch('/api/agent/sync', {method: 'POST'});
+            const data = await res.json();
+            showAgentToast(data.message || data.error, !res.ok);
+            loadOverview();
+        }
+
+        async function importMusic(compId) {
+            const res = await fetch(`/api/agent/competitor/${compId}/import_music`, {method: 'POST'});
+            const data = await res.json();
+            showAgentToast(data.message || data.error, !res.ok);
+            loadOverview();
+        }
+
+        async function saveAgentConfig() {
+            const payload = {
+                competitor_channels: document.getElementById('cfgCompetitors').value,
+                posts_per_day: Number(document.getElementById('cfgPostsPerDay').value || 2),
+                series_size: Number(document.getElementById('cfgSeriesSize').value || 4),
+                timezone: document.getElementById('cfgTimezone').value.trim() || 'Europe/Kyiv',
+                ai_model: document.getElementById('cfgModel').value.trim() || 'gemini-3.8-flash',
+                watermark_text: document.getElementById('cfgWatermark').value.trim(),
+                automap_url: document.getElementById('cfgAutomapUrl').value.trim(),
+                description_template: document.getElementById('cfgDescTemplate').value.trim(),
+            };
+            const res = await fetch('/api/agent/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            showAgentToast(res.ok ? 'Settings saved!' : (data.error || 'Error'), !res.ok);
+            loadOverview();
+        }
+
+        const SECRET_STORAGE_KEYS = {
+            secTgToken: 'automap-agent-tg-token',
+            secTgChatId: 'automap-agent-tg-chat-id',
+            secYtApiKey: 'automap-agent-yt-api-key',
+            secGeminiApiKey: 'automap-gemini-api-key',
+            secDeepseekApiKey: 'automap-deepseek-api-key',
+        };
+
+        function saveLocalSecret(id, val) {
+            try {
+                const key = SECRET_STORAGE_KEYS[id];
+                if (!key) return;
+                if (val) localStorage.setItem(key, val);
+                else localStorage.removeItem(key);
+            } catch (_) {}
+        }
+
+        function initLocalSecrets() {
+            Object.entries(SECRET_STORAGE_KEYS).forEach(([id, storageKey]) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                try {
+                    const saved = localStorage.getItem(storageKey);
+                    if (saved) el.value = saved;
+                } catch (_) {}
+                el.addEventListener('input', () => saveLocalSecret(id, el.value.trim()));
+                el.addEventListener('change', () => saveLocalSecret(id, el.value.trim()));
+            });
+        }
+
+        function toggleSecretVisibility(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (!input || !icon) return;
+            const show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
+            icon.className = show ? 'fa-solid fa-eye-slash text-xs' : 'fa-solid fa-eye text-xs';
+        }
+
+        async function saveSecrets() {
+            const payload = {};
+            const tok = document.getElementById('secTgToken').value.trim();
+            const cid = document.getElementById('secTgChatId').value.trim();
+            const ytk = document.getElementById('secYtApiKey').value.trim();
+            const gmk = document.getElementById('secGeminiApiKey').value.trim();
+            const dsk = document.getElementById('secDeepseekApiKey').value.trim();
+            if (tok) payload.telegram_bot_token = tok;
+            if (cid) payload.telegram_chat_id = cid;
+            if (ytk) payload.youtube_api_key = ytk;
+            if (gmk) payload.gemini_api_key = gmk;
+            if (dsk) payload.deepseek_api_key = dsk;
+            if (!Object.keys(payload).length) { showAgentToast('Enter at least one key or Chat ID.', true); return; }
+            const res = await fetch('/api/agent/secrets', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                if (tok) saveLocalSecret('secTgToken', tok);
+                if (cid) saveLocalSecret('secTgChatId', cid);
+                if (ytk) saveLocalSecret('secYtApiKey', ytk);
+                if (gmk) saveLocalSecret('secGeminiApiKey', gmk);
+                if (dsk) saveLocalSecret('secDeepseekApiKey', dsk);
+                showAgentToast('Keys saved! Agent will pick them up automatically.');
+            } else {
+                showAgentToast(data.error || 'Failed to save keys', true);
+            }
+            loadOverview();
+        }
+
+        async function testTelegram() {
+            const res = await fetch('/api/agent/telegram/test', {method: 'POST'});
+            const data = await res.json();
+            showAgentToast(data.message || data.error, !res.ok);
+        }
+
+        async function connectAgentYouTube() {
+            const file = document.getElementById('agentYtSecretFile').files[0];
+            if (!file) { showAgentToast('Choose a client_secret.json file first.', true); return; }
+            const form = new FormData();
+            form.append('client_secret', file);
+            try {
+                const res = await fetch('/api/agent/youtube/connect', {method: 'POST', body: form});
+                const text = await res.text();
+                let data = {};
+                try { data = JSON.parse(text); } catch (_) {}
+                if (res.ok && data.authorization_url) {
+                    window.location.assign(data.authorization_url);
+                } else {
+                    showAgentToast(data.error || `Could not start OAuth flow (HTTP ${res.status}).`, true);
+                }
+            } catch (err) {
+                showAgentToast(err?.message || 'Network error starting OAuth flow.', true);
+            }
+        }
+
+        async function disconnectAgentYouTube() {
+            const res = await fetch('/api/agent/youtube/disconnect', {method: 'POST'});
+            const data = await res.json();
+            showAgentToast(data.message || data.error, !res.ok);
+            loadOverview();
+        }
+
+        async function uploadMedia(kind) {
+            const input = document.getElementById(kind === 'background' ? 'bgUploadInput' : 'musicUploadInput');
+            if (!input.files || !input.files.length) { showAgentToast('Select files to upload.', true); return; }
+            const form = new FormData();
+            form.append('kind', kind);
+            for (const f of input.files) form.append('files', f);
+            const res = await fetch('/api/agent/media/upload', {method: 'POST', body: form});
+            const data = await res.json();
+            if (res.ok) input.value = '';
+            showAgentToast(data.message || data.error, !res.ok);
+            loadOverview();
+        }
+
+        async function deleteMedia(kind, filename) {
+            const res = await fetch('/api/agent/media/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({kind, filename}),
+            });
+            const data = await res.json();
+            showAgentToast(data.message || data.error, !res.ok);
+            loadOverview();
+        }
+
+        async function importMusicByUrl() {
+            const input = document.getElementById('musicUrlInput');
+            const url = input.value.trim();
+            if (!url) { showAgentToast('Paste a YouTube URL first.', true); return; }
+            const res = await fetch('/api/agent/media/import_url', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({url}),
+            });
+            const data = await res.json();
+            if (res.ok) input.value = '';
+            showAgentToast(data.message || data.error, !res.ok);
+            loadOverview();
+        }
+
+        const ytOutcome = new URLSearchParams(location.search).get('youtube');
+        if (ytOutcome) {
+            showAgentToast(
+                ytOutcome === 'connected' ? 'Agent YouTube OAuth connected!' : 'Failed to connect Agent YouTube OAuth.',
+                ytOutcome !== 'connected'
+            );
+            history.replaceState(null, '', location.pathname);
+        }
+
+        initLocalSecrets();
+        loadOverview();
+        setInterval(loadOverview, 15000);
+    </script>
+</body>
+</html>

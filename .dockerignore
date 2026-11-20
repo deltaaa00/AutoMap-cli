@@ -65,3 +65,4 @@ client_secrets*.json
 /backups/
 /storage/
 /operations/
+AutoMap-agent/

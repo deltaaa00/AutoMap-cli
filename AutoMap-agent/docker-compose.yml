@@ -1,0 +1,45 @@
+services:
+  agent-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["gunicorn", "--bind", "0.0.0.0:4000", "--workers", "2", "--threads", "4", "--timeout", "120", "web:app"]
+    ports:
+      - "${AGENT_PORT:-4000}:4000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - AUTOMAP_URL=${AUTOMAP_URL:-http://host.docker.internal:3000}
+      - AUTOMAP_PUBLIC_URL=${AUTOMAP_PUBLIC_URL:-http://localhost:3000}
+      - AGENT_DB_PATH=/app/instance/agent.db
+      - AGENT_MEDIA_DIR=/app/agent_media
+      - AGENT_YOUTUBE_TOKEN_PATH=/app/instance/agent_youtube_token.json
+      - OAUTHLIB_INSECURE_TRANSPORT=${OAUTHLIB_INSECURE_TRANSPORT:-1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./instance:/app/instance
+      - ./agent_media:/app/agent_media
+    restart: unless-stopped
+
+  agent-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "agent.runner"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - AUTOMAP_URL=${AUTOMAP_URL:-http://host.docker.internal:3000}
+      - AGENT_DB_PATH=/app/instance/agent.db
+      - AGENT_MEDIA_DIR=/app/agent_media
+      - AGENT_YOUTUBE_TOKEN_PATH=/app/instance/agent_youtube_token.json
+      - AGENT_ENABLED=${AGENT_ENABLED:-TRUE}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./instance:/app/instance
+      - ./agent_media:/app/agent_media
+    restart: unless-stopped
