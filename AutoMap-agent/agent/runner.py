@@ -11,12 +11,12 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from agent.automap_client import AutoMapClient, AutoMapClientError
-from agent.db import AgentDB, utc_now_iso
-from agent.media_pool import MediaPool
-from agent.optimizer import AgentOptimizer, infer_label_suffix, render_video_description
-from agent.telegram_bot import TelegramBot
-from agent.youtube_intel import YouTubeIntel
+from .automap_client import AutoMapClient, AutoMapClientError
+from .db import AgentDB, utc_now_iso
+from .media_pool import MediaPool
+from .optimizer import AgentOptimizer, infer_label_suffix, render_video_description
+from .telegram_bot import TelegramBot
+from .youtube_intel import YouTubeIntel
 
 logging.basicConfig(
     level=logging.INFO,

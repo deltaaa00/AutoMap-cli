@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from agent.db import AgentDB
+from .db import AgentDB
 
 
 @dataclass(frozen=True)

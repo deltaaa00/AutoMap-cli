@@ -13,8 +13,8 @@ from typing import Any
 
 import requests
 
-from agent.db import AgentDB, utc_now_iso
-from agent.optimizer import compute_video_score
+from .db import AgentDB, utc_now_iso
+from .optimizer import compute_video_score
 
 log = logging.getLogger("automap-agent")
 
