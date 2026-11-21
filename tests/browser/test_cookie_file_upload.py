@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Cookies remain parseable across file import, browser storage and both APIs."""
+"""Keep YouTube cookie-file contents intact through the browser and proxy layers.
+
+Uses the shared studio fixture to import Netscape-style files and inspect the
+worker command input, including empty fields. Invalid imports must preserve the
+previous usable cookie text. External downloads are faked; no account is used.
+"""
 from http.cookiejar import MozillaCookieJar
 from pathlib import Path
 

@@ -1,3 +1,9 @@
+# Run the browser-facing web service and its private media worker.
+# Port 3000 on the host reaches Flask port 5000; web uses the internal service URL
+# for worker requests. The worker is not published on a host port in this file.
+# Named volumes retain web session/YouTube data and temporary worker media across
+# container replacement. Change build dependencies in the matching Dockerfile,
+# and recreate containers after editing environment settings.
 # Copyright 2025-2026 deltaaa00
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

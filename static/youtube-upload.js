@@ -1,3 +1,14 @@
+/**
+ * Video Studio controller for YouTube connection, metadata and upload progress.
+ *
+ * Loaded after the feature controllers listed in templates/video/scripts.html;
+ * it relies on that
+ * page's element IDs and render-completion hooks. Calls /api/youtube/* served by
+ * webapp/youtube.py. Only upload preferences belong in browser storage; Google
+ * OAuth credentials stay on the server. Status requests share session setup, and
+ * CSRF refresh retries only the explicitly identified token-rejection response.
+ * Keep rendered-video download usable when upload fails.
+ */
 /* Google credentials and OAuth tokens are never stored in browser storage. */
 let youtubeCsrf = '';
 let youtubeConnected = false;

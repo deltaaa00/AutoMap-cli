@@ -1,4 +1,12 @@
-"""HTTP client allowing automap-agent to drive AutoMap web API as a tool."""
+"""HTTP boundary between the agent and the separate AutoMap web service.
+
+The runner and CandidateVideoGenerator use AutoMapClient for idea/map generation,
+video rendering, and music downloads. AUTOMAP_URL and WEB_LOGIN/WEB_PASSWORD
+provide defaults; constructor arguments support explicit configuration and tests.
+This client owns the HTTP session and retries authentication after a 401.
+Rendering sends multipart media, while generated maps arrive as base64 data.
+Completed video downloads replace their destination atomically; server-side
+rendering and media validation remain in the AutoMap application."""
 
 from __future__ import annotations
 
@@ -162,7 +170,10 @@ class AutoMapClient:
         raise AutoMapClientError(str(error or f"render_video failed ({resp.status_code})"))
 
     def download_rendered_video(self, download_url: str, dest_path: Path) -> Path:
-        """Download the rendered MP4 from /api/download_video to a local path."""
+        """Stream an MP4 into a temporary sibling and publish it only when complete.
+
+        The destination is preserved on interrupted/empty downloads. Temporary .part
+        files are removed on all exits, including network and filesystem failures."""
         path = download_url if download_url.startswith("/") else f"/{download_url}"
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         partial = None

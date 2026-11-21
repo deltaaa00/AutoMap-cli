@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Verify AI-answer reuse without sharing credentials or losing numeric precision.
+
+Fake render buffers carry the same map_meta shape as real generation. Requests
+change visual settings, prompt/provider inputs, research budgets and short form
+to check cache identity, refresh and repaint behavior. This module also checks
+the multipart-to-worker encoding contract without external network calls.
+"""
+
+from webapp import generation, http_client
 import io
 import json
 from unittest.mock import Mock
@@ -19,14 +28,14 @@ from unittest.mock import Mock
 import pytest
 
 import main as web
-from web_ai_cache import AIResponseCache
+from webapp.cache import AIResponseCache
 
 
 @pytest.fixture(autouse=True)
 def fresh_cache():
-    web.ai_cache.clear()
+    generation.ai_cache.clear()
     yield
-    web.ai_cache.clear()
+    generation.ai_cache.clear()
 
 
 def _buffer(answer):
@@ -36,7 +45,7 @@ def _buffer(answer):
 
 
 def _body(**extra):
-    body = {'topic': 'GDP', 'mode': 'text', 'map_type': 'default', 'model': web.AVAILABLE_MODELS[0],
+    body = {'topic': 'GDP', 'mode': 'text', 'map_type': 'default', 'model': generation.AVAILABLE_MODELS[0],
             'font': 'Arial', 'api_key': 'secret-key-123'}
     body.update(extra)
     return body
@@ -49,7 +58,7 @@ def test_visual_change_reuses_cached_ai_answer(monkeypatch):
         calls.append(kwargs)
         return _buffer(kwargs.get('ai_answer_override') or {'france': 'Paris'})
 
-    monkeypatch.setattr(web, 'auto_map', render)
+    monkeypatch.setattr(generation, 'auto_map', render)
     client = web.app.test_client()
     first = client.post('/api/generate', json=_body(palette_theme='ocean')).get_json()
     second = client.post('/api/generate', json=_body(palette_theme='forest', label_style='x')).get_json()
@@ -60,7 +69,7 @@ def test_visual_change_reuses_cached_ai_answer(monkeypatch):
 
 def test_refresh_and_request_changes_bypass_cache(monkeypatch):
     render = Mock(side_effect=lambda **kw: _buffer({'a': 1}))
-    monkeypatch.setattr(web, 'auto_map', render)
+    monkeypatch.setattr(generation, 'auto_map', render)
     client = web.app.test_client()
     client.post('/api/generate', json=_body())
     client.post('/api/generate', json=_body(refresh_ai=True))
@@ -76,14 +85,14 @@ def test_cache_never_stores_api_key_and_expires(monkeypatch):
     cache.put(key, {'a': 1})
     assert 'secret-key-123' not in repr(cache._data)
     assert cache.get(key) == {'a': 1}
-    now = web.time.monotonic()
-    monkeypatch.setattr('web_ai_cache.time.monotonic', lambda: now + 11)
+    now = generation.time.monotonic()
+    monkeypatch.setattr('webapp.cache.time.monotonic', lambda: now + 11)
     assert cache.get(key) is None
 
 
 def test_search_settings_bypass_cache_but_visual_changes_reuse_it(monkeypatch):
     render = Mock(side_effect=lambda **kw: _buffer({'france': 1}))
-    monkeypatch.setattr(web, 'auto_map', render)
+    monkeypatch.setattr(generation, 'auto_map', render)
     client = web.app.test_client()
     for settings in (
         {'web_search': False},
@@ -105,7 +114,7 @@ def test_toggling_short_form_abbreviates_cached_large_numbers_on_regenerate(monk
         ans = kwargs.get('ai_answer_override') or {'ukraine': 38_000_000, 'germany': 84_500_000}
         return _buffer(ans)
 
-    monkeypatch.setattr(web, 'auto_map', render)
+    monkeypatch.setattr(generation, 'auto_map', render)
     client = web.app.test_client()
     first = client.post('/api/generate', json=_body(mode='number', extra_option='none')).get_json()
     second = client.post('/api/generate', json=_body(mode='number', extra_option='short_form')).get_json()
@@ -119,7 +128,7 @@ def test_render_video_accepts_binary_multipart(monkeypatch):
     upstream = Mock(status_code=200)
     upstream.json.return_value = {'status': 'success'}
     post = Mock(return_value=upstream)
-    monkeypatch.setattr(web.requests, 'post', post)
+    monkeypatch.setattr(http_client.worker_http, 'post', post)
     client = web.app.test_client()
     response = client.post('/api/render_video', data={
         'payload': json.dumps({'video_title': 'T', 'duration': 8}),
@@ -137,7 +146,7 @@ def test_explicit_map_values_bypass_cache_without_replacing_it(monkeypatch):
     original = {'france': 10}
     supplied = {'france': 20}
     render = Mock(side_effect=lambda **kw: _buffer(kw.get('ai_answer_override', original)))
-    monkeypatch.setattr(web, 'auto_map', render)
+    monkeypatch.setattr(generation, 'auto_map', render)
     client = web.app.test_client()
 
     assert client.post('/api/generate', json=_body()).json['map_values'] == original
@@ -156,11 +165,11 @@ def test_combined_features_keep_precision_across_cached_requests_and_repaint(mon
     def render(**kwargs):
         calls.append(kwargs)
         values = kwargs.get('ai_answer_override', raw)
-        buf = _buffer({k: web._format_short_number(v) for k, v in values.items()})
+        buf = _buffer({k: generation._format_short_number(v) for k, v in values.items()})
         buf.map_meta['raw_ai_answer'] = dict(values)
         return buf
 
-    monkeypatch.setattr(web, 'auto_map', render)
+    monkeypatch.setattr(generation, 'auto_map', render)
     client = web.app.test_client()
     body = _body(mode='number', extra_option='show_most_least,short_form')
     for _ in range(2):

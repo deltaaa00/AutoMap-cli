@@ -12,11 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Offline browser interaction tests; CDN styling is deliberately stubbed.
+"""Exercise Video Studio interactions in offline Chromium.
 
-Python API and real title rasterization run in-process. These are behavior
-checks, not visual regression tests of external Tailwind/font assets.
+The studio fixture serves the real Flask page and bridges selected fetches to
+an isolated worker, while CDN assets and expensive provider work are stubbed.
+Tests cover overlays, title previews, uploads, restored materials, progress and
+YouTube UI behavior. These are behavioral tests, not screenshot comparisons;
+shared Chromium setup lives in test_map_palettes.
 """
+from webapp import http_client
 import base64
 import json
 from urllib.parse import urlsplit
@@ -67,7 +71,7 @@ def studio(web, worker, monkeypatch):
         response.headers.update(result.headers)
         return response
 
-    monkeypatch.setattr(requests, 'post', Mock(side_effect=upstream))
+    monkeypatch.setattr(http_client.worker_http, 'post', Mock(side_effect=upstream))
     # Hardware availability is a worker capability, independent of the test host.
     monkeypatch.setattr(worker, '_available_codecs', lambda: ('libx264', 'h264_nvenc'))
     def get_upstream(url, **kwargs):
@@ -75,7 +79,7 @@ def studio(web, worker, monkeypatch):
         response = requests.Response()
         response.status_code, response._content = result.status_code, result.data
         return response
-    monkeypatch.setattr(requests, 'get', Mock(side_effect=get_upstream))
+    monkeypatch.setattr(http_client.worker_http, 'get', Mock(side_effect=get_upstream))
     context = get_browser().new_context(viewport={'width': 1200, 'height': 900})
     page = context.new_page()
     errors = []

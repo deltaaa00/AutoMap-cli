@@ -1,3 +1,7 @@
+# Define the root Docker build context, not Git tracking rules.
+# Excludes credentials, runtime data, development environments and the standalone
+# agent tree; selected bundled fonts are explicitly retained. Update this file
+# with Docker COPY paths when reorganizing assets or packages.
 # Copyright 2025-2026 deltaaa00
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

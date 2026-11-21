@@ -1,0 +1,302 @@
+{#
+   Automatic sticker variants, custom corner images, and subscribe controls. Uses sticker-
+   presets.js and overlay-images.js. Keep IDs and inline handlers aligned with static/video
+   scripts.
+#}
+<!-- Shorts Auto-Montage Overlays (Top Stickers + Animated Subscribe Pill) -->
+<div class="mt-2 pt-3 border-t border-slate-800/80 flex flex-col gap-3">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <span class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+            <i class="fa-solid fa-map text-slate-400"></i>
+            <span>Shorts Auto-Montage Overlays</span>
+            <span class="px-2 py-1 rounded bg-slate-900 text-xs font-mono font-normal text-slate-400 border border-slate-800">Optional</span>
+        </span>
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="button" id="shortsPresetBtn" onclick="applyShortsViralPreset()"
+                class="px-3 py-1 rounded-lg bg-slate-800 text-slate-400 border border-slate-700 text-xs font-mono font-semibold transition flex items-center gap-1">
+                <i class="fa-solid fa-bolt text-slate-400"></i>
+                <span>Apply Reference Video Preset</span>
+            </button>
+            <button type="button" id="clearOverlaysBtn" onclick="clearAutoMontageOverlays()"
+                class="px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-slate-400 border border-slate-700 hover:border-slate-700 text-xs font-mono font-semibold transition flex items-center gap-1">
+                <i class="fa-solid fa-rotate-left text-slate-400"></i>
+                <span>Clear Overlays</span>
+            </button>
+        </div>
+    </div>
+    <p class="text-xs text-slate-400">Optional overlays — leave as None / unchecked to render a standard map video without extra badges.</p>
+
+    <div class="flex items-center justify-between gap-2 pt-0.5">
+        <span class="text-xs font-medium text-slate-300">Top corner stickers</span>
+        <button type="button" id="autoPickStickersBtn" onclick="setAutoStickers()"
+            class="px-3 py-1 rounded-lg bg-accent-500/15 hover:bg-accent-500/25 text-accent-300 border border-accent-500/30 text-xs font-mono font-semibold transition flex items-center gap-1">
+            <span>Match stickers to title</span>
+        </button>
+    </div>
+
+    <!-- Interactive Left & Right Variant Picker for Match stickers to title -->
+    <div id="autoStickerVariantsBox" class="hidden p-3 rounded-xl bg-slate-950/90 border border-accent-500/30 flex flex-col gap-2">
+        <div class="flex items-center justify-between gap-2 text-xs">
+            <span id="autoStickerThemeLabel" class="font-mono text-accent-300">Suggested variants for title</span>
+            <button type="button" onclick="document.getElementById('autoStickerVariantsBox').classList.add('hidden')" class="text-slate-500 hover:text-slate-300">Hide</button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+                <div class="text-xs text-slate-400 mb-1">Left sticker options:</div>
+                <div id="autoLeftVariantsList" class="flex flex-wrap gap-1"></div>
+            </div>
+            <div>
+                <div class="text-xs text-slate-400 mb-1">Right sticker options:</div>
+                <div id="autoRightVariantsList" class="flex flex-wrap gap-1"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="sticker-pickers grid grid-cols-2 gap-3">
+        <div>
+            <label for="topLeftStickerSelect" class="text-xs text-slate-300">Top-left sticker
+                <select id="topLeftStickerSelect" onchange="updateAutoMontagePreview()" class="mt-1 w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100">
+                    <option value="none" selected>None (No sticker)</option>
+                    <option value="auto">Auto-match (Library)</option>
+                    <optgroup label="Generated Styles (Auto Theme)">
+                        <option value="gen_diecut:auto">Generated Die-Cut Sticker</option>
+                        <option value="gen_neon:auto">Generated Neon Badge</option>
+                        <option value="gen_stamp:auto">Generated Editorial Stamp</option>
+                    </optgroup>
+                    <optgroup label="Holiday &amp; Seasonal">
+                        <option value="santa">Santa Claus</option>
+                        <option value="gift">Festive Gift</option>
+                        <option value="snowflake">Winter Snowflake</option>
+                        <option value="pumpkin">Halloween Pumpkin</option>
+                    </optgroup>
+                    <optgroup label="Geography &amp; Travel">
+                        <option value="globe">Earth Globe</option>
+                        <option value="compass">Explorer Compass</option>
+                        <option value="pin">Map Location Pin</option>
+                        <option value="plane">Travel Airplane</option>
+                    </optgroup>
+                    <optgroup label="Economy &amp; Wealth">
+                        <option value="money">Money Bag</option>
+                        <option value="chart">Growth Chart</option>
+                        <option value="diamond">Luxury Diamond</option>
+                    </optgroup>
+                    <optgroup label="History, Power &amp; Military">
+                        <option value="crown">Royal Crown</option>
+                        <option value="shield">Defense Shield</option>
+                        <option value="swords">Crossed Swords</option>
+                    </optgroup>
+                    <optgroup label="Science &amp; Tech">
+                        <option value="rocket">Space Rocket</option>
+                        <option value="bolt">High Voltage / Energy</option>
+                    </optgroup>
+                    <optgroup label="Viral &amp; Ranking">
+                        <option value="trophy">Champion Trophy</option>
+                        <option value="fire">Viral Fire</option>
+                        <option value="star">⭐ Gold Star</option>
+                        <option value="heart">Red Heart</option>
+                        <option value="skull">Danger Skull</option>
+                    </optgroup>
+                    <optgroup label="Wildlife, Nature &amp; Weather">
+                        <option value="bear">Bear</option>
+                        <option value="paw">Animal Paw</option>
+                        <option value="tree">Forest Tree</option>
+                        <option value="wolf">Wolf</option>
+                        <option value="sun">Sun / Climate</option>
+                    </optgroup>
+                    <optgroup label="Food, Drinks &amp; Lifestyle">
+                        <option value="beer">Beer Mug</option>
+                        <option value="coffee">Coffee / Tea</option>
+                        <option value="wine">Wine Glass</option>
+                        <option value="pizza">Pizza / Food</option>
+                    </optgroup>
+                    <optgroup label="People, Sports &amp; Transport">
+                        <option value="brain">Brain / IQ</option>
+                        <option value="book">Books / Language</option>
+                        <option value="soccer">Football / Sports</option>
+                        <option value="car">Car / Transport</option>
+                    </optgroup>
+                    <optgroup label="More Nature, Science &amp; Lifestyle">
+                        <option value="mountain">Mountain</option>
+                        <option value="volcano">Volcano</option>
+                        <option value="island">Island</option>
+                        <option value="rainbow">Rainbow</option>
+                        <option value="moon">Moon</option>
+                        <option value="rain">Rain</option>
+                        <option value="robot">Robot</option>
+                        <option value="satellite">Satellite</option>
+                        <option value="laptop">Laptop</option>
+                        <option value="graduation">Graduation</option>
+                        <option value="medal">Medal</option>
+                        <option value="cat">Cat</option>
+                        <option value="dog">Dog</option>
+                        <option value="fish">Fish</option>
+                        <option value="burger">Burger</option>
+                        <option value="train">Train</option>
+                    </optgroup>
+                    <optgroup label="Society, History, Health &amp; Media">
+                        <option value="bank">Bank / Finance</option>
+                        <option value="coin">Coin / Currency</option>
+                        <option value="hospital">Hospital / Health</option>
+                        <option value="pill">Medicine / Pharma</option>
+                        <option value="family">Family / Births</option>
+                        <option value="city">City / Urban</option>
+                        <option value="castle">Castle / Heritage</option>
+                        <option value="museum">Museum / Culture</option>
+                        <option value="gamepad">Gaming / Esports</option>
+                        <option value="camera">Camera / Media</option>
+                        <option value="oil">Oil / Fossil Fuels</option>
+                        <option value="leaf">Ecology / Green</option>
+                        <option value="scales">Law / Justice</option>
+                        <option value="ship">Ship / Maritime</option>
+                    </optgroup>
+                </select>
+            </label>
+            <input id="leftStickerImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="selectLeftStickerImage(this.files[0])" class="hidden">
+            <div class="mt-2 flex items-center justify-between gap-2 text-xs">
+                <span id="leftStickerFileName" class="text-slate-500 truncate">Preset or custom file</span>
+                <div class="flex items-center gap-1 shrink-0">
+                    <button type="button" onclick="document.getElementById('leftStickerImageInput').click()" class="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-accent-300 border border-slate-700 transition">Upload file</button>
+                    <button type="button" onclick="clearLeftStickerImage()" class="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 transition">Clear</button>
+                </div>
+            </div>
+        </div>
+        <div>
+            <label for="topRightStickerSelect" class="text-xs text-slate-300">Top-right sticker
+                <select id="topRightStickerSelect" onchange="updateAutoMontagePreview()" class="mt-1 w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100">
+                    <option value="none" selected>None (No sticker)</option>
+                    <option value="auto">Auto-match (Library)</option>
+                    <optgroup label="Generated Styles (Auto Theme)">
+                        <option value="gen_diecut:auto">Generated Die-Cut Sticker</option>
+                        <option value="gen_neon:auto">Generated Neon Badge</option>
+                        <option value="gen_stamp:auto">Generated Editorial Stamp</option>
+                    </optgroup>
+                    <optgroup label="Holiday &amp; Seasonal">
+                        <option value="gift">Festive Gift</option>
+                        <option value="santa">Santa Claus</option>
+                        <option value="snowflake">Winter Snowflake</option>
+                        <option value="pumpkin">Halloween Pumpkin</option>
+                    </optgroup>
+                    <optgroup label="Geography &amp; Travel">
+                        <option value="globe">Earth Globe</option>
+                        <option value="compass">Explorer Compass</option>
+                        <option value="pin">Map Location Pin</option>
+                        <option value="plane">Travel Airplane</option>
+                    </optgroup>
+                    <optgroup label="Economy &amp; Wealth">
+                        <option value="money">Money Bag</option>
+                        <option value="chart">Growth Chart</option>
+                        <option value="diamond">Luxury Diamond</option>
+                    </optgroup>
+                    <optgroup label="History, Power &amp; Military">
+                        <option value="crown">Royal Crown</option>
+                        <option value="shield">Defense Shield</option>
+                        <option value="swords">Crossed Swords</option>
+                    </optgroup>
+                    <optgroup label="Science &amp; Tech">
+                        <option value="rocket">Space Rocket</option>
+                        <option value="bolt">High Voltage / Energy</option>
+                    </optgroup>
+                    <optgroup label="Viral &amp; Ranking">
+                        <option value="trophy">Champion Trophy</option>
+                        <option value="fire">Viral Fire</option>
+                        <option value="star">⭐ Gold Star</option>
+                        <option value="heart">Red Heart</option>
+                        <option value="skull">Danger Skull</option>
+                    </optgroup>
+                    <optgroup label="Wildlife, Nature &amp; Weather">
+                        <option value="bear">Bear</option>
+                        <option value="paw">Animal Paw</option>
+                        <option value="tree">Forest Tree</option>
+                        <option value="wolf">Wolf</option>
+                        <option value="sun">Sun / Climate</option>
+                    </optgroup>
+                    <optgroup label="Food, Drinks &amp; Lifestyle">
+                        <option value="beer">Beer Mug</option>
+                        <option value="coffee">Coffee / Tea</option>
+                        <option value="wine">Wine Glass</option>
+                        <option value="pizza">Pizza / Food</option>
+                    </optgroup>
+                    <optgroup label="People, Sports &amp; Transport">
+                        <option value="brain">Brain / IQ</option>
+                        <option value="book">Books / Language</option>
+                        <option value="soccer">Football / Sports</option>
+                        <option value="car">Car / Transport</option>
+                    </optgroup>
+                    <optgroup label="More Nature, Science &amp; Lifestyle">
+                        <option value="mountain">Mountain</option>
+                        <option value="volcano">Volcano</option>
+                        <option value="island">Island</option>
+                        <option value="rainbow">Rainbow</option>
+                        <option value="moon">Moon</option>
+                        <option value="rain">Rain</option>
+                        <option value="robot">Robot</option>
+                        <option value="satellite">Satellite</option>
+                        <option value="laptop">Laptop</option>
+                        <option value="graduation">Graduation</option>
+                        <option value="medal">Medal</option>
+                        <option value="cat">Cat</option>
+                        <option value="dog">Dog</option>
+                        <option value="fish">Fish</option>
+                        <option value="burger">Burger</option>
+                        <option value="train">Train</option>
+                    </optgroup>
+                    <optgroup label="Society, History, Health &amp; Media">
+                        <option value="bank">Bank / Finance</option>
+                        <option value="coin">Coin / Currency</option>
+                        <option value="hospital">Hospital / Health</option>
+                        <option value="pill">Medicine / Pharma</option>
+                        <option value="family">Family / Births</option>
+                        <option value="city">City / Urban</option>
+                        <option value="castle">Castle / Heritage</option>
+                        <option value="museum">Museum / Culture</option>
+                        <option value="gamepad">Gaming / Esports</option>
+                        <option value="camera">Camera / Media</option>
+                        <option value="oil">Oil / Fossil Fuels</option>
+                        <option value="leaf">Ecology / Green</option>
+                        <option value="scales">Law / Justice</option>
+                        <option value="ship">Ship / Maritime</option>
+                    </optgroup>
+                </select>
+            </label>
+            <input id="rightStickerImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="selectRightStickerImage(this.files[0])" class="hidden">
+            <div class="mt-2 flex items-center justify-between gap-2 text-xs">
+                <span id="rightStickerFileName" class="text-slate-500 truncate">Preset or custom file</span>
+                <div class="flex items-center gap-1 shrink-0">
+                    <button type="button" onclick="document.getElementById('rightStickerImageInput').click()" class="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-accent-300 border border-slate-700 transition">Upload file</button>
+                    <button type="button" onclick="clearRightStickerImage()" class="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 transition">Clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <label class="flex items-center gap-2 text-xs text-slate-300 pt-0.5">
+        <input id="subscribeBadgeToggle" type="checkbox" onchange="updateAutoMontagePreview()" class="accent-rose-500">
+        <span>Animated <strong class="text-slate-100">[ Subscribe! ▶]</strong> pill below title</span>
+    </label>
+
+    <input id="subscribeImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="selectSubscribeImage(this.files[0])" class="hidden">
+    <div class="p-3 rounded-xl bg-slate-950/90 border border-slate-800/90 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span id="subscribeFileName" class="text-slate-400 truncate">Built-in [ Subscribe! ▶] or upload file</span>
+        <div class="flex items-center gap-2 shrink-0">
+            <button type="button" onclick="document.getElementById('subscribeImageInput').click()" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-semibold transition">
+                Upload custom badge image (PNG/WebP)
+            </button>
+            <button type="button" onclick="clearSubscribeImage()" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 text-xs transition">
+                Remove file
+            </button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-2">
+        <label for="subscribeTextInput" class="col-span-2 text-xs text-slate-400">Badge text
+            <input id="subscribeTextInput" type="text" maxlength="40" value="Subscribe!" placeholder="Subscribe!"
+                oninput="updateAutoMontagePreview()"
+                class="mt-1 w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-slate-100">
+        </label>
+        <label for="subscribeDelayInput" class="text-xs text-slate-400">Fade-in (s)
+            <input id="subscribeDelayInput" type="number" min="0" max="25" step="0.5" value="2.5"
+                oninput="saveVideoSettings()"
+                class="mt-1 w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-slate-400">
+        </label>
+    </div>
+</div>

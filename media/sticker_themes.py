@@ -12,7 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""English-only sticker catalog and keyword dictionary for automatic video sticker selection."""
+"""Sticker identifiers, Twemoji asset keys, and English title matching rules.
+
+``media.stickers`` validates requests against ALLOWED_STICKERS and scores each
+ordered theme by distinct keyword hits. The highest score wins; ties retain the
+earlier theme. EXACT_WORD_KEYWORDS avoids accidental substring matches for
+ambiguous words. Keep identifiers consistent across the allowed list, asset map,
+procedural drawing, and UI choices when adding a sticker.
+"""
 
 # Valid sticker identifiers accepted by the API; 'none' and 'auto' are control modes.
 ALLOWED_STICKERS: tuple[str, ...] = (

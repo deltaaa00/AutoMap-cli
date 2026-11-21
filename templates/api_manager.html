@@ -1,4 +1,13 @@
 <!doctype html>
+<!--
+API Manager view, served by webapp/pages.py at /api-manager.
+
+Server context contains credential-presence flags, never raw server keys.
+static/api-manager.js manages browser-saved AI/search keys and server-side
+YouTube connection actions. Shared styling comes from studio.css, then
+api-manager.css. Keep element IDs and data-provider attributes aligned with the
+controller and map workspace's shared storage-key names.
+-->
 <html lang="en">
 <head>
     <meta charset="utf-8">

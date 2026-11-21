@@ -20,6 +20,8 @@ limitations under the License.
 
 AutoMap turns a natural-language topic into a colored, labeled map and can place that map in a short portrait video. It includes a web interface, a command-line interface, and a Python renderer.
 
+New to the codebase? Start with the [maintainer’s guide](overview.md) for entry points, request flows, module responsibilities, data contracts and test commands.
+
 Choose **Google Gemini** or **DeepSeek** for map data. Customize the palette and labels, generate several maps from a CSV file, or open **Video Studio** to combine a map with background footage, a headline, branding, and optional music.
 
 AI-generated values can be approximate or incorrect. Check the underlying data before publishing a map; a prompt asking for current information does not guarantee verified sources or live web research.

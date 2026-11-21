@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Regressions found while checking long-lived server deployments."""
+"""Keep worker storage and long-lived request regressions reproducible.
+
+Covers temporary download cleanup, bounded waits, safe long filenames, expired
+output cleanup and track/cut identity when source titles collide. Downloads use
+fake process results; assertions inspect temporary files rather than real media
+accounts or shared server storage.
+"""
 import base64
 from pathlib import Path
 import subprocess

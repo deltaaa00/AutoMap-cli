@@ -1,0 +1,177 @@
+/*
+ * Video Studio preview geometry, animation, and responsive controls.
+ * Extracted from the page head; load before shared studio.css to retain the
+ * existing cascade. Coordinate selectors match templates/video/preview.html.
+ */
+.video-preview-stage {
+    width: min(100%, 315px);
+    aspect-ratio: 9 / 16;
+    container-type: inline-size;
+}
+
+.stage-scrim {
+    background: linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,.10) 50%, rgba(0,0,0,.35));
+}
+#stageBgPreview { transform: scale(1.02); }
+.video-preview-stage.effects-on #stageBgPreview { filter: blur(2.5px); }
+.effects-on #stageMapPreview, .effects-on #stageWatermarkImage {
+    filter: drop-shadow(0 8px 10px rgba(0,0,0,.8));
+}
+
+#stageCompositeBox {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 1080px;
+    height: 1920px;
+    transform-origin: top left;
+    justify-content: flex-start;
+    gap: 16px;
+    padding: 70px 20px 160px;
+}
+#stageCompositeBox.has-branding { padding-bottom: 256px; }
+#stageCompositeBox.has-logo { padding-bottom: 470px; }
+#stageCompositeBox.has-top-stickers { padding-top: 176px; }
+#stageAccentRow {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    width: 1040px;
+    flex: none;
+}
+#stageAccentRow.hidden { display: none; }
+
+#stageTopLeftSticker, #stageTopRightSticker {
+    position: absolute;
+    top: 20px;
+    width: 188px;
+    height: 188px;
+    pointer-events: none;
+}
+#stageTopLeftSticker { left: 145px; }
+#stageTopRightSticker { right: 145px; }
+#stageTopLeftSticker img, #stageTopRightSticker img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 188px;
+    max-height: 188px;
+    object-fit: contain;
+}
+.effects-on #stageCompositeBox img.custom-overlay {
+    margin: 24px;
+    filter: drop-shadow(0 8px 10px rgba(0,0,0,.8));
+}
+
+#stageTitleBanner {
+    width: 1040px;
+    flex: none;
+}
+
+#stageTitleBanner img { display: block; width: 1040px; }
+#stageSubscribeBanner {
+    display: flex;
+    justify-content: center;
+    width: 728px;
+    flex: none;
+    margin-top: 0;
+}
+#stageSubscribeBanner img { display: block; max-width: 728px; max-height: 163px; width: auto; height: auto; object-fit: contain; }
+#stageWatermarkImage {
+    position: absolute; left: 50%; top: 1470px;
+    width: 230px; height: 230px; object-fit: cover; border-radius: 50%; transform: translateX(-50%);
+}
+#watermarkThumbPreview {
+    width: 88px; height: 88px; object-fit: cover; border-radius: 50%;
+    border: 2px solid #34d399; margin: 0 auto 10px;
+    background: repeating-conic-gradient(#334155 0% 25%, #1e293b 0% 50%) 50% / 16px 16px;
+}
+#watermarkDropzone.has-logo { border-style: solid; border-color: #34d399; }
+#stageWatermarkText { position: absolute; left: 72px; top: 1740px; width: 936px; transition: top .15s ease; }
+#stageCompositeBox.has-stars #stageWatermarkText { top: 1695px; }
+#stageWatermarkText img { display: block; width: 936px; }
+#stageWatermarkStars {
+    position: absolute;
+    left: 50%;
+    top: 1805px;
+    transform: translateX(-50%);
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+}
+#stageWatermarkStars img { display: block; max-width: 480px; max-height: 110px; width: auto; height: auto; object-fit: contain; }
+#watermarkDropzone {
+    padding: 16px; border: 2px dashed #475569; border-radius: 12px;
+    cursor: pointer; text-align: center; transition: border-color .15s, background .15s;
+}
+#watermarkDropzone.drag-active, #watermarkDropzone:focus-visible {
+    border-color: #34d399; background: rgba(52, 211, 153, .1); outline: none;
+}
+.codec-card:disabled { opacity: .4; cursor: not-allowed; }
+#stageMapArea {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    width: 1080px;
+    margin-inline: -20px;
+    align-items: center;
+    justify-content: center;
+}
+#stageMapPreview { position: relative; flex: none; max-width: none; max-height: none; }
+#stageEmptyPlaceholder { align-self: center; margin-inline: auto; transform: scale(3); max-width: 260px; }
+
+/* Custom Audio Control Styling */
+audio {
+    height: 36px;
+    border-radius: 10px;
+    filter: invert(0.92) hue-rotate(180deg) brightness(0.95) contrast(1.05);
+}
+
+/* Let grid and flex children shrink around long filenames and font names. */
+main > section, main form, main .grid > *, main .flex > * { min-width: 0; }
+button, a, summary, .dropzone, #watermarkDropzone { touch-action: manipulation; }
+
+@media (max-width: 639px) {
+    body { min-height: 100svh; }
+    header { position: relative !important; }
+    .studio-navigation {
+        height: auto !important;
+        min-height: 64px;
+        padding-top: max(12px, env(safe-area-inset-top));
+        padding-bottom: 12px;
+        flex-wrap: wrap;
+        gap: 12px !important;
+    }
+    .studio-navigation h1 { font-size: 16px; }
+    .studio-navigation-actions { width: 100%; gap: 8px !important; }
+    .studio-navigation-actions a { flex: 1; justify-content: center; }
+    .studio-navigation-actions a, .studio-navigation-actions button { min-height: 44px; }
+    main { padding: 12px !important; gap: 16px !important; }
+    main > section { gap: 16px !important; }
+    main .studio-glass.p-5, #renderForm { padding: 16px; }
+    main .justify-between { flex-wrap: wrap; gap: 8px; }
+    main code { overflow-wrap: anywhere; }
+    main input:not([type="checkbox"]):not([type="range"]):not([type="hidden"]),
+    main select, main textarea { font-size: 16px; min-height: 44px; max-width: 100%; }
+    main input[type="file"] { font-size: 13px; }
+    main button, main summary { min-height: 44px; }
+    main button { overflow-wrap: anywhere; }
+    main label:has(input[type="checkbox"]) { min-height: 44px; }
+    main input[type="checkbox"] { width: 20px; height: 20px; flex-shrink: 0; }
+    main input[type="range"] { min-height: 32px; min-width: 0; }
+    .sticker-pickers { grid-template-columns: minmax(0, 1fr) !important; }
+    #subscribeFileName + div, #watermarkStarsFileName + div { flex-wrap: wrap; flex-shrink: 1; width: 100%; }
+    #codecPanel > .grid { grid-template-columns: minmax(0, 1fr); }
+    #codecPanel > .flex > select { width: 100%; }
+    .video-preview-stage { width: min(100%, 315px, 45svh); }
+    #renderResult button { width: 100%; justify-content: center; }
+    #consoleTabContent { overflow-wrap: anywhere; }
+    #toast {
+        left: max(12px, env(safe-area-inset-left));
+        right: max(12px, env(safe-area-inset-right));
+        bottom: max(12px, env(safe-area-inset-bottom));
+        max-width: none;
+        overflow-wrap: anywhere;
+    }
+}

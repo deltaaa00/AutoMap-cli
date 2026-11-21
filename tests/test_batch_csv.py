@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Check CSV schema, batch rendering and PNG archive HTTP contracts.
+
+Rows use deterministic fake rendering to verify defaults, per-row overrides,
+temperature zero, search forwarding and partial failure. ZIP tests inspect real
+PNG members and duplicate-name handling; invalid image bytes must not be archived.
+"""
+
+from webapp import generation
 import io
 import base64
 import zipfile
@@ -74,7 +82,7 @@ def test_batch_template_endpoint_and_parsing():
 
 def test_generate_batch_rejects_invalid_csv_before_ai_call():
     client = app.test_client()
-    with patch("main.auto_map") as mock_auto_map:
+    with patch("webapp.generation.auto_map") as mock_auto_map:
         res = client.post(
             "/api/generate_batch",
             json={
@@ -103,7 +111,7 @@ def test_generate_batch_forwards_temperature_zero_and_row_overrides_and_partial_
         buf.map_meta = {"ai_answer": {"Europe": "10"}}
         return buf
 
-    with patch("main.auto_map", side_effect=fake_auto_map) as mock_auto_map:
+    with patch("webapp.generation.auto_map", side_effect=fake_auto_map) as mock_auto_map:
         res = client.post(
             "/api/generate_batch",
             json={
@@ -148,16 +156,18 @@ def test_generate_batch_forwards_temperature_zero_and_row_overrides_and_partial_
 
 
 def test_index_html_batch_safety_and_studio_sync():
-    html = (Path(__file__).resolve().parent.parent / "templates" / "index.html").read_text(encoding="utf-8")
+    client = app.test_client()
+    html = client.get('/').get_data(as_text=True)
     assert 'accept=".csv"' in html
     assert "/api/batch-template" in html
-    assert "syncLatestMapToStudioStorage" in html
-    assert "selectBtn.textContent" in html
-    assert "title=\"${item.prompt" not in html
+    script = client.get('/static/map/batch.js').get_data(as_text=True)
+    assert "syncLatestMapToStudioStorage" in script
+    assert "selectBtn.textContent" in script
+    assert "title=\"${item.prompt" not in script
 
 
 def test_batch_web_search_reaches_renderer():
-    with patch('main.auto_map', return_value=io.BytesIO(b'PNGDATA')) as render:
+    with patch('webapp.generation.auto_map', return_value=io.BytesIO(b'PNGDATA')) as render:
         response = app.test_client().post('/api/generate_batch', json={
             'filename': 'ideas.csv', 'ideas_text': 'prompt\nSearch regression\n',
             'api_key': 'test-key', 'model': 'deepseek-flash',

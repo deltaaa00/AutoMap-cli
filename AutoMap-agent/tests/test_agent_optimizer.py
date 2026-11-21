@@ -1,4 +1,10 @@
-"""Tests for A/B effect optimizer, posting-hour selector, and competitor outlier scanner."""
+"""Test scoring, experiment selection, and competitor intelligence policies.
+
+Uses temporary AgentDB state, seeded randomness, and mocked YouTube responses
+to make ranking/preset decisions reproducible without credentials or network.
+Score assertions document policy weights in ``agent.optimizer``; competitor
+fixtures exercise parsing/outlier persistence in ``agent.youtube_intel``.
+Run with the same PYTHONPATH=AutoMap-agent setup as the remaining agent suite."""
 
 from __future__ import annotations
 

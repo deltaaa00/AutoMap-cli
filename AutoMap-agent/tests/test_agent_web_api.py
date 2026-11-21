@@ -1,9 +1,19 @@
-"""Tests for /agent dashboard HTML and /api/agent/* endpoints in main.py."""
+"""Test the standalone dashboard and extracted HTTP Blueprints offline.
+
+Flask's test client uses temporary database/media paths and controlled auth
+settings. Coverage includes configuration/secrets, queued actions, media upload
+and deletion, video containment checks, and OAuth callback URL/auth boundaries.
+Requests must enqueue runner work rather than perform actual rendering/uploads.
+When routes move, keep URL/response/session contracts stable and update only
+patch targets that deliberately follow the responsible module."""
 
 from __future__ import annotations
 
+from html.parser import HTMLParser
+
 import web
 from agent.db import AgentDB
+from agent.web_youtube import oauth_redirect_uri
 
 
 def test_agent_dashboard_and_api_endpoints(tmp_path, monkeypatch):
@@ -110,3 +120,62 @@ def test_agent_dashboard_and_api_endpoints(tmp_path, monkeypatch):
     assert up_resp.status_code == 200 and "beat.mp3" in up_resp.get_json()["saved"]
     del_resp = client.post("/api/agent/media/delete", json={"kind": "music", "filename": "beat.mp3"})
     assert del_resp.status_code == 200
+
+
+def test_extracted_routes_keep_callback_url_and_authentication(monkeypatch):
+    monkeypatch.delenv("AGENT_YOUTUBE_REDIRECT_URI", raising=False)
+    with web.app.test_request_context(base_url="https://agent.example"):
+        assert oauth_redirect_uri() == "https://agent.example/api/agent/youtube/callback"
+
+    monkeypatch.setattr(web, "AUTH_ENABLED", True)
+    client = web.app.test_client()
+    assert client.post("/api/agent/media/upload").status_code == 401
+    assert client.post("/api/agent/youtube/connect").status_code == 401
+
+
+def test_dashboard_renders_partials_and_serves_ordered_assets(tmp_path, monkeypatch):
+    monkeypatch.setitem(web.app.config, "AGENT_DB_PATH", str(tmp_path / "agent.db"))
+    monkeypatch.setattr(web, "AUTH_ENABLED", False)
+    client = web.app.test_client()
+    page = client.get("/agent")
+    assert page.status_code == 200
+
+    class DashboardAssets(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.scripts = []
+            self.styles = []
+            self.element_ids = set()
+
+        def handle_starttag(self, tag, attrs):
+            attributes = dict(attrs)
+            if tag == "script" and attributes.get("src", "").startswith("/static/"):
+                self.scripts.append(attributes["src"])
+            if tag == "link" and attributes.get("href", "").startswith("/static/"):
+                self.styles.append(attributes["href"])
+            if "id" in attributes:
+                self.element_ids.add(attributes["id"])
+
+    assets = DashboardAssets()
+    assets.feed(page.get_data(as_text=True))
+    assert assets.scripts == [
+        "/static/agent/common.js",
+        "/static/agent/overview.js",
+        "/static/agent/actions.js",
+        "/static/agent/connections.js",
+        "/static/agent/media.js",
+        "/static/agent/bootstrap.js",
+    ]
+    assert assets.styles == ["/static/agent/dashboard.css"]
+    assert {
+        "mapStudioLink", "statPending", "secTgToken", "bgUploadInput",
+        "pendingQueueContainer", "leaderboardBody", "cfgCompetitors",
+        "competitorsBody", "ownVideosBody", "historyBody",
+    } <= assets.element_ids
+
+    # Public static delivery must not redirect script/CSS requests to login.
+    monkeypatch.setattr(web, "AUTH_ENABLED", True)
+    for url in assets.scripts + assets.styles:
+        response = client.get(url)
+        assert response.status_code == 200
+        assert response.mimetype in {"text/javascript", "application/javascript", "text/css"}

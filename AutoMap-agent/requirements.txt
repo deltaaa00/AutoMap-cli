@@ -1,3 +1,8 @@
+# Python runtime dependencies for the standalone agent image and local execution.
+# The agent calls the separate AutoMap API; its rendering dependencies belong to
+# the repository-root requirements.txt. Dockerfile installs this list for both
+# web and runner processes; ffmpeg is installed separately as a system package.
+
 Flask>=3.0,<4.0
 gunicorn>=22.0,<24.0
 python-dotenv>=1.0,<2.0

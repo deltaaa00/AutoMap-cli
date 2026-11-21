@@ -1,3 +1,12 @@
+/**
+ * Shared workbench styling for map generation, Video Studio and API Manager.
+ *
+ * The root custom properties define shared colors, typography and motion. Rules
+ * also override utility classes in the map/video templates; component selectors and
+ * responsive breakpoints therefore depend on their HTML structure. Keep changes
+ * shared here when they affect both workspaces; API-Manager-only layout belongs in
+ * api-manager.css. Browser suites verify behavior/layout constraints, not all visuals.
+ */
 /* AutoMap workbench direction. Unslop method by Damir Sokolovsky
    (@heydamir), https://heydamir.design/unslop — CC BY 4.0. */
 :root {

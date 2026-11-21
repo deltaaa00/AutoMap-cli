@@ -1,4 +1,10 @@
-"""Search evidence, credential isolation, failures, and actual tool conversations."""
+"""Verify research evidence and bounded tool conversations with fake services.
+
+Checks provider selection, credential redaction, result normalization, required
+searches and budget exhaustion across the model tool loop. Web forwarding uses
+request-local Tavily keys and must not change process environment or echo secrets.
+"""
+from webapp import generation
 import copy
 import io
 import json
@@ -185,14 +191,14 @@ def test_browser_tavily_key_overrides_server_provider_without_mutating_env(monke
 
 
 def test_web_generation_forwards_tavily_key_without_returning_it(web, monkeypatch):
-    monkeypatch.setattr(web, 'auto_map', Mock(return_value=io.BytesIO(b'png')))
+    monkeypatch.setattr(generation, 'auto_map', Mock(return_value=io.BytesIO(b'png')))
     response = web.app.test_client().post('/api/generate', json={
         'topic': 'GDP', 'mode': 'number', 'map_type': 'default',
         'model': 'deepseek-flash', 'provider': 'deepseek', 'api_key': 'model-secret',
         'web_search': True, 'tavily_api_key': 'browser-search-secret', 'refresh_ai': True,
     })
     assert response.status_code == 200
-    assert web.auto_map.call_args.kwargs['tavily_api_key'] == 'browser-search-secret'
+    assert generation.auto_map.call_args.kwargs['tavily_api_key'] == 'browser-search-secret'
     assert 'browser-search-secret' not in response.get_data(as_text=True)
 
 

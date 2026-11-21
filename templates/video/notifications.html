@@ -1,0 +1,31 @@
+{#
+   Render-ready download notice and transient toast. Owned by render.js and init.js. Keep
+   IDs and inline handlers aligned with static/video scripts.
+#}
+                    <!-- Render result -->
+                    <div id="renderResult" role="status" aria-live="polite" class="hidden p-4 rounded-xl bg-slate-950/95 border border-slate-700 ">
+                        <button type="button" id="closeRenderResultBtn" onclick="dismissRenderResult()" aria-label="Close video ready notification" title="Close" class="render-result-close">&times;</button>
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                                    <i class="fa-solid fa-file-video text-slate-400 text-sm"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="text-xs font-mono text-slate-400">Video ready</div>
+                                    <span id="renderResultText" class="block text-xs font-mono text-slate-200 truncate">Ready</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <button type="button" id="downloadVideoBtn" onclick="downloadRenderedVideo()" class="render-download-button">
+                                    <i class="fa-solid fa-download"></i>
+                                    <span>Download video</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+<!-- Notification Toast -->
+<div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-colors duration-300 pointer-events-none bg-slate-900/95 border border-slate-700/80 text-slate-100 px-4 py-3 rounded-xl flex items-center gap-3 text-xs font-medium">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-slate-400 text-base"></i>
+    <span id="toastMsg">Operation successful</span>
+</div>

@@ -12,7 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Exercise palette selection and request ordering in the actual map UI."""
+"""Exercise map-editor state and request ordering in offline Chromium.
+
+The shared map_page fixture renders the real Flask page, intercepts HTTP and
+replaces external CDN assets. Cases cover palettes, provider/search keys,
+repainting, history, storage failures and stale asynchronous responses. This
+module also supplies get_browser/map_page to neighboring browser suites; keep
+those fixtures reusable and close browser resources at process exit.
+"""
+from webapp import analysis as map_analysis
 import atexit
 import base64
 import io
@@ -80,7 +88,7 @@ def map_page(web):
         page.add_style_tag(content='.hidden {display:none!important}')
         page.evaluate('''({analysis, values}) => {
             applyAnalysisToFillingStudio(analysis, values, false);
-        }''', {'analysis': web._build_analysis_from_ai(
+        }''', {'analysis': map_analysis._build_analysis_from_ai(
             VALUES, mode='text', palette_theme='heatmap'), 'values': VALUES})
         page.click('#openFillingStudioBtn')
         yield page
@@ -162,7 +170,7 @@ def test_latest_theme_wins_when_responses_arrive_out_of_order(map_page, web):
                 status: 200, headers: {'Content-Type': 'application/json'}
             }));
         }''', {'index': index, 'payload': {'status': 'success', 'map_values': VALUES,
-            'analysis': web._build_analysis_from_ai(VALUES, mode='text', palette_theme=theme)}})
+            'analysis': map_analysis._build_analysis_from_ai(VALUES, mode='text', palette_theme=theme)}})
 
     respond(1, 'festive')
     page.wait_for_function("lastMapAnalysis.resolved_theme === 'festive' && !paletteAnalysisPending")
@@ -400,7 +408,7 @@ def test_batch_selection_restores_parameters_before_repainting(map_page, web):
         'temperature': 0.25, 'palette_theme': 'oceanic',
         'image_url': 'data:image/png;base64,' + base64.b64encode(png.getvalue()).decode(),
         'map_values': world_values,
-        'analysis': web._build_analysis_from_ai(world_values, mode='number', palette_theme='oceanic'),
+        'analysis': map_analysis._build_analysis_from_ai(world_values, mode='number', palette_theme='oceanic'),
     }
     analysis_requests = []
     page.on('request', lambda request: analysis_requests.append(request.url)
@@ -690,7 +698,7 @@ def test_run_history_persists_map_and_settings_without_api_keys(map_page, web):
                       label_style:{...getFormState().label_style, offset_x:75}}, 'Saved command',
                      {image_url, analysis, map_values:values});
         await historyWrites;
-    }''', {'image_url': image_url, 'analysis': web._build_analysis_from_ai(VALUES, mode='text'), 'values': VALUES})
+    }''', {'image_url': image_url, 'analysis': map_analysis._build_analysis_from_ai(VALUES, mode='text'), 'values': VALUES})
     saved = page.evaluate('StudioStorage.getHistory()')
     assert len(saved) == 1
     assert 'api_key' not in saved[0]['state']

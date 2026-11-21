@@ -1,0 +1,13 @@
+{# Pending approval container and refresh action. overview.js renders candidate cards with handlers from static/agent/actions.js. #}
+<section class="glass rounded-2xl p-5 space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-circle-check text-amber-400"></i>
+            Approval Queue (1-Click)
+        </h2>
+        <button type="button" onclick="loadOverview()" class="text-xs text-slate-400 hover:text-white"><i class="fa-solid fa-arrows-rotate mr-1"></i>Refresh</button>
+    </div>
+    <div id="pendingQueueContainer" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <p class="text-xs text-slate-500">Loading…</p>
+    </div>
+</section>

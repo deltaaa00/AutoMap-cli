@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Shared clip preparation and encoding policy for ``media.worker``.
+
+FFmpeg normalizes background footage before either rendering engine uses it.
+MoviePy helpers build float alpha masks and merge consecutive static layers in
+painter's order; dynamic clips remain separate so fades and reveals still work.
+Sizes are (width, height) in pixels and all durations are seconds. Helpers return
+clips to the worker, which owns closing file-backed readers after encoding.
+"""
+
 import os
 import subprocess
 
@@ -47,7 +56,9 @@ def _x264_preset() -> str:
     allowed = ('ultrafast', 'superfast', 'veryfast', 'faster', 'fast',
                'medium', 'slow', 'slower', 'veryslow')
     preset = os.environ.get('VIDEO_X264_PRESET', 'veryfast').strip().lower()
-    return preset if preset in allowed else 'veryfast'
+    if preset not in allowed:
+        return 'veryfast'
+    return preset
 
 
 def _render_threads() -> int:
@@ -56,7 +67,9 @@ def _render_threads() -> int:
         threads = int(os.environ.get('VIDEO_RENDER_THREADS', '0'))
     except ValueError:
         threads = 0
-    return threads if threads > 0 else (os.cpu_count() or 2)
+    if threads > 0:
+        return threads
+    return os.cpu_count() or 2
 
 
 def _prepare_background(src: str, dst: str, duration: float, size=(1080, 1920),
@@ -99,18 +112,22 @@ def _flatten_static_layers(clips, size, dynamic, duration):
     from moviepy import ImageClip
     from moviepy.tools import compute_position
 
-    out, canvas = [], None
+    flattened_clips = []
+    canvas = None
 
     def flush():
         nonlocal canvas
         if canvas is not None:
-            out.append(ImageClip(np.array(canvas)).with_duration(duration).with_position((0, 0)))
+            # A completed static run becomes one clip at the canvas origin.
+            combined_clip = ImageClip(np.array(canvas))
+            combined_clip = combined_clip.with_duration(duration).with_position((0, 0))
+            flattened_clips.append(combined_clip)
             canvas = None
 
     for clip in clips:
         if id(clip) in dynamic:
             flush()
-            out.append(clip)
+            flattened_clips.append(clip)
             continue
         frame = np.asarray(clip.get_frame(0))
         if frame.dtype != np.uint8:
@@ -126,5 +143,5 @@ def _flatten_static_layers(clips, size, dynamic, duration):
             canvas = Image.new('RGBA', size, (0, 0, 0, 0))
         canvas.alpha_composite(layer, tuple(int(v) for v in pos))
     flush()
-    return out
+    return flattened_clips
 

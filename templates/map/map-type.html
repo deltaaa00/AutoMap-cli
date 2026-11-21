@@ -1,0 +1,104 @@
+{# Text/number mode and artwork selection controls. Values form the mode/map_type API contract consumed by form.js. #}
+                    <!-- 1. Flag: -m, --mode (Visual Segmented Cards) -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                <i class="fa-solid fa-database text-accent-300 text-xs"></i>
+                                Data mode
+                            </label>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="cursor-pointer group relative">
+                                <input type="radio" name="mode" value="text" checked onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-slate-800 peer-checked:border-accent-500 peer-checked:[&_.mode-dot]:opacity-100 hover:border-slate-700 transition-colors flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-accent-300 shrink-0 ">
+                                        <!-- Mini SVG Illustration for Text Mode -->
+                                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7V5h16v2M9 20h6M12 5v15"/>
+                                        </svg>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-semibold text-slate-100 font-mono">text</span>
+                                            <span class="mode-dot w-2 h-2 rounded-full bg-accent-400 opacity-0 transition"></span>
+                                        </div>
+                                        <div class="text-xs text-slate-400 truncate">Categories &amp; labels</div>
+                                    </div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer group relative">
+                                <input type="radio" name="mode" value="number" onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-slate-800 peer-checked:border-slate-700 peer-checked:[&_.mode-dot]:opacity-100 hover:border-slate-700 transition-colors flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 shrink-0 ">
+                                        <!-- Mini SVG Illustration for Number Mode -->
+                                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+                                        </svg>
+                                    </div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-semibold text-slate-100 font-mono">number</span>
+                                            <span class="mode-dot w-2 h-2 rounded-full bg-slate-800 opacity-0 transition"></span>
+                                        </div>
+                                        <div class="text-xs text-slate-400 truncate">Numeric ranges</div>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 2. Flag: -mp, --map-type (Visual Segmented Cards with SVG Mini-Illustrations) -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                <i class="fa-solid fa-layer-group text-accent-300 text-xs"></i>
+                                Map canvas
+                            </label>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <!-- Default Europe Map -->
+                            <label class="cursor-pointer group">
+                                <input type="radio" name="map_type" value="default" checked onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-slate-800 peer-checked:border-accent-500 text-center hover:border-slate-700 transition-colors flex flex-col items-center">
+                                    <div class="w-10 h-8 rounded-lg bg-accent-500/10 border border-accent-500/20 flex items-center justify-center mb-2 text-accent-300 transition-transform">
+                                        <i class="fa-solid fa-map text-sm"></i>
+                                    </div>
+                                    <div class="text-xs font-semibold font-mono text-slate-100">default</div>
+                                    <div class="text-xs text-slate-400 mt-1">Europe Relief</div>
+                                </div>
+                            </label>
+                            <!-- Flag Map -->
+                            <label class="cursor-pointer group">
+                                <input type="radio" name="map_type" value="flag" onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-slate-800 peer-checked:border-slate-700 text-center hover:border-slate-700 transition-colors flex flex-col items-center">
+                                    <div class="w-10 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center mb-2 text-slate-400 transition-transform">
+                                        <i class="fa-solid fa-flag text-sm"></i>
+                                    </div>
+                                    <div class="text-xs font-semibold font-mono text-slate-100">flag</div>
+                                    <div class="text-xs text-slate-400 mt-1">National Flags</div>
+                                </div>
+                            </label>
+                            <!-- World Map -->
+                            <label class="cursor-pointer group">
+                                <input type="radio" name="map_type" value="world" onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-slate-800 peer-checked:border-slate-700 text-center hover:border-slate-700 transition-colors flex flex-col items-center">
+                                    <div class="w-10 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center mb-2 text-slate-400 transition-transform">
+                                        <i class="fa-solid fa-globe text-sm"></i>
+                                    </div>
+                                    <div class="text-xs font-semibold font-mono text-slate-100">world</div>
+                                    <div class="text-xs text-slate-400 mt-1">Continents</div>
+                                </div>
+                            </label>
+                            <!-- World Countries Map -->
+                            <label class="cursor-pointer group">
+                                <input type="radio" name="map_type" value="world_countries" onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-slate-800 peer-checked:border-slate-700 text-center hover:border-slate-700 transition-colors flex flex-col items-center">
+                                    <div class="w-10 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center mb-2 text-slate-400 transition-transform">
+                                        <i class="fa-solid fa-earth-americas text-sm"></i>
+                                    </div>
+                                    <div class="text-xs font-semibold text-slate-100">World Countries</div>
+                                    <div class="text-xs text-slate-400 mt-1">All Nations</div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>

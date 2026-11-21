@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for the ``world_countries`` map type across renderer, CLI, CSV, and web API."""
+"""Protect the world_countries path across rendering, CLI, CSV and web APIs.
+
+Synthetic scenes verify normalized country keys, label skipping and numeric
+features; an asset-backed case checks bundled artwork when available. Provider
+responses are fake so the tests do not need credentials or network access.
+"""
+from webapp import generation
 import importlib
 import io
 import sys
@@ -219,7 +225,7 @@ def test_csv_cli_api_and_ui_accept_world_countries(web, monkeypatch):
     assert generate.call_args.kwargs["map_type"] == "world_countries"
 
     web_mock = Mock(return_value=io.BytesIO(b"png-data"))
-    monkeypatch.setattr(web, "auto_map", web_mock)
+    monkeypatch.setattr(generation, "auto_map", web_mock)
     resp = web.app.test_client().post(
         "/api/generate",
         json={
@@ -246,7 +252,7 @@ def test_csv_cli_api_and_ui_accept_world_countries(web, monkeypatch):
     )
     assert bad_resp.status_code == 400
 
-    html = (ROOT / "templates" / "index.html").read_text(encoding="utf-8")
+    html = web.app.test_client().get('/').get_data(as_text=True)
     assert 'value="world_countries"' in html
     assert "World Countries" in html
 

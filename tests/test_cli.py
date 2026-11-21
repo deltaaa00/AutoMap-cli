@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Check Click options and renderer calls without live generation.
+
+CliRunner invokes make/batch commands with patched rendering. Assertions protect
+model/provider selection, credentials, temperature, output paths, font discovery
+and useful failure exit codes. CLI flags should stay consistent with shared
+map options while web-only payload behavior remains in the web route tests.
+"""
+
 import importlib
 import io
 import re
@@ -70,8 +78,8 @@ def test_current_gemini_and_gemma_models_reach_generation(generate, model):
     assert generate.call_args.kwargs['model'] == model
 
 
-def test_web_fallback_models_match_cli_choices():
-    html = (Path(__file__).resolve().parents[1] / 'templates' / 'index.html').read_text(encoding='utf-8')
+def test_web_fallback_models_match_cli_choices(web):
+    html = web.app.test_client().get('/').get_data(as_text=True)
     selector = re.search(r'<select id="modelSelect"[^>]*>(.*?)</select>', html, re.DOTALL)
     assert selector is not None
     choices = re.findall(r'<option value="([^"]+)"', selector.group(1))
@@ -125,7 +133,8 @@ def test_cli_rejects_invalid_temperature_without_generating(generate, value):
 
 @pytest.mark.parametrize('module_name', ['cli', 'main'])
 def test_font_discovery(module_name, web, tmp_path, monkeypatch):
-    module = cli if module_name == 'cli' else web
+    from webapp import inputs
+    module = cli if module_name == 'cli' else inputs
     for name in ['z.ttf', 'A.OTF', 'ignore.txt']:
         (tmp_path / name).touch()
     monkeypatch.setattr(module, 'FONTS_DIR', tmp_path)

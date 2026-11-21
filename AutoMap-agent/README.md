@@ -23,3 +23,13 @@ Open **http://localhost:4000**.
    - `AGENT_YOUTUBE_REDIRECT_URI=https://your-agent-domain.com/api/agent/youtube/callback`
    - `OAUTHLIB_INSECURE_TRANSPORT=0`
 3. Run `docker compose up -d --build`.
+
+## Code structure
+
+- `web.py` assembles the Flask app and serves dashboard, settings, and approval actions.
+- `agent/web_media.py` handles media routes; `agent/web_youtube.py` handles YouTube OAuth routes.
+- `agent/web_services.py` resolves shared database and media paths from the current Flask app.
+- `agent/runner.py` runs scheduling, queued commands, and Telegram interactions.
+- `agent/video_generation.py` selects a topic and media, renders a candidate Short, and sends it for approval.
+- `templates/agent.html` assembles dashboard sections from `templates/agent/`; `templates/login.html` contains the standalone sign-in form.
+- `static/agent/` contains dashboard CSS and classic controllers for overview rendering, actions/settings, connections, and media. `bootstrap.js` loads last to initialize credentials and start polling after every controller is available.

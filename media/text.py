@@ -12,20 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Validated text settings and transparent text artwork for video overlays.
+
+``media.worker`` uses the same Pillow title renderer for previews and final
+MoviePy clips. Font names are restricted to bundled resources under the project
+root; dimensions and font sizes are pixels. Image builders return uint8 RGBA
+arrays or Pillow RGBA images. Shadows add 24 pixels around each side, so layout
+code must account for that padding when positioning the original artwork.
+"""
+
 import os
 import re
+from pathlib import Path
 
-TITLE_FONT_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "resources", "fonts", "DIN Condensed.ttf",
-)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+TITLE_FONT_PATH = str(PROJECT_ROOT / 'resources' / 'fonts' / 'DIN Condensed.ttf')
 
 
 def _title_settings(data):
+    """Resolve a bundled font path and validate its pixel size for API callers."""
     font_name = str(data.get('title_font') or 'DIN Condensed.ttf')
     font_dir = os.path.dirname(TITLE_FONT_PATH)
     # Accept bundled filenames only, rather than arbitrary client-supplied paths.
-    fonts = {name for name in os.listdir(font_dir) if name.lower().endswith(('.ttf', '.otf'))}
+    fonts = set()
+    for name in os.listdir(font_dir):
+        if name.lower().endswith(('.ttf', '.otf')):
+            fonts.add(name)
     if font_name not in fonts:
         raise ValueError('Unknown title font.')
     raw_size = data.get('title_font_size', 100)
@@ -42,10 +54,14 @@ def _title_settings(data):
 
 
 def _title_colors(data):
+    """Return first/remaining line colors after validating strict #RRGGBB values."""
     colors = (data.get('title_first_line_color', '#ffffff'),
               data.get('title_other_lines_color', '#ffe735'))
-    if any(not isinstance(color, str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', color) for color in colors):
-        raise ValueError('Title colors must use #RRGGBB format.')
+    for color in colors:
+        if not isinstance(color, str):
+            raise ValueError('Title colors must use #RRGGBB format.')
+        if not re.fullmatch(r'#[0-9a-fA-F]{6}', color):
+            raise ValueError('Title colors must use #RRGGBB format.')
     return colors
 
 
@@ -60,7 +76,12 @@ def _title_image(
     max_height: int = 360,
     uppercase: bool = True,
 ):
-    """Lay out a centered, wrapped title with safe margins and a layered shadow."""
+    """Return a centered, wrapped title as a uint8 RGBA array.
+
+    ``max_width`` includes horizontal padding. Font size shrinks until the
+    measured text fits ``max_height``; a title that still cannot fit raises
+    ValueError. Preview and final render callers share this layout algorithm.
+    """
     import numpy as np
     from PIL import Image, ImageColor, ImageDraw, ImageFilter, ImageFont
 
@@ -114,17 +135,26 @@ def _title_image(
                          font=font, anchor='ma', fill=(0, 0, 0, 255), stroke_width=outline)
     # Combine a soft halo with a tighter drop shadow for contrast on bright footage.
     # Preview and final video both use this image, so the shading stays consistent.
-    image = shadow.filter(ImageFilter.GaussianBlur(8)) if effects else Image.new('RGBA', size)
     if effects:
+        image = shadow.filter(ImageFilter.GaussianBlur(8))
         image = Image.alpha_composite(image, shadow.filter(ImageFilter.GaussianBlur(2)))
+    else:
+        image = Image.new('RGBA', size)
     draw = ImageDraw.Draw(image)
     first_rgb = ImageColor.getrgb(first_line_color)
     other_rgb = ImageColor.getrgb(other_lines_color)
     for row, line in enumerate(lines):
-        color = first_rgb if row == 0 else other_rgb
+        if row == 0:
+            color = first_rgb
+        else:
+            color = other_rgb
+        if effects:
+            stroke_color = (0, 0, 0, 255)
+        else:
+            stroke_color = color + (220,)
         draw.text((xy[0], xy[1] + row * advance), line, font=font, anchor='ma',
                   fill=color + (255,), stroke_width=outline,
-                  stroke_fill=(0, 0, 0, 255) if effects else color + (220,))
+                  stroke_fill=stroke_color)
     return np.array(image)
 
 
@@ -139,6 +169,7 @@ def _build_title_clip(
     effects: bool = True,
     uppercase: bool = True,
 ):
+    """Wrap the shared RGBA title artwork in a MoviePy clip lasting ``duration`` seconds."""
     from moviepy import ImageClip
 
     return ImageClip(
@@ -156,6 +187,7 @@ def _build_title_clip(
 
 
 def _watermark_settings(data):
+    """Validate and return trimmed watermark text plus its #RRGGBB color."""
     text = data.get('watermark_text', '')
     color = data.get('watermark_color', '#a4e9ee')
     if not isinstance(text, str) or len(text) > 80:
@@ -167,6 +199,7 @@ def _watermark_settings(data):
 
 def _watermark_font_path(data):
     # Validate the watermark's own font against the bundled filenames.
+    """Resolve the watermark font through the same bundled-font allowlist as titles."""
     return _title_settings({'title_font': data.get('watermark_font', 'DIN Condensed.ttf')})[0]
 
 
@@ -184,7 +217,11 @@ def _round_watermark(image, diameter=230):
 
 
 def _with_shadow(image):
-    """Add a soft silhouette shadow while keeping transparent areas transparent."""
+    """Return RGBA artwork with a soft shadow and 24-pixel margins.
+
+    The original image begins at (24, 24) in a canvas 48 pixels wider and
+    taller. Callers positioning the original artwork must offset accordingly.
+    """
     from PIL import Image, ImageFilter
 
     image = image.convert('RGBA')

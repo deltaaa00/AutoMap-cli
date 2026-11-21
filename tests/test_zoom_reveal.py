@@ -1,4 +1,11 @@
-"""Country targeting, PNG masks, and real reveal animation frames."""
+"""Verify country targeting, grayscale masks and reveal animation pixels.
+
+Synthetic PNGs and coordinate tables exercise nearest-country thresholds,
+outline/mask endpoints, extrema isolation and actual animation frames. Invalid
+mask input must stay controlled. Web geometry and worker animation live in
+separate modules but share the same mask interpretation.
+"""
+from webapp import zoom
 import base64
 import importlib
 import io
@@ -19,12 +26,12 @@ def png(image):
 
 @pytest.mark.parametrize('key,x,y,expected', [('one',0,0,'one'),('',.5,.5,'one'),('',0,0,''),('',True,.5,''),('',None,.5,''),('',float('nan'),.5,'')])
 def test_nearest_country_selection_rejects_remote_or_invalid_points(web,key,x,y,expected):
-    assert web._resolve_reveal_country_key({'one':[(50,50)],'empty':[]},100,100,key,x,y)==expected
+    assert zoom._resolve_reveal_country_key({'one':[(50,50)],'empty':[]},100,100,key,x,y)==expected
 
 
 @pytest.mark.parametrize('raw,expected', [(None,None),('',None),('data:image/png;base64,',None),('!!',None),(base64.b64encode(b'not png').decode(),None)])
 def test_invalid_uploaded_map_cannot_be_used_as_reveal_mask(web,raw,expected):
-    assert web._decode_image_size(raw)==expected
+    assert zoom._decode_image_size(raw)==expected
 
 
 def test_reveal_masks_and_outline_endpoints_use_country_geometry(web,tmp_path,monkeypatch):
@@ -34,27 +41,27 @@ def test_reveal_masks_and_outline_endpoints_use_country_geometry(web,tmp_path,mo
     ImageDraw.Draw(country).rectangle((3,3,12,12),fill='white')
     for filename in ['default_map.png','world_map.png','world_countries_map.png']:
         country.save(maps/filename)
-    monkeypatch.setattr(web,'BASE_DIR',tmp_path)
+    monkeypatch.setattr(zoom, 'BASE_DIR',tmp_path)
     from map import constants, world_countries_coords
     monkeypatch.setattr(constants,'europe_coords',{'one':[(5,5)]})
     monkeypatch.setattr(constants,'world_coords',{'continent':[(5,5)]})
     monkeypatch.setattr(world_countries_coords,'world_countries_coords',{'one':[(5,5)]})
-    monkeypatch.setattr(web,'_ZOOM_REF_DIMENSIONS',{'europe':(64,64),'world':(64,64)})
-    assert web._region_mask_from_index(maps/'default_map.png',{'one':[(5,5)]},'missing') is None
-    assert web._world_country_floodfill_mask([]) is None
-    assert web._extract_country_mask_image('invalid','one') is None
-    assert web._extract_country_mask_image('world','continent') is None
-    assert web._extract_country_mask_image('world','continent',allow_world_continent_fallback=True).getbbox()
-    assert web._world_country_floodfill_mask([(5,5)]).getpixel((5,5))==255
-    assert web._extract_country_mask_image('world','one').getbbox()
-    assert web._extract_country_reveal_mask(0,4,'one',.5,.5)==''
-    assert web._extract_country_reveal_mask(64,64,'unknown',1,1)==''
+    monkeypatch.setattr(zoom, '_ZOOM_REF_DIMENSIONS',{'europe':(64,64),'world':(64,64)})
+    assert zoom._region_mask_from_index(maps/'default_map.png',{'one':[(5,5)]},'missing') is None
+    assert zoom._world_country_floodfill_mask([]) is None
+    assert zoom._extract_country_mask_image('invalid','one') is None
+    assert zoom._extract_country_mask_image('world','continent') is None
+    assert zoom._extract_country_mask_image('world','continent',allow_world_continent_fallback=True).getbbox()
+    assert zoom._world_country_floodfill_mask([(5,5)]).getpixel((5,5))==255
+    assert zoom._extract_country_mask_image('world','one').getbbox()
+    assert zoom._extract_country_reveal_mask(0,4,'one',.5,.5)==''
+    assert zoom._extract_country_reveal_mask(64,64,'unknown',1,1)==''
     for width,height in [(32,64),(128,64)]:
-        encoded=web._extract_country_reveal_mask(width,height,'one',.1,.1)
+        encoded=zoom._extract_country_reveal_mask(width,height,'one',.1,.1)
         mask=Image.open(io.BytesIO(base64.b64decode(encoded)))
         assert mask.mode=='L' and mask.size==(width,height) and mask.getbbox()
-        assert web._decode_image_size('data:image/png;base64,'+encoded)==(width,height)
-        assert web._extract_country_reveal_mask(width,height,'one',.1,.1)==encoded
+        assert zoom._decode_image_size('data:image/png;base64,'+encoded)==(width,height)
+        assert zoom._extract_country_reveal_mask(width,height,'one',.1,.1)==encoded
     client=web.app.test_client()
     countries=client.get('/api/zoom_countries').json
     assert countries['europe'][0]['key']=='one' and countries['world'][0]['x']==pytest.approx(5/64,abs=.0001)

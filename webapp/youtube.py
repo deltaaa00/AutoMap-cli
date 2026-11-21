@@ -1,4 +1,17 @@
-"""Server-side YouTube OAuth and background uploads for Video Studio."""
+"""Manage Google OAuth and background YouTube uploads for Video Studio.
+
+The app factory creates YouTubeUploads, which registers its routes and lives in
+app.extensions. Browser sessions own separate credentials. Client configuration
+accepts Google endpoints, OAuth uses state/PKCE, and credential files are encrypted
+with a key derived from the web signing secret under instance/youtube by default.
+Changing that secret makes existing saved credentials unreadable.
+
+Successful renders receive signed, session-bound upload tokens. Background
+threads download the worker's MP4, upload it through the resumable YouTube API,
+and expose sanitized job progress. Slots limit concurrency and repeated tokens
+reuse jobs. Jobs are process-local; restart loses progress, so check YouTube
+Studio before retrying a possibly completed upload. Temporary MP4s are cleaned up.
+"""
 import base64
 import hashlib
 import hmac
@@ -18,22 +31,37 @@ SCOPE = 'https://www.googleapis.com/auth/youtube.upload'
 
 
 def metadata(data):
-    """Validate YouTube limits before spending time rendering or uploading."""
+    """Validate upload settings and return a YouTube videos.insert body.
+
+    Title, description, tags, privacy and made_for_kids are user input. Enforce
+    YouTube limits before rendering/uploading; preserve Unicode and deduplicate tags.
+    Raise ValueError with a client-facing message for unsupported values.
+    """
     if not isinstance(data, dict):
         raise ValueError('YouTube settings must be an object.')
     title = data.get('title', '')
     description = data.get('description', '')
     tags = data.get('tags', [])
-    if not isinstance(title, str) or not title.strip() or len(title) > 100 or any(c in title for c in '<>'):
+    if not isinstance(title, str):
         raise ValueError('YouTube title must contain 1–100 characters and no < or >.')
-    if not isinstance(description, str) or len(description.encode('utf-8')) > 5000 or any(c in description for c in '<>'):
+    if not title.strip() or len(title) > 100 or any(c in title for c in '<>'):
+        raise ValueError('YouTube title must contain 1–100 characters and no < or >.')
+    if not isinstance(description, str):
+        raise ValueError('YouTube description must be at most 5000 UTF-8 bytes and contain no < or >.')
+    if len(description.encode('utf-8')) > 5000 or any(c in description for c in '<>'):
         raise ValueError('YouTube description must be at most 5000 UTF-8 bytes and contain no < or >.')
     if isinstance(tags, str):
         tags = [tag.strip() for tag in tags.split(',') if tag.strip()]
     if not isinstance(tags, list) or any(not isinstance(tag, str) or not tag.strip() for tag in tags):
         raise ValueError('YouTube tags must be strings or comma-separated text.')
     tags = list(dict.fromkeys(tag.strip() for tag in tags))
-    if sum(len(tag) + (2 if ' ' in tag else 0) for tag in tags) + max(0, len(tags) - 1) > 500:
+    # YouTube counts separators and quotes around tags containing spaces.
+    tags_length = max(0, len(tags) - 1)
+    for tag in tags:
+        tags_length += len(tag)
+        if ' ' in tag:
+            tags_length += 2
+    if tags_length > 500:
         raise ValueError('YouTube tags exceed the 500-character limit.')
     privacy = data.get('privacy', 'private')
     if privacy not in ('private', 'unlisted', 'public'):
@@ -41,19 +69,44 @@ def metadata(data):
     kids = data.get('made_for_kids', False)
     if not isinstance(kids, bool):
         raise ValueError('Made for kids must be true or false.')
-    return {'snippet': {'title': title.strip(), 'description': description, 'tags': tags, 'categoryId': '22'},
-            'status': {'privacyStatus': privacy, 'selfDeclaredMadeForKids': kids}}
+    return {
+        'snippet': {
+            'title': title.strip(),
+            'description': description,
+            'tags': tags,
+            'categoryId': '22',
+        },
+        'status': {
+            'privacyStatus': privacy,
+            'selfDeclaredMadeForKids': kids,
+        },
+    }
 
 
 def client_config(data):
-    """Accept Google client files, never arbitrary OAuth/token endpoints."""
+    """Accept a Google web/installed OAuth client file or raise ValueError.
+
+    Both client credentials must be present and authorization/token endpoints must
+    be Google's expected URLs. Redirect locality/HTTPS is checked by the connect
+    route after resolving this application's callback URI.
+    """
     if not isinstance(data, dict):
         raise ValueError('Upload a Google OAuth client secret JSON file.')
     kind = 'web' if 'web' in data else 'installed'
     config = data.get(kind)
-    if not isinstance(config, dict) or not all(isinstance(config.get(k), str) and config[k] for k in ('client_id', 'client_secret')):
-        raise ValueError('Use an OAuth client secret file (Web application or Desktop app), not an API key or service account.')
-    if config.get('auth_uri') != 'https://accounts.google.com/o/oauth2/auth' or config.get('token_uri') != 'https://oauth2.googleapis.com/token':
+    config_error = (
+        'Use an OAuth client secret file (Web application or Desktop app), '
+        'not an API key or service account.'
+    )
+    if not isinstance(config, dict):
+        raise ValueError(config_error)
+    for field in ('client_id', 'client_secret'):
+        value = config.get(field)
+        if not isinstance(value, str) or not value:
+            raise ValueError(config_error)
+    valid_auth_uri = config.get('auth_uri') == 'https://accounts.google.com/o/oauth2/auth'
+    valid_token_uri = config.get('token_uri') == 'https://oauth2.googleapis.com/token'
+    if not valid_auth_uri or not valid_token_uri:
         raise ValueError('The client secret file must use the standard Google OAuth endpoints.')
     return {kind: config}
 
@@ -70,8 +123,17 @@ def _write_json(path, value):
 
 
 class YouTubeUploads:
+    """Own session-scoped credentials, HTTP routes and upload jobs for one app.
+
+    The factory injects the Flask app, private worker URL and pooled HTTP session.
+    Credential files survive restarts if the app signing key and instance directory
+    survive. Jobs/locks/semaphore slots live in memory; they are not a durable queue.
+    Do not expose encrypted records or raw provider exceptions in route responses.
+    """
     def __init__(self, app, worker_url, http):
-        self.app, self.worker_url, self.http = app, worker_url, http
+        self.app = app
+        self.worker_url = worker_url
+        self.http = http
         self.jobs = {}
         self.lock = threading.Lock()
         self.slots = threading.BoundedSemaphore(2)
@@ -82,6 +144,12 @@ class YouTubeUploads:
         self._routes()
 
     def owner(self):
+        """Return a stable browser owner ID, creating session state if necessary.
+
+        The login identity participates in the hash, so changing login credentials also
+        changes access to saved YouTube credentials. Call before parallel page requests
+        begin to avoid competing session-cookie initialization.
+        """
         if 'youtube_owner' not in session:
             session['youtube_owner'] = secrets.token_hex(24)
             session.permanent = True
@@ -89,17 +157,28 @@ class YouTubeUploads:
         return hashlib.sha256((session['youtube_owner'] + session.get('web_identity', '')).encode()).hexdigest()
 
     def token_path(self, owner):
+        """Resolve one owner's credential record under YOUTUBE_DATA_DIR or instance/youtube.
+
+        Owners are generated hashes, not user-supplied filenames. OAuth pending state
+        uses the same path with a .pending suffix.
+        """
         root = Path(self.app.config.get('YOUTUBE_DATA_DIR', Path(self.app.instance_path) / 'youtube'))
         return root / (owner + '.json')
 
     def save_secret(self, path, value):
+        """Encrypt JSON data and atomically replace its on-disk record.
+        """
         ciphertext = self.cipher.encrypt(json.dumps(value).encode()).decode()
         _write_json(path, {'encrypted': ciphertext})
 
     def load_secret(self, path):
+        """Decrypt a saved record or raise a safe reconnect error for invalid contents.
+        """
         from cryptography.fernet import InvalidToken
         try:
-            return json.loads(self.cipher.decrypt(json.loads(path.read_text())['encrypted']).decode())
+            stored = json.loads(path.read_text())
+            plaintext = self.cipher.decrypt(stored['encrypted']).decode()
+            return json.loads(plaintext)
         except (InvalidToken, KeyError, ValueError):
             raise ValueError('Saved YouTube credentials cannot be opened. Connect your account again.') from None
 
@@ -112,6 +191,8 @@ class YouTubeUploads:
                 or url_for('youtube_callback', _external=True))
 
     def credentials(self, owner):
+        """Load this owner's Google credentials; raise ValueError when disconnected.
+        """
         from google.oauth2.credentials import Credentials
         path = self.token_path(owner)
         if not path.is_file():
@@ -124,18 +205,31 @@ class YouTubeUploads:
         return session['youtube_csrf']
 
     def valid_csrf(self):
+        """Compare the request header with the current session token without exposing it.
+        """
         token = request.headers.get('X-YouTube-CSRF', '')
         return bool(token) and hmac.compare_digest(token.encode(), session.get('youtube_csrf', '').encode())
 
     def render_token(self, path):
+        """Sign a worker video path with the browser owner for later upload authorization.
+        """
         return self.signer.dumps({'owner': self.owner(), 'path': path})
 
     def check_ready(self, settings):
+        """Validate upload metadata and require stored credentials without starting work.
+        """
         result = metadata(settings)
         self.credentials(self.owner())
         return result
 
     def start(self, token, body):
+        """Authorize a signed render token and return an existing or newly queued job ID.
+
+        Reject expired/cross-session tokens before downloading media. Under the lock,
+        reuse a job for repeated clicks, reserve a concurrency slot and remove stale
+        finished jobs. The daemon thread performs the upload and releases the slot.
+        Raise ValueError for invalid ownership or a full queue.
+        """
         try:
             rendered = self.signer.loads(token, max_age=86400)
         except (BadSignature, TypeError):
@@ -151,10 +245,27 @@ class YouTubeUploads:
                     return job_id
             if not self.slots.acquire(blocking=False):
                 raise ValueError('YouTube upload queue is busy. Try again after the current uploads finish.')
-            self.jobs = {key: job for key, job in self.jobs.items() if time.time() - job['created'] < 86400 or job['status'] == 'uploading'}
+            retained_jobs = {}
+            for existing_id, job in self.jobs.items():
+                is_recent = time.time() - job['created'] < 86400
+                if is_recent or job['status'] == 'uploading':
+                    retained_jobs[existing_id] = job
+            self.jobs = retained_jobs
             job_id = secrets.token_hex(16)
-            self.jobs[job_id] = {'owner': owner, 'token': token, 'created': time.time(), 'status': 'uploading', 'progress': 0, 'phase': 'Downloading rendered video'}
-        threading.Thread(target=self._upload, args=(job_id, rendered['path'], body, credentials), daemon=True).start()
+            self.jobs[job_id] = {
+                'owner': owner,
+                'token': token,
+                'created': time.time(),
+                'status': 'uploading',
+                'progress': 0,
+                'phase': 'Downloading rendered video',
+            }
+        upload_thread = threading.Thread(
+            target=self._upload,
+            args=(job_id, rendered['path'], body, credentials),
+            daemon=True,
+        )
+        upload_thread.start()
         return job_id
 
     def _update(self, job_id, **values):
@@ -162,6 +273,13 @@ class YouTubeUploads:
             self.jobs[job_id].update(values)
 
     def _upload(self, job_id, path, body, credentials):
+        """Download a rendered MP4, upload it in chunks and finalize the job.
+
+        Only local temporary files bridge the worker and the resumable Google upload.
+        Refresh credentials without undoing a concurrent disconnect. Public job errors
+        must be sanitized because provider exceptions can embed tokens/signed URLs.
+        Finally close API/file resources and release the reserved concurrency slot.
+        """
         youtube = None
         try:
             from google.auth.transport.requests import Request
@@ -178,14 +296,20 @@ class YouTubeUploads:
                         self.save_secret(token_path, json.loads(credentials.to_json()))
             with tempfile.TemporaryDirectory(prefix='automap-youtube-') as directory:
                 video = Path(directory) / 'render.mp4'
-                with self.http.get(f'{self.worker_url}/api/download_video', params={'path': path}, stream=True, timeout=(10, 120)) as response:
+                with self.http.get(
+                    f'{self.worker_url}/api/download_video',
+                    params={'path': path},
+                    stream=True,
+                    timeout=(10, 120),
+                ) as response:
                     response.raise_for_status()
                     with video.open('wb') as stream:
                         for chunk in response.iter_content(chunk_size=1024 * 1024):
                             if chunk:
                                 stream.write(chunk)
                 self._update(job_id, phase='Uploading to YouTube')
-                youtube = build('youtube', 'v3', http=AuthorizedHttp(credentials, http=httplib2.Http(timeout=120)), cache_discovery=False)
+                authorized_http = AuthorizedHttp(credentials, http=httplib2.Http(timeout=120))
+                youtube = build('youtube', 'v3', http=authorized_http, cache_discovery=False)
                 media = MediaFileUpload(str(video), mimetype='video/mp4', chunksize=8 * 1024 * 1024, resumable=True)
                 try:
                     upload = youtube.videos().insert(part='snippet,status', body=body, media_body=media)
@@ -195,14 +319,26 @@ class YouTubeUploads:
                         if progress:
                             self._update(job_id, progress=round(progress.progress() * 100))
                     video_id = result.get('id', '')
-                    if not isinstance(video_id, str) or not video_id or not all(c.isalnum() or c in '_-' for c in video_id):
+                    if not isinstance(video_id, str) or not video_id:
                         raise ValueError('YouTube did not return a video ID.')
-                    self._update(job_id, status='complete', progress=100, phase='Uploaded', url=f'https://www.youtube.com/shorts/{video_id}')
+                    if not all(c.isalnum() or c in '_-' for c in video_id):
+                        raise ValueError('YouTube did not return a video ID.')
+                    self._update(
+                        job_id,
+                        status='complete',
+                        progress=100,
+                        phase='Uploaded',
+                        url=f'https://www.youtube.com/shorts/{video_id}',
+                    )
                 finally:
                     media.stream().close()
         except Exception as error:
             # OAuth and HTTP exceptions can contain tokens, secrets or signed URLs.
-            message = 'Upload failed. Check your Google authorization, YouTube API access and quota. The rendered video is still available to download. Check YouTube Studio before rendering again to avoid duplicates.'
+            message = (
+                'Upload failed. Check your Google authorization, YouTube API access and quota. '
+                'The rendered video is still available to download. '
+                'Check YouTube Studio before rendering again to avoid duplicates.'
+            )
             if getattr(error, 'resp', None) is not None:
                 try:
                     reason = json.loads(error.content)['error']['errors'][0]['reason']
@@ -219,6 +355,8 @@ class YouTubeUploads:
                 self.slots.release()
 
     def _routes(self):
+        """Register OAuth, status, disconnect, upload and polling routes on this app.
+        """
         app = self.app
 
         @app.before_request
@@ -250,15 +388,28 @@ class YouTubeUploads:
                     raise ValueError('Invalid client secret JSON file.') from None
                 config = client_config(parsed)
                 callback = self.callback_uri()
-                if 'installed' in config and urlsplit(callback).hostname not in ('localhost', '127.0.0.1', '::1'):
-                    raise ValueError('Desktop app credentials require localhost. For a hosted AutoMap use a Web application client with the displayed redirect URI.')
-                if urlsplit(callback).scheme != 'https' and urlsplit(callback).hostname not in ('localhost', '127.0.0.1', '::1'):
+                callback_url = urlsplit(callback)
+                is_local_callback = callback_url.hostname in ('localhost', '127.0.0.1', '::1')
+                if 'installed' in config and not is_local_callback:
+                    raise ValueError(
+                        'Desktop app credentials require localhost. '
+                        'For a hosted AutoMap use a Web application client with the displayed redirect URI.'
+                    )
+                if callback_url.scheme != 'https' and not is_local_callback:
                     raise ValueError('Hosted Google authorization requires HTTPS.')
                 flow = Flow.from_client_config(config, scopes=[SCOPE], redirect_uri=callback, autogenerate_code_verifier=True)
                 auth_url, state = flow.authorization_url(access_type='offline', prompt='consent select_account')
                 owner = self.owner()
-                pending = {'config': config, 'state': state, 'verifier': flow.code_verifier, 'redirect': callback, 'created': time.time()}
-                pending['return_to'] = '/api-manager' if request.form.get('return_to') == '/api-manager' else '/studio'
+                pending = {
+                    'config': config,
+                    'state': state,
+                    'verifier': flow.code_verifier,
+                    'redirect': callback,
+                    'created': time.time(),
+                    'return_to': '/studio',
+                }
+                if request.form.get('return_to') == '/api-manager':
+                    pending['return_to'] = '/api-manager'
                 self.save_secret(self.token_path(owner).with_suffix('.pending'), pending)
                 return jsonify(authorization_url=auth_url)
             except ValueError as error:
@@ -275,7 +426,9 @@ class YouTubeUploads:
                 if pending.get('return_to') == '/api-manager':
                     return_to = '/api-manager'
                 state = request.args.get('state', '')
-                if not state or not hmac.compare_digest(state, pending['state']) or time.time() - pending['created'] > 600:
+                if not state or not hmac.compare_digest(state, pending['state']):
+                    raise ValueError('Expired or invalid OAuth state.')
+                if time.time() - pending['created'] > 600:
                     raise ValueError('Expired or invalid OAuth state.')
                 pending_path.unlink(missing_ok=True)
                 if request.args.get('error') or not request.args.get('code'):

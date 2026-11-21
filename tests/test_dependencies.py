@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Keep Docker/requirements and package installations on the same dependencies."""
+"""Keep package/Docker dependency declarations and installed media versions compatible.
+
+Parses requirements.txt and pyproject.toml, then checks installed Pillow against
+both application and MoviePy requirements. These tests inspect local metadata;
+they neither install packages nor contact package registries.
+"""
 from importlib import metadata
 from pathlib import Path
 import tomllib

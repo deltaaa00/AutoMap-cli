@@ -1,4 +1,10 @@
-"""Idea generation, provider errors and bounded research without external calls."""
+"""Check single and multiple AI topic ideas, parameter choices and research limits.
+
+Fake provider outputs verify schema errors, duplicate/invalid ideas and bounded
+counts. Flask requests check option forwarding and service-error status codes.
+The tests never spend real model or search quota.
+"""
+from webapp import generation
 import json
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -81,7 +87,7 @@ def test_research_budget_prevents_unbounded_model_tool_calls(monkeypatch):
 @pytest.mark.parametrize('payload,status', [({'provider':'unknown'},400),({'provider':'gemini','model':'deepseek-flash'},400),({'temperature':3},400),({},200)])
 def test_idea_endpoint_validates_and_forwards_settings(web,monkeypatch,payload,status):
     generate=Mock(return_value={'idea':'Example'})
-    monkeypatch.setattr(web,'generate_map_idea',generate)
+    monkeypatch.setattr(generation, 'generate_map_idea',generate)
     response=web.app.test_client().post('/api/generate_idea',json={'api_key':'test-key', **payload})
     assert response.status_code==status
     if status==200:assert response.json['idea']=='Example'
@@ -89,7 +95,7 @@ def test_idea_endpoint_validates_and_forwards_settings(web,monkeypatch,payload,s
 
 @pytest.mark.parametrize('error,status',[(ai.AIServiceError('overloaded',503),503),(RuntimeError('failed'),500)])
 def test_idea_endpoint_provider_errors(web,monkeypatch,error,status):
-    monkeypatch.setattr(web,'generate_map_idea',Mock(side_effect=error))
+    monkeypatch.setattr(generation, 'generate_map_idea',Mock(side_effect=error))
     assert web.app.test_client().post('/api/generate_idea',json={'api_key':'test-key'}).status_code==status
 
 
@@ -122,7 +128,7 @@ def test_idea_endpoint_rejects_invalid_counts(web, count):
 def test_idea_endpoint_returns_multiple_candidates(web, monkeypatch):
     candidates = [{'idea': 'First'}, {'idea': 'Second'}]
     generate = Mock(return_value={'ideas': candidates})
-    monkeypatch.setattr(web, 'generate_map_idea', generate)
+    monkeypatch.setattr(generation, 'generate_map_idea', generate)
     response = web.app.test_client().post('/api/generate_idea', json={'api_key': 'test-key', 'count': 2, 'with_params': True})
     assert response.json['ideas'] == candidates
     assert generate.call_args.kwargs['count'] == 2

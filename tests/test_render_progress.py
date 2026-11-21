@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Progress is isolated per request and follows actual MoviePy callbacks."""
+"""Check video progress lifecycle across worker callbacks and web polling.
+
+Fake MoviePy progress updates exercise monotonic percentages, UUID isolation,
+capacity and error completion. Proxy tests assert recoverable status handling.
+No real render is needed to verify the render_progress module contract.
+"""
+from webapp import http_client
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -118,11 +124,11 @@ def test_web_progress_proxy(web, monkeypatch, status):
     upstream = Mock(status_code=status)
     upstream.json.return_value = {'status': 'rendering', 'progress': 63, 'phase': 'Encoding video'}
     get = Mock(return_value=upstream)
-    monkeypatch.setattr(requests, 'get', get)
+    monkeypatch.setattr(http_client.worker_http, 'get', get)
     result = web.app.test_client().get(f'/api/render_progress/{render_id}')
     assert result.status_code == status
     assert result.json == upstream.json.return_value
-    get.assert_called_once_with(f'{web.WORKER_URL}/api/render_progress/{render_id}', timeout=5)
+    get.assert_called_once_with(f'{web.app.config['WORKER_URL']}/api/render_progress/{render_id}', timeout=5)
     upstream.close.assert_called_once()
 
 
@@ -131,7 +137,7 @@ def test_web_progress_errors_are_recoverable(web, monkeypatch, failure):
     upstream = Mock()
     upstream.json.side_effect = ValueError('bad json')
     get = Mock(side_effect=requests.Timeout()) if failure == 'connection' else Mock(return_value=upstream)
-    monkeypatch.setattr(requests, 'get', get)
+    monkeypatch.setattr(http_client.worker_http, 'get', get)
     result = web.app.test_client().get(f'/api/render_progress/{uuid4()}')
     assert result.status_code == 502
 
@@ -139,7 +145,7 @@ def test_web_progress_errors_are_recoverable(web, monkeypatch, failure):
 def test_render_progress_id_is_forwarded_to_worker(web, monkeypatch):
     render_id = str(uuid4())
     post = Mock(return_value=Mock(status_code=200, json=lambda: {'status': 'success'}))
-    monkeypatch.setattr(requests, 'post', post)
+    monkeypatch.setattr(http_client.worker_http, 'post', post)
     result = web.app.test_client().post('/api/render_video', json={'video_title': 'Test', 'render_id': render_id})
     assert result.status_code == 200
     assert post.call_args.kwargs['json']['render_id'] == render_id

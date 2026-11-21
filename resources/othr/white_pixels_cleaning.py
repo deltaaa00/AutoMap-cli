@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Remove partially transparent pixels from a prepared map asset.
+
+This standalone asset-maintenance script reads and overwrites map.png in the
+current working directory. Opaque pixels stay opaque; every other alpha value
+becomes zero via a lookup table. Its top-level I/O runs on import, so do not
+import it into a request handler. Work on a copy of artwork when tuning edges;
+tests/test_asset_tools.py provides a temporary-input regression check.
+"""
+
 from PIL import Image
 
 _OPAQUE_ALPHA_LUT: list[int] = [255 if a == 255 else 0 for a in range(256)]

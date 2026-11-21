@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Malformed untrusted login/logout input must not raise server errors."""
+"""Keep malformed login/logout input from escaping the authentication boundary.
+
+Uses the isolated app factory from test_web_auth. Unicode logout tokens and
+control characters in redirect targets must produce controlled responses
+without crashing the server or clearing a valid session unexpectedly.
+"""
 from test_web_auth import auth_app
 
 

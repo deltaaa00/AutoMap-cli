@@ -1,4 +1,12 @@
-"""YouTube competitor intelligence, Analytics metrics sync, and video upload helper."""
+"""Collect YouTube intelligence/analytics and upload approved candidate videos.
+
+AgentRunner supplies AgentDB and calls scans, analytics synchronization, and
+uploads. Public competitor data uses YOUTUBE_API_KEY; channel analytics/uploads
+use the OAuth token written by ``web_youtube.py`` at AGENT_YOUTUBE_TOKEN_PATH
+or the instance-directory default. Credential refresh can rewrite that token.
+Collected statistics, retention curves, and scores are persisted through AgentDB;
+scoring policy itself is in ``optimizer.py``. Network/API failures in optional
+analytics collection are logged so other available metric sources can be used."""
 
 from __future__ import annotations
 
@@ -493,7 +501,11 @@ class YouTubeIntel:
     # --- Own-Channel Analytics Sync ---
 
     def sync_own_analytics(self) -> int:
-        """Update full views/retention/engagement/curve metrics for published experiments."""
+        """Refresh published experiments from whichever metric sources are available.
+
+        Prefer current Data API counts, then Analytics, then saved experiment values;
+        a reported zero is valid data. Retention curves and engagement feed the shared
+        optimizer score. Return the number of updated experiment records."""
         self.sync_own_top_topics(limit=15)
         published = self.db.list_experiments(status="published", limit=60)
         targets = [exp for exp in published if exp.get("youtube_video_id")]
@@ -576,21 +588,27 @@ class YouTubeIntel:
             a_info = analytics_by_id.get(vid, {})
             c_info = curves_by_id.get(vid, {})
 
-            views = int(
-                d_info.get("views")
-                if d_info.get("views") is not None
-                else (a_info.get("views") if a_info.get("views") is not None else (exp.get("views_72h") or exp.get("views_24h") or 0))
-            )
-            likes = int(
-                d_info.get("likes")
-                if d_info.get("likes") is not None
-                else (a_info.get("likes") if a_info.get("likes") is not None else (exp.get("likes_72h") or 0))
-            )
-            comments = (
-                d_info.get("comments")
-                if d_info.get("comments") is not None
-                else (a_info.get("comments") if a_info.get("comments") is not None else exp.get("comments_72h"))
-            )
+            # Prefer current Data API metrics, then Analytics, then saved values.
+            # A reported zero is valid; only None means a source is unavailable.
+            views = d_info.get("views")
+            if views is None:
+                views = a_info.get("views")
+            if views is None:
+                views = exp.get("views_72h") or exp.get("views_24h") or 0
+            views = int(views)
+
+            likes = d_info.get("likes")
+            if likes is None:
+                likes = a_info.get("likes")
+            if likes is None:
+                likes = exp.get("likes_72h") or 0
+            likes = int(likes)
+
+            comments = d_info.get("comments")
+            if comments is None:
+                comments = a_info.get("comments")
+            if comments is None:
+                comments = exp.get("comments_72h")
             shares = a_info.get("shares") if a_info.get("shares") is not None else exp.get("shares_72h")
             dislikes = a_info.get("dislikes") if a_info.get("dislikes") is not None else exp.get("dislikes_72h")
             avg_pct = a_info.get("avg_view_pct") if a_info.get("avg_view_pct") is not None else exp.get("avg_view_pct")

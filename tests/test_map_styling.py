@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Color configuration and AI-value analysis without external services."""
+"""Verify numeric parsing, palettes and editor rules without live AI.
+
+Covers malformed/nonfinite colors, fractional bounds, explicit theme priority
+and effective-render metadata. These tests focus on reusable styling contracts;
+actual country fill pixels are checked by test_auto_map.
+"""
+from webapp import analysis as map_analysis
 import importlib
 
 import pytest
@@ -133,7 +139,7 @@ def test_numeric_overrides_preserve_fractional_bounds(raw):
 
 
 def test_analysis_preserves_actual_render_rules_and_skips_malformed_metadata(web):
-    analysis = web._build_analysis_from_ai({'a': '2.5M', 'b': 10}, mode='number', render_meta={
+    analysis = map_analysis._build_analysis_from_ai({'a': '2.5M', 'b': 10}, mode='number', render_meta={
         'resolved_theme': 'heatmap',
         'used_txt': {'Yes': '#112233', 'invalid': None},
         'used_num': {'(0, 10)': [1, 2, 3, 128], (10, 3_000_000): '#445566',

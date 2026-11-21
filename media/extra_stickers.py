@@ -12,13 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Offline vector artwork for the extended sticker library."""
+"""Offline vector artwork for the extended sticker collection.
+
+``media.stickers`` delegates icons outside its original set to
+``draw_extra_sticker``. Artwork uses normalized coordinates scaled to a square
+Pillow canvas; this module draws into the caller's canvas and does not save files,
+apply shadows, fetch assets, or choose themes. Returning False lets the caller
+continue its own fallback drawing for an unsupported identifier.
+"""
 
 
 def draw_extra_sticker(kind, draw, s, outline, ow, star_polygon_fn=None):
-    """Draw an extended procedural sticker onto a Pillow ImageDraw canvas.
+    """Draw an extended icon into the caller's Pillow ImageDraw canvas.
 
-    Returns True if `kind` is handled by this library, False otherwise.
+    ``s`` is the square canvas size in pixels and ``ow`` the outline width.
+    Normalized coordinates are scaled internally; ``star_polygon_fn`` is the
+    caller's shared star geometry helper. Return True when the icon is drawn,
+    or False without drawing when this collection does not handle ``kind``.
     """
     extras = {
         'mountain', 'volcano', 'island', 'rainbow', 'moon', 'rain', 'robot',

@@ -1,4 +1,12 @@
-"""A/B effect optimizer, posting-hour selector, and topic planner for automap-agent."""
+"""Choose experiment presets, posting hours, and reusable topic metadata.
+
+AgentOptimizer reads AgentDB performance/history to balance preset exploration
+and exploitation, prefer useful posting hours, and find competitor inspiration.
+Randomness can be injected for reproducible tests. Pure helpers calculate video
+scores, infer numeric label suffixes, and build descriptions/hashtags.
+This module does not render files or call external APIs: collection lives in
+``youtube_intel.py`` and candidate execution lives in ``video_generation.py``.
+Changes to score weights affect both ranking and future experiment choices."""
 
 from __future__ import annotations
 

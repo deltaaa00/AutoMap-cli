@@ -1,0 +1,22 @@
+{# A/B effect leaderboard table shell. static/agent/overview.js renders rows from the overview API leaderboard field. #}
+<section class="lg:col-span-7 glass rounded-2xl p-5 space-y-3">
+    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+        <i class="fa-solid fa-flask text-emerald-400"></i>
+        A/B Effect Leaderboard
+    </h2>
+    <div class="overflow-x-auto">
+        <table class="w-full text-xs text-left">
+            <thead class="text-slate-400 border-b border-slate-800">
+                <tr>
+                    <th class="py-2 pr-3">Effect Preset</th>
+                    <th class="py-2 px-2">Runs</th>
+                    <th class="py-2 px-2">Avg Views</th>
+                    <th class="py-2 px-2">Retention / Watch</th>
+                    <th class="py-2 px-2">Engagement</th>
+                    <th class="py-2 pl-2">Score</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboardBody" class="divide-y divide-slate-800/70"></tbody>
+        </table>
+    </div>
+</section>

@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Regression fixture for the original saved AI response."""
+"""Keep saved AI-response and duplicate CSV-header parsing regressions.
+
+A local response fixture exercises the parser without a model call. General
+provider/filling behavior lives in test_ai_and_filling and CSV row validation
+in test_batch_csv; add narrow historical parser regressions here.
+"""
 import json
 import pytest
 from pathlib import Path

@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test provider JSON parsing, failure translation and filling-file loading.
+
+Fake Gemini clients expose request configuration and bounded errors. Temporary
+filling files cover color/range conversion and template fallback. Use this suite
+for map.functions contracts; provider-specific DeepSeek/research behavior has
+its own suites and must not call real services.
+"""
+
 import json
 from pathlib import Path
 from types import SimpleNamespace

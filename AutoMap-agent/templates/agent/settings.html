@@ -1,0 +1,69 @@
+{# Agent scheduling, AI, search, and description settings. overview.js populates form values; static/agent/actions.js saves them. #}
+<section class="lg:col-span-5 glass rounded-2xl p-5 space-y-3">
+    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+        <i class="fa-solid fa-sliders text-sky-400"></i>
+        Agent Settings
+    </h2>
+    <div class="space-y-3 text-xs">
+        <label class="block">
+            <span class="text-slate-400">Competitor Channels (@handle or UC… comma/newline separated)</span>
+            <textarea id="cfgCompetitors" rows="3" placeholder="@terramapper, @examplemaps"
+                class="mt-1 w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs"></textarea>
+        </label>
+        <div class="grid grid-cols-3 gap-2">
+            <label class="block">
+                <span class="text-slate-400">Videos/Day</span>
+                <input id="cfgPostsPerDay" type="number" min="1" max="6" value="2"
+                    class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+            </label>
+            <label class="block">
+                <span class="text-slate-400">Series Size</span>
+                <input id="cfgSeriesSize" type="number" min="1" max="20" value="4"
+                    class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+            </label>
+            <label class="block">
+                <span class="text-slate-400">Timezone</span>
+                <input id="cfgTimezone" type="text" value="Europe/Kyiv"
+                    class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+            </label>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+            <label class="block">
+                <span class="text-slate-400">AI Model</span>
+                <select id="cfgModel"
+                    class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                    <option value="gemini-3.8-flash">gemini-3.8-flash</option>
+                </select>
+            </label>
+            <label class="block">
+                <span class="text-slate-400">Watermark</span>
+                <input id="cfgWatermark" type="text" value="TERRAMAPPER"
+                    class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+            </label>
+        </div>
+        <div class="grid grid-cols-2 gap-2 items-end">
+            <label class="flex items-center gap-2 py-1.5 px-2.5 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+                <input id="cfgWebSearch" type="checkbox" checked class="rounded border-slate-700 bg-slate-900 text-indigo-500">
+                <span class="text-slate-200">Enable Web Search</span>
+            </label>
+            <label class="block">
+                <span class="text-slate-400">Searches / Map (1–5)</span>
+                <input id="cfgMaxSearches" type="number" min="1" max="5" value="5"
+                    class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+            </label>
+        </div>
+        <label class="block">
+            <span class="text-slate-400">AutoMap Server URL (leave blank for local Docker)</span>
+            <input id="cfgAutomapUrl" type="url" placeholder="https://your-automap-server.com"
+                class="mt-1 w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+        </label>
+        <label class="block">
+            <span class="text-slate-400">YouTube Description Template (<code class="text-sky-300">{topic}</code> &amp; <code class="text-sky-300">{hashtags}</code>)</span>
+            <textarea id="cfgDescTemplate" rows="3" placeholder="{topic}&#10;&#10;Subscribe for daily map shorts!&#10;&#10;{hashtags}"
+                class="mt-1 w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-xs"></textarea>
+        </label>
+        <button type="button" onclick="saveAgentConfig()" class="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition">
+            Save Settings
+        </button>
+    </div>
+</section>

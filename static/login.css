@@ -1,0 +1,23 @@
+/**
+ * Styles for the login page rendered by webapp/auth.py.
+ * Keep this standalone: authentication does not load the workspace theme or scripts.
+ * The form must remain usable on narrow screens and with a visible keyboard focus.
+ */
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #0b1020; color: #edf2ff; font: 16px system-ui, sans-serif; }
+main { width: 100%; max-width: 390px; padding: 32px; border: 1px solid #303b58; border-radius: 20px; background: #141c30; }
+h1 { margin: 0 0 8px; font-size: 28px; }
+p { color: #adb8d0; line-height: 1.5; }
+label { display: block; margin: 20px 0 8px; }
+input, button { width: 100%; padding: 13px; border-radius: 9px; font: inherit; }
+input { color: #fff; background: #0b1020; border: 1px solid #465474; }
+input:focus-visible, button:focus-visible { outline: 3px solid #9fb8ff; outline-offset: 3px; }
+button { margin-top: 24px; cursor: pointer; border: 0; background: #8caaff; color: #0b1020; font-weight: 700; }
+.error { color: #ffb4b4; }
+body { min-height: 100svh; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+main { min-width: 0; overflow-wrap: anywhere; }
+input { min-width: 0; }
+button { min-height: 48px; touch-action: manipulation; }
+@media (max-width: 390px) {
+  main { padding: 24px 20px; }
+}

@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""DeepSeek transport and credential isolation; no real API keys or requests."""
+"""Verify DeepSeek transport and provider credential isolation.
+
+Fake HTTP responses cover JSON completeness, model listing, timeouts and useful
+redacted errors. Web/CLI/batch cases ensure one provider cannot receive another
+provider's browser key. Do not replace the fake transport with live credentials.
+"""
+from webapp import generation, inputs
 import io
 from unittest.mock import Mock
 
@@ -123,7 +129,7 @@ def test_deepseek_model_discovery(monkeypatch):
 
 @pytest.mark.parametrize('source', ['browser', 'environment', 'file'])
 def test_web_deepseek_key_sources_are_independent(web, monkeypatch, tmp_path, source):
-    monkeypatch.setattr(web, 'auto_map', Mock(return_value=io.BytesIO(b'png')))
+    monkeypatch.setattr(generation, 'auto_map', Mock(return_value=io.BytesIO(b'png')))
     body = dict(topic='Population', mode='number', map_type='default', model='deepseek-flash', provider='deepseek')
     if source == 'browser':
         body['api_key'] = 'deepseek-only-key'
@@ -132,20 +138,20 @@ def test_web_deepseek_key_sources_are_independent(web, monkeypatch, tmp_path, so
     else:
         env = tmp_path / '.env'
         env.write_text('DEEPSEEK_API_KEY=deepseek-only-key\nGEMINI_API_KEY=your_gemini_key\n')
-        monkeypatch.setattr(web, 'env', env)
-        monkeypatch.setattr(web, 'dotenv_values', dotenv_values)
+        monkeypatch.setitem(web.app.config, 'ENV_FILE', env)
+        monkeypatch.setattr(inputs.dotenv, 'dotenv_values', dotenv_values)
     client = web.app.test_client()
     assert client.get('/api/status?provider=deepseek').json == {'needs_api_key': source == 'browser'}
     assert client.get('/api/status').json == {'needs_api_key': True}
     response = client.post('/api/generate', json=body)
     assert response.status_code == 200
-    assert web.auto_map.call_args.kwargs['api_key'] == 'deepseek-only-key'
+    assert generation.auto_map.call_args.kwargs['api_key'] == 'deepseek-only-key'
     assert 'deepseek-only-key' not in response.json['command']
 
 
 def test_web_provider_mismatch_cannot_send_a_key_to_another_provider(web, monkeypatch):
     render = Mock()
-    monkeypatch.setattr(web, 'auto_map', render)
+    monkeypatch.setattr(generation, 'auto_map', render)
     result = web.app.test_client().post('/api/generate', json={
         'topic': 'Population', 'model': 'deepseek-flash', 'provider': 'gemini', 'api_key': 'gemini-key',
     })
@@ -157,14 +163,14 @@ def test_web_provider_mismatch_cannot_send_a_key_to_another_provider(web, monkey
 def test_web_deepseek_discovery_uses_its_key(web, monkeypatch):
     monkeypatch.setenv('DEEPSEEK_API_KEY', 'deepseek-server')
     listing = Mock(return_value=['deepseek-flash'])
-    monkeypatch.setattr(web, 'list_deepseek_models', listing)
+    monkeypatch.setattr(generation, 'list_deepseek_models', listing)
     result = web.app.test_client().post('/api/models', json={'provider': 'deepseek'})
     assert result.json == {'status': 'success', 'models': ['deepseek-flash']}
     listing.assert_called_once_with('deepseek-server')
 
 
 def test_deepseek_batch_does_not_forward_browser_key_to_gemini(web, monkeypatch):
-    monkeypatch.setattr(web, 'auto_map', Mock(return_value=io.BytesIO(b'png')))
+    monkeypatch.setattr(generation, 'auto_map', Mock(return_value=io.BytesIO(b'png')))
     result = web.app.test_client().post('/api/generate_batch', json={
         'provider': 'deepseek', 'model': 'deepseek-flash', 'api_key': 'deepseek-browser',
         'filename': 'ideas.csv', 'ideas_text': 'prompt,model\nOne,deepseek-flash\nTwo,gemini-3.8-flash\n',
@@ -173,5 +179,5 @@ def test_deepseek_batch_does_not_forward_browser_key_to_gemini(web, monkeypatch)
     assert result.json['succeeded'] == 1
     assert result.json['results'][0]['provider'] == 'deepseek'
     assert result.json['results'][1]['status'] == 'error'
-    web.auto_map.assert_called_once()
-    assert web.auto_map.call_args.kwargs['api_key'] == 'deepseek-browser'
+    generation.auto_map.assert_called_once()
+    assert generation.auto_map.call_args.kwargs['api_key'] == 'deepseek-browser'

@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Render benchmark for the video worker.
+"""Measure local worker rendering with synthetic video, map and audio material.
 
-Usage: python benchmarks/bench_video_render.py [--seconds 3] [--module yt-dlp_serv.py]
+Run ``python benchmarks/bench_video_render.py --seconds 3`` from the project root.
+The --module option selects a compatible media/worker.py implementation so
+revisions can be compared. Cases toggle visual effects and draft rendering and
+print elapsed times; they are measurements, not fixed CI timing thresholds.
 
-Renders a short synthetic clip through /api/render_video with visual effects
-on and off (plus a draft run) and prints wall-clock timings. ``--module`` lets
-you time another revision of the worker file for before/after comparisons.
+No AI or remote downloads are required. MoviePy/FFmpeg must work locally. The
+harness creates temporary input/output files and overrides worker storage; it
+loads the implementation module rather than the thin yt-dlp_serv.py launcher.
 """
 import argparse
 import base64
@@ -32,6 +35,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def load_worker(path):
+    """Load a worker implementation for benchmarking with the project on sys.path.
+    """
     sys.path.insert(0, ROOT)
     spec = importlib.util.spec_from_file_location('bench_worker', path)
     module = importlib.util.module_from_spec(spec)
@@ -42,7 +47,7 @@ def load_worker(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--seconds', type=float, default=3.0)
-    parser.add_argument('--module', default=os.path.join(ROOT, 'yt-dlp_serv.py'))
+    parser.add_argument('--module', default=os.path.join(ROOT, 'media', 'worker.py'))
     parser.add_argument('--repeat', type=int, default=1)
     args = parser.parse_args()
 

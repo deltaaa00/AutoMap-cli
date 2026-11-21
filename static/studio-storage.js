@@ -1,3 +1,13 @@
+/**
+ * Browser persistence shared by the map workspace and Video Studio.
+ *
+ * Exports window.StudioStorage. IndexedDB keeps large material blobs and map
+ * history; localStorage holds small UI preferences in the page scripts. Callers
+ * must tolerate blocked/unavailable storage. The clearing flag and transaction
+ * ordering prevent late asynchronous writes from restoring data the user deleted.
+ * Keep the database version/store migration and exported methods compatible when
+ * changing record shapes; tests/browser covers restore and clear races.
+ */
 // Copyright 2025-2026 deltaaa00
 //
 // Licensed under the Apache License, Version 2.0 (the "License");

@@ -1,0 +1,32 @@
+{# Background/music uploads and URL import controls. File lists are populated by overview.js; static/agent/media.js performs management requests. #}
+<section class="lg:col-span-6 glass rounded-2xl p-5 space-y-4">
+    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+        <i class="fa-solid fa-film text-purple-400"></i>
+        Media Pool (4-video series)
+    </h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-3 space-y-2">
+            <div class="font-semibold text-slate-200">Background Videos (.mp4/.mov/.webm, &le;100 MB)</div>
+            <input id="bgUploadInput" type="file" accept=".mp4,.mov,.webm,video/*" multiple class="block w-full text-[11px] text-slate-300">
+            <button type="button" onclick="uploadMedia('background')" class="w-full py-1.5 rounded-lg bg-indigo-600/85 hover:bg-indigo-500 text-white font-semibold">
+                Upload Backgrounds
+            </button>
+            <ul id="bgFilesList" class="space-y-1 max-h-28 overflow-y-auto text-[11px] font-mono text-slate-300"></ul>
+        </div>
+        <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-3 space-y-2">
+            <div class="font-semibold text-slate-200">Music Tracks (.mp3/.wav/.m4a, &le;100 MB)</div>
+            <input id="musicUploadInput" type="file" accept=".mp3,.wav,.m4a,.aac,.ogg,.flac,audio/*" multiple class="block w-full text-[11px] text-slate-300">
+            <button type="button" onclick="uploadMedia('music')" class="w-full py-1.5 rounded-lg bg-emerald-600/85 hover:bg-emerald-500 text-white font-semibold">
+                Upload Music
+            </button>
+            <ul id="musicFilesList" class="space-y-1 max-h-28 overflow-y-auto text-[11px] font-mono text-slate-300"></ul>
+        </div>
+    </div>
+    <div class="flex gap-2 text-xs">
+        <input id="musicUrlInput" type="url" placeholder="Or paste a YouTube URL to import a track into the music pool…"
+            class="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white">
+        <button type="button" onclick="importMusicByUrl()" class="px-3.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold shrink-0">
+            <i class="fa-solid fa-music mr-1"></i> Import
+        </button>
+    </div>
+</section>

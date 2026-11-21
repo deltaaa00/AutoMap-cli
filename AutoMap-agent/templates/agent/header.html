@@ -1,0 +1,34 @@
+{# Dashboard identity, heartbeat, AutoMap studio links, and conditional sign-out.
+automap_public_url and auth_enabled are supplied by web.py's agent_home route. #}
+<header class="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3.5">
+            <div class="relative group">
+                <div class="absolute -inset-1 rounded-xl bg-gradient-to-r from-emerald-500 via-cyan-400 to-indigo-500 opacity-60 blur group-hover:opacity-90 transition duration-300"></div>
+                <div class="relative w-10 h-10 rounded-xl bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 flex items-center justify-center shadow-lg border border-emerald-400/30 text-emerald-300">
+                    <i class="fa-solid fa-robot text-base"></i>
+                </div>
+            </div>
+            <div>
+                <h1 class="text-base font-bold text-white leading-tight">AutoMap Agent</h1>
+                <p class="text-[11px] text-slate-400">Autonomous YouTube Shorts Pipeline &bull; 2 videos/day &bull; A/B Learning</p>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <span id="agentHeartbeatBadge" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-300">Checking agent…</span>
+            <a id="mapStudioLink" href="{{ automap_public_url }}/" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                <i class="fa-solid fa-map text-indigo-400"></i> Map Studio
+            </a>
+            <a id="videoStudioLink" href="{{ automap_public_url }}/studio" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-600/90 to-orange-600/90 hover:from-rose-500 hover:to-orange-500 text-xs font-semibold text-white flex items-center gap-1.5">
+                <i class="fa-solid fa-clapperboard"></i> Video Studio
+            </a>
+            {% if auth_enabled %}
+            <form method="POST" action="/logout">
+                <button type="submit" class="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-300">
+                    Sign Out
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</header>

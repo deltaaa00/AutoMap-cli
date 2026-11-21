@@ -1,0 +1,51 @@
+{#
+   Encoder selection and local save/audio status. Owned by codecs.js. Keep IDs and inline
+   handlers aligned with static/video scripts.
+#}
+<!-- Codec Selection (Synced Visual Cards + Original Select) -->
+<div id="codecPanel" class="md:col-span-2 self-start p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 flex flex-col gap-3">
+    <div class="flex items-center justify-between">
+        <label for="codecSelect" class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+            <span class="w-5 h-5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 font-mono text-xs font-medium flex items-center justify-center">F4</span>
+            <i class="fa-solid fa-microchip text-slate-400"></i>
+            <span>Hardware / Software Codec</span>
+        </label>
+        <select id="codecSelect" onchange="syncCodecCards(this.value)"
+            class="px-3 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-400 focus:outline-none focus:border-slate-700 transition">
+            <option value="libx264" selected>libx264</option>
+            <option value="h264_nvenc" disabled>h264_nvenc</option>
+            <option value="h264_videotoolbox" disabled>h264_videotoolbox</option>
+        </select>
+    </div>
+
+    <!-- Interactive Codec Pill Cards -->
+    <div class="grid grid-cols-3 gap-2 pt-1">
+        <button type="button" data-codec="libx264" onclick="selectCodecCard('libx264')"
+            class="codec-card p-2 rounded-xl border border-slate-700 bg-slate-800 text-left transition">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono font-medium text-slate-100">libx264</span>
+                <i class="fa-solid fa-server text-xs text-slate-400"></i>
+            </div>
+            <div class="text-xs text-slate-400 mt-1 truncate">Universal CPU</div>
+        </button>
+        <button type="button" data-codec="h264_nvenc" disabled onclick="selectCodecCard('h264_nvenc')"
+            class="codec-card p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 text-left transition">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono font-medium text-slate-200">nvenc</span>
+                <i class="fa-solid fa-bolt text-xs text-slate-400"></i>
+            </div>
+            <div class="text-xs text-slate-400 mt-1 truncate">NVIDIA GPU</div>
+        </button>
+        <button type="button" data-codec="h264_videotoolbox" disabled onclick="selectCodecCard('h264_videotoolbox')"
+            class="codec-card p-2 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 text-left transition">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-mono font-medium text-slate-200">videotoolbox</span>
+                <i class="fa-brands fa-apple text-xs text-slate-400"></i>
+            </div>
+            <div class="text-xs text-slate-400 mt-1 truncate">Apple Silicon</div>
+        </button>
+    </div>
+    <p id="codecStatus" role="status" aria-live="polite" class="text-xs text-slate-400">Checking encoders on the render worker…</p>
+    <p id="studioSaveStatus" role="status" class="text-xs text-slate-500">Settings and selected files are saved automatically on this device.</p>
+    <p id="renderAudioStatus" role="status" class="text-xs text-slate-400">No music uploaded · video will be silent.</p>
+</div>

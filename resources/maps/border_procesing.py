@@ -15,11 +15,26 @@
 #This file makes blured borders
 
 
+"""Prepare a blurred border overlay from a map asset, outside the live renderer.
+
+This standalone maintenance script reads default_map.png in the current working
+directory and writes default_map_blured.png there. It blurs first, blackens the
+selected border pixels, then strengthens their alpha without uint8 overflow.
+Run from a disposable asset directory when experimenting. Top-level I/O also runs
+on import; application code should use prepared assets rather than import this
+script. tests/test_asset_tools.py exercises it with temporary artwork.
+"""
+
 from PIL import Image, ImageFilter
 import numpy as np
 
 def borders_procesing(image: Image.Image): #Function prepares borders to composing after ImageFilter.GaussianBlur()
 
+    """Return an RGBA border overlay with selected blur pixels blackened and strengthened.
+
+    The input must have four channels. Opacity addition uses a wider integer type
+    before clamping to 255 so bright edges cannot wrap back to transparency.
+    """
     pixels = np.array(image)
 
     r, g, b, a = pixels[..., 0], pixels[..., 1], pixels[..., 2], pixels[..., 3]

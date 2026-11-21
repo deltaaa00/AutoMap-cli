@@ -12,7 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Shared development and production launch settings for the web services."""
+"""Choose how the web application and media worker listen for requests.
+
+Both root launchers call run_app with their Flask app and default port. Settings
+come from process environment first, then the repository .env file. Only the
+exact value SERVER=TRUE selects Waitress; other values use Flask development
+mode. PORT overrides the caller's default. This module starts a server only
+when run_app is called; authentication belongs to webapp.auth, not this switch.
+"""
 
 import os
 from pathlib import Path

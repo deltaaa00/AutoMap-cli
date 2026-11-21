@@ -1,3 +1,7 @@
+# Validate the root application on the configured push/PR branches.
+# Installs Python runtime/test dependencies plus Chromium, then runs pytest with
+# coverage. Agent tests and Node-only frontend checks have separate local commands
+# in overview.md; adding modules does not automatically add a new CI job.
 # Copyright 2025-2026 deltaaa00
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

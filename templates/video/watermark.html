@@ -1,0 +1,52 @@
+{#
+   Watermark image, font, text, and footer controls. Uses title_fonts and watermark.js.
+   Keep IDs and inline handlers aligned with static/video scripts.
+#}
+<!-- Watermark image and text controls -->
+<div id="watermarkPanel" class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 flex flex-col gap-3">
+        <h3 class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+            <i class="fa-solid fa-stamp text-slate-400"></i> Watermark
+            <span class="ml-auto text-xs font-normal text-slate-500">Optional</span>
+        </h3>
+        <div id="watermarkDropzone" role="button" tabindex="0" aria-label="Upload watermark image" aria-describedby="watermarkUploadHint">
+            <img id="watermarkThumbPreview" alt="Selected watermark logo" class="hidden">
+            <p id="watermarkUploadPrompt" class="text-xs text-slate-200">Drop your watermark image here, or click to browse</p>
+            <p id="watermarkUploadHint" class="mt-1 text-xs text-slate-500">PNG, JPEG or WebP · up to 15 MB</p>
+        </div>
+        <input id="watermarkFileInput" type="file" accept="image/png,image/jpeg,image/webp" onchange="selectWatermark(this.files[0])" class="hidden">
+        <div class="flex items-center justify-between gap-2 text-xs">
+            <span id="watermarkFileName" class="text-xs font-medium text-slate-200 truncate">No logo selected</span>
+            <button type="button" onclick="clearWatermarkImage()" class="text-slate-400">Remove logo</button>
+        </div>
+        <label class="block text-xs text-slate-300" for="watermarkTextInput">Watermark text
+            <input id="watermarkTextInput" type="text" maxlength="80" placeholder="YOUR CHANNEL" oninput="updateWatermarkPreview()" class="mt-1 w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-100">
+        </label>
+        <label class="block text-xs text-slate-300" for="watermarkFontSelect">Watermark text font
+            <select id="watermarkFontSelect" onchange="updateWatermarkPreview()" class="mt-1 w-full px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-100">
+                {% for font in title_fonts %}
+                <option value="{{ font }}" {% if font == 'DIN Condensed.ttf' %}selected{% endif %}>{{ font.rsplit('.', 1)[0] }}{% if font in ['kodchasan.ttf', 'arialroundedmtbold.ttf'] %} (Latin){% endif %}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="block text-xs text-slate-300" for="watermarkColor">Text color
+            <input id="watermarkColor" type="color" value="#a4e9ee" oninput="updateWatermarkPreview()" class="mt-1 block w-full h-9 p-1 bg-slate-950 border border-slate-700 rounded-lg">
+        </label>
+        <label class="flex items-center gap-2 text-xs text-slate-300 pt-1">
+            <input id="watermarkStarsToggle" type="checkbox" onchange="updateWatermarkPreview()" class="accent-emerald-400">
+            <span>Show 3 stars / footer badge (<strong class="text-slate-400"></strong>) beneath watermark</span>
+        </label>
+        <input id="watermarkStarsImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="selectWatermarkStarsImage(this.files[0])" class="hidden">
+        <div class="p-3 rounded-xl bg-slate-950/90 border border-slate-800/90 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span id="watermarkStarsFileName" class="text-slate-400 truncate">Built-in or upload file</span>
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="document.getElementById('watermarkStarsImageInput').click()" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-semibold transition">
+                    Upload custom stars / footer image
+                </button>
+                <button type="button" onclick="clearWatermarkStarsImage()" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 text-xs transition">
+                    Remove file
+                </button>
+            </div>
+        </div>
+        <p class="text-xs text-slate-500">Your logo is center-cropped to a circle below the map. Watermark text uses its own font near the bottom.</p>
+        <p id="watermarkPreviewStatus" role="status" aria-live="polite" class="text-xs text-slate-400"></p>
+</div>

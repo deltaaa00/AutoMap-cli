@@ -1,0 +1,49 @@
+{#
+   Frame composition form and console. Form partials preserve the existing renderForm boundary.
+   Keep IDs and inline handlers aligned with static/video scripts.
+#}
+<!-- RIGHT COLUMN: FRAME COMPOSER, CINEMA STAGE & RENDER ENGINE (8 COLS) -->
+<section id="composerControls" class="lg:col-span-7 xl:col-span-8 flex flex-col gap-5">
+
+    <!-- Render Video & Frame Builder Studio Card -->
+    <div class="studio-glass rounded-2xl flex flex-col flex-1 overflow-hidden relative">
+        <!-- Subtle top accent bar -->
+        <div class="absolute inset-x-0 top-0 h-0.5 bg-slate-800 opacity-90"></div>
+
+        <!-- Studio Toolbar -->
+        <div class="px-5 py-4 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3 bg-slate-950/60">
+            <div class="flex items-center gap-3">
+                <span class="w-2.5 h-2.5 rounded-full bg-slate-800 " id="statusIndicator"></span>
+                <h2 class="font-display font-semibold text-sm sm:text-base text-slate-100">Frame composer</h2>
+                <span id="studioMetaBadge" class="text-xs font-mono px-3 py-1 rounded-md bg-slate-900 text-accent-300 border border-accent-500/30">Ready</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="hidden sm:inline-flex items-center gap-2 text-xs font-mono px-3 py-1 rounded-md bg-slate-900 text-slate-400 border border-slate-800">
+                    <i class="fa-solid fa-film text-slate-400"></i>
+                    1080p Composite
+                </span>
+                <code class="text-xs font-mono px-2 py-1 rounded-md bg-slate-950 text-accent-300 border border-accent-500/20">/api/render_video</code>
+            </div>
+        </div>
+
+        <!-- Form -->
+        <form id="renderForm" onsubmit="handleRenderVideo(event)" class="relative flex-1 p-5 flex flex-col gap-5">
+
+            {% include 'video/render-overlay.html' %}
+            {% include 'video/materials.html' %}
+            <!-- Separate title and watermark panels, followed by compact codec controls. -->
+            <div class="grid grid-cols-1 md:grid-cols-2 items-start gap-4">
+
+                {% include 'video/title.html' %}
+                {% include 'video/watermark.html' %}
+                {% include 'video/codecs.html' %}
+
+            </div>
+
+            {% include 'video/youtube.html' %}
+
+        </form>
+    </div>
+
+    {% include 'video/console.html' %}
+</section>

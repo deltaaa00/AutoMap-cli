@@ -1,4 +1,10 @@
-"""Tests for agent SQLite storage and 4-video series MediaPool rotation."""
+"""Test agent persistence and deterministic media rotation without live services.
+
+Temporary paths isolate SQLite schema/configuration, experiment/command state,
+and background/music fixtures. These tests exercise AgentDB and MediaPool
+contracts shared by the runner and web routes. Keep network clients mocked in
+integration tests rather than introducing real API calls here. Run from the
+repository root with PYTHONPATH=AutoMap-agent and pytest AutoMap-agent/tests."""
 
 from __future__ import annotations
 

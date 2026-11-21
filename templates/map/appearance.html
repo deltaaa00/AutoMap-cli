@@ -1,0 +1,96 @@
+{# Map label sizing, extrema/legend options and suffix controls. Defaults and payload names are normalized by form.js. #}
+<details class="settings-group" open><summary><span>02</span> Map appearance</summary><div class="settings-group-body">                    <!-- 3. Flag: -gsm, --global-size-modifier -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label for="gsmNumber" class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                <i class="fa-solid fa-text-height text-accent-300 text-xs"></i>
+                                Global size modifier
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-3 bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                            <input type="range" id="gsmRange" min="-50" max="100" step="1" value="15"
+                                oninput="syncGsm(this.value)"
+                                class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                            <div class="flex items-center bg-slate-900 border border-slate-700/80 rounded-lg overflow-hidden shrink-0">
+                                <button type="button" onclick="adjustGsm(-1)" class="px-3 py-1 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">-</button>
+                                <input type="number" id="gsmNumber" name="gsm" value="15" step="1"
+                                    oninput="syncGsm(this.value)"
+                                    class="w-14 text-center bg-transparent text-sm font-mono text-slate-100 focus:outline-none">
+                                <button type="button" onclick="adjustGsm(1)" class="px-3 py-1 text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Flag: -eop, --extra-option -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label id="extraOptionSelect" class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                <i class="fa-solid fa-sparkles text-accent-300 text-xs"></i>
+                                Extra Display Options
+                            </label>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="checkbox" id="showMostLeastToggle" value="show_most_least" onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="px-2 py-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-accent-600/20 peer-checked:border-accent-500 text-center hover:border-slate-700 transition">
+                                    <div class="text-xs font-semibold text-slate-200 truncate">Show Most / Least</div>
+                                    <div class="text-xs text-slate-400 mt-1">Min / Max HUD</div>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="checkbox" id="shortFormToggle" value="short_form" onchange="updateCommandPreview()" class="peer sr-only">
+                                <div class="px-3 py-3 rounded-xl border border-slate-800 bg-slate-950/70 peer-checked:bg-accent-600/20 peer-checked:border-accent-500 text-center hover:border-slate-700 transition">
+                                    <div class="text-xs font-semibold text-slate-200">Short Form</div>
+                                    <div class="text-xs text-slate-400 mt-1">Compact (1k/1M)</div>
+                                </div>
+                            </label>
+                        </div>
+                        <p id="extraOptionHint" class="text-xs text-slate-400 mt-2 hidden"></p>
+                        <label class="mt-3 flex items-center justify-between gap-3 px-3 py-3 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-slate-700 transition cursor-pointer">
+                            <div>
+                                <div class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                    <i class="fa-solid fa-list-ul text-accent-300 text-xs"></i>
+                                    Legend Overlay
+                                </div>
+                                <div class="text-xs text-slate-400 mt-1">Float color legend in the left sea area</div>
+                            </div>
+                            <input type="checkbox" id="showLegendToggle" onchange="updateCommandPreview()"
+                                class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-accent-500 focus:ring-accent-500">
+                        </label>
+                        <label class="mt-2 flex items-center justify-between gap-3 px-3 py-3 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-slate-700 transition cursor-pointer">
+                            <div>
+                                <div class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                                    <i class="fa-solid fa-highlighter text-slate-400 text-xs"></i>
+                                    Highlight Min / Max Countries
+                                </div>
+                                <div class="text-xs text-slate-400 mt-1">Soft glow on highest &amp; lowest values (number mode)</div>
+                            </div>
+                            <input type="checkbox" id="highlightExtremaToggle" onchange="updateCommandPreview()"
+                                class="h-4 w-4 rounded border-slate-700 bg-slate-900 text-accent-500 focus:ring-accent-500">
+                        </label>
+                        <div id="highlightColorsRow" class="hidden mt-2 grid grid-cols-2 gap-2 px-3 py-2 rounded-xl border border-slate-800/80 bg-slate-950/50">
+                            <label class="flex items-center justify-between gap-2 text-xs text-slate-300 cursor-pointer">
+                                <span>Highest color</span>
+                                <input type="color" id="highlightHighColor" value="#00e5ff" onchange="updateCommandPreview()"
+                                    class="h-6 w-9 rounded border border-slate-700 bg-slate-900 cursor-pointer">
+                            </label>
+                            <label class="flex items-center justify-between gap-2 text-xs text-slate-300 cursor-pointer">
+                                <span>Lowest color</span>
+                                <input type="color" id="highlightLowColor" value="#ff2daa" onchange="updateCommandPreview()"
+                                    class="h-6 w-9 rounded border border-slate-700 bg-slate-900 cursor-pointer">
+                            </label>
+                        </div>
+                        <label class="mt-2 flex items-center justify-between gap-3 px-3 py-2 rounded-xl border border-slate-800 bg-slate-950/70 hover:border-slate-700 transition">
+                            <div>
+                                <div class="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-tag text-emerald-400 text-[11px]"></i>
+                                    Label Suffix
+                                </div>
+                                <div class="text-[10px] text-slate-400 mt-0.5">Append letters/units at the end of each country (e.g. m, %, km)</div>
+                            </div>
+                            <input type="text" id="labelSuffixInput" maxlength="16" placeholder="e.g. m" oninput="updateCommandPreview()" onchange="updateCommandPreview()"
+                                class="w-24 px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                        </label>
+                    </div>
+
+</div></details>

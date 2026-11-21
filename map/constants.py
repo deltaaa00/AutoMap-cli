@@ -14,6 +14,17 @@
 
 # Pixel coordinates in the bundled map artwork, rather than geographic coordinates.
 # The first point anchors the label; additional points fill disconnected land areas.
+"""Artwork-specific map seeds, prompt templates, palettes, and render defaults.
+
+The renderer and web controls share these definitions. Seed pairs are image
+pixels: the first point anchors a region label and later points identify
+separate land areas. Keep seeds synchronized with resources/maps artwork;
+world-country seeds and label sizes live in world_countries_coords instead.
+
+Prompt templates intentionally contain blank values for the model to fill,
+so they are instructions rather than JSON to parse. Palette definitions and
+semantic colors are consumed by styling; change selection logic there.
+"""
 from pathlib import Path
 
 

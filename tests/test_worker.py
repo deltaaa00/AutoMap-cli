@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Protect private media-worker endpoints and file/subprocess boundaries.
+
+Fake network/process responses cover download/cut failures, unsafe filenames,
+material validation, codec discovery and cleanup. The worker fixture isolates
+file directories per test. Real encoded output is tested in test_video_render
+and real audio normalization in test_audio_upload.
+"""
+
 import base64
 import os
 from pathlib import Path

@@ -1,0 +1,21 @@
+{# Classic scripts share lexical state and public inline handlers. Keep this order.
+   DOMContentLoaded callbacks run after every controller is defined. No async,
+   defer, or type=module: youtube-upload.js expects the existing global API.
+   The feature scripts contain no Jinja values; dynamic server data stays in HTML.
+#}
+<script src="{{ url_for('static', filename='studio-storage.js') }}"></script>
+<script src="{{ url_for('static', filename='video/settings.js') }}"></script>
+<script src="{{ url_for('static', filename='video/audio-source.js') }}"></script>
+<script src="{{ url_for('static', filename='video/audio-cut.js') }}"></script>
+<script src="{{ url_for('static', filename='video/console.js') }}"></script>
+<script src="{{ url_for('static', filename='video/stage-layout.js') }}"></script>
+<script src="{{ url_for('static', filename='video/stage-animation.js') }}"></script>
+<script src="{{ url_for('static', filename='video/sticker-presets.js') }}"></script>
+<script src="{{ url_for('static', filename='video/overlay-images.js') }}"></script>
+<script src="{{ url_for('static', filename='video/watermark.js') }}"></script>
+<script src="{{ url_for('static', filename='video/title-preview.js') }}"></script>
+<script src="{{ url_for('static', filename='video/codecs.js') }}"></script>
+<script src="{{ url_for('static', filename='video/materials.js') }}"></script>
+<script src="{{ url_for('static', filename='video/render.js') }}"></script>
+<script src="{{ url_for('static', filename='video/init.js') }}"></script>
+<script src="{{ url_for('static', filename='youtube-upload.js') }}"></script>

@@ -12,10 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tiny rich-based logging helper for AutoMap.
+"""Shared Rich console output for CLI generation and research diagnostics.
 
-Only messages that pass the verbose/quiet gate are printed, so the CLI stays
-clean by default and becomes chatty with ``-v``.
+Output goes to stderr so generated data on stdout remains usable in pipes.
+set_verbose controls routine info, step, and success messages. Warnings,
+errors, research audit records, configuration tables, completion messages,
+and the spinner remain visible without verbose mode.
+
+Research messages deliberately disable Rich markup because queries may
+contain external text. Keep that distinction when changing output styling;
+callers remain responsible for removing secrets before logging.
 """
 
 from rich.console import Console

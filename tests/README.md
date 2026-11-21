@@ -77,4 +77,10 @@ styles and fonts are stubbed, so browser tests verify behavior rather than
 visual appearance of the external Tailwind stylesheet. Live Gemini/YouTube
 availability and NVIDIA/VideoToolbox encoders are not covered.
 
+Page shells include sections from `templates/map/` and `templates/video/` and
+load ordered feature scripts from `static/map/` and `static/video/`.
+`test_templates.py` checks rendered includes and local asset delivery. Source-level
+checks should read the relevant controller or a rendered page. The Node preview
+tests read `static/map/form.js`; they no longer slice JavaScript out of HTML.
+
 Tests use temporary folders and leave repository maps and user outputs intact.

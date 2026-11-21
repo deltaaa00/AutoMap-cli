@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Untrusted model responses and UI text must remain literal browser text."""
+"""Ensure untrusted model/UI strings stay literal text in the map editor.
+
+Uses shared offline map_page and injects hostile labels, model names and color
+values. Assertions check DOM nodes and event-handler execution, not just string
+escaping. No external AI service or CDN is contacted.
+"""
+from webapp import analysis as map_analysis
 import pytest
 
 from test_map_palettes import map_page
@@ -23,7 +29,7 @@ pytestmark = pytest.mark.browser
 
 def test_ai_labels_and_samples_cannot_create_html(map_page, web):
     payload = '\"><img src=x onerror="window.injected=true">'
-    analysis = web._build_analysis_from_ai({'ukraine': payload}, mode='text')
+    analysis = map_analysis._build_analysis_from_ai({'ukraine': payload}, mode='text')
     map_page.evaluate('''({analysis, payload}) => {
         window.injected = false;
         applyAnalysisToFillingStudio(analysis, {ukraine: payload}, false);

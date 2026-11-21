@@ -1,0 +1,7 @@
+/*
+ * Agent dashboard surface styles, loaded after the shared CDN utility framework.
+ * Keep component utility classes in templates/agent/; this file contains only
+ * the original page background and reusable glass-panel surface declarations.
+ */
+body { background: radial-gradient(circle at top, #0f172a 0%, #020617 65%); color: #e2e8f0; }
+.glass { background: rgba(15, 23, 42, 0.78); backdrop-filter: blur(14px); border: 1px solid rgba(148, 163, 184, 0.14); }

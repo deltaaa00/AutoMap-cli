@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Verify the map renderer using tiny synthetic artwork and deterministic AI data.
+
+Fixtures replace maps, coordinates and fonts so tests assert actual PNG pixels,
+label layout, palettes, numeric intervals, metadata and feature combinations.
+No live AI calls are made. Extend this suite when changing map.auto_map, styling,
+geometry or legend behavior; keep frontend behavior in the browser suites.
+"""
+
 import importlib
 import io
 from pathlib import Path

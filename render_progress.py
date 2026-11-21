@@ -12,7 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Thread-safe per-render progress for the single-process media worker."""
+"""Bridge worker render requests and MoviePy callbacks to polling progress.
+
+``media.worker`` owns one RenderProgress instance and decorates its render route
+with ``track``. An optional UUID render_id connects that POST to later progress
+GETs through Flask request state. Updates are monotonic percentages from 0 to
+100; encoding completion alone does not mark a failed HTTP response successful.
+Records are locked, bounded and expire after completion. They live only in this
+worker process, so polling assumes requests reach the same process; a restart
+loses progress history. No video files or credentials are stored here.
+"""
 from functools import wraps
 from threading import Lock
 from time import monotonic

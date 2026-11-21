@@ -1,4 +1,11 @@
-"""Tests for the agent's render and approval workflows without live APIs."""
+"""Test rendering/download/approval workflows using temporary files and mocks.
+
+Exercises AutoMapClient multipart uploads and atomic downloads, candidate
+zoom/reveal handling, and duplicate approval prevention. AgentRunner instances
+are assembled with controlled dependencies; AutoMap/YouTube calls never reach
+live services. Patch generation randomness in ``agent.video_generation``.
+Expected experiment status transitions should match AgentDB and runner contracts,
+not implementation details such as module layout."""
 
 import json
 import unittest
@@ -86,7 +93,7 @@ class AgentIntegrationTests(unittest.TestCase):
         runner.bot = Mock()
         runner.bot.send_approval_video.return_value = None
 
-        with patch('agent.runner.random.random', return_value=0), self.assertLogs('automap-agent', level='WARNING'):
+        with patch('agent.video_generation.random.random', return_value=0), self.assertLogs('automap-agent', level='WARNING'):
             exp = runner.generate_candidate_video(forced_topic='Test map')
 
         clean_request = runner.client.generate_map.call_args.args[0]

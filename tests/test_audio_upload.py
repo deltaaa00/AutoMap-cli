@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Real audio uploads and browser-restored sources without external downloads."""
+"""Verify uploaded audio using generated WAV/MP3 data and local conversion.
+
+Covers normalization, size/time limits, invalid material, FFmpeg failures and
+cutting restored inline audio after the worker file has expired. Storage is
+isolated and no remote downloads occur; local encoders are needed for real cases.
+"""
 import base64
 from functools import lru_cache
 import io

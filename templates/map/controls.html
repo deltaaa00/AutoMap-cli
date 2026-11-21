@@ -1,0 +1,128 @@
+{# Map parameter form, CLI command preview, studio navigation and generation actions. Feature field groups are included below; retain form IDs and inline handler names. #}
+        <!-- LEFT COLUMN: CLI FLAGS & CONFIGURATION (5 Cols on Desktop) -->
+        <section id="mapControls" class="lg:col-span-5 xl:col-span-4 flex flex-col gap-5">
+<div class="control-scroll">
+
+            <!-- Main Parameters Card -->
+            <div class="cyber-card border border-slate-800/90 rounded-2xl p-5 relative overflow-hidden">
+                <!-- Subtle top highlight bar -->
+                <div class="absolute inset-x-0 top-0 h-px bg-slate-800 "></div>
+
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/80">
+                    <div class="flex items-center gap-3">
+                        <div class="w-7 h-7 rounded-lg bg-accent-500/15 border border-accent-500/30 flex items-center justify-center text-accent-300">
+                            <i class="fa-solid fa-sliders text-xs"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-display font-semibold text-sm sm:text-base text-slate-100 leading-tight">Map parameters</h2>
+                            <p class="text-xs text-slate-400">Configure AI query &amp; cartographic CLI flags</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="resetForm()" class="text-xs px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-accent-300 hover:border-accent-500/40 transition flex items-center gap-2" title="Reset to default values">
+                        <i class="fa-solid fa-rotate-left text-xs"></i>
+                        <span>Reset</span>
+                    </button>
+                </div>
+
+                <form style="scroll-margin-top: 145px" id="cliForm" onsubmit="handleGenerate(event)" class="space-y-5">
+
+                    <div id="apiConnectionNotice" class="hidden p-3 rounded-xl bg-slate-900 border border-slate-700 text-sm text-slate-300" role="status">
+                        <span id="apiConnectionMessage">Configure your API key in API Manager.</span>
+                        <a id="apiManagerLink" href="/api-manager" class="text-accent-300 underline">Open API Manager</a>
+                    </div>
+
+                    <h3 class="workflow-heading"><span>01</span> Topic and map</h3>
+{% include 'map/topic.html' %}
+{% include 'map/map-type.html' %}
+{% include 'map/appearance.html' %}
+{% include 'map/model-typography.html' %}
+                    <!-- Color Filling Studio: single entry in the left panel -->
+                    <div class="mobile-style-entry p-3 rounded-xl bg-slate-950/75 border border-slate-800/90 flex items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-xs font-semibold text-slate-200">Color &amp; Label Style</span>
+                                <span id="fillingSummaryBadge" class="text-xs font-mono px-2 py-1 rounded bg-accent-500/15 text-accent-300 border border-accent-500/30">Auto-Detect ON</span>
+                            </div>
+                            <p id="fillingSidebarSubtext" class="text-xs text-slate-400 truncate mt-1">Auto-detects map numbers/words, palette &amp; text style</p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <div id="miniSwatchPreview" class="flex -space-x-1.5"></div>
+                            <button type="button" id="quickAutoDetectBtn" onclick="autoDetectMapColorsAndStyle(false)" class="px-2 py-2 rounded-lg bg-slate-800 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-medium transition flex items-center gap-1" title="Inspect current map / topic and auto-generate colors &amp; style">
+                                <i class="fa-solid fa-map text-xs"></i>
+                                <span>Auto</span>
+                            </button>
+                            <button type="button" id="openFillingStudioBtn" onclick="openFillingStudio()" aria-controls="fillingStudioModal" class="px-3 py-2 rounded-lg bg-slate-900 hover:bg-accent-600/20 text-accent-300 border border-slate-700 hover:border-accent-500/50 text-xs font-medium transition">
+                                Theme &amp; Style
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-3 rounded-xl bg-slate-950/75 border border-slate-800">
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <label for="labelOffsetX" class="text-xs font-semibold text-slate-200">Global label position</label>
+                            <output id="labelOffsetXValue" for="labelOffsetX" class="text-xs font-mono text-accent-300">0 px</output>
+                        </div>
+                        <input id="labelOffsetX" type="range" min="-500" max="500" step="1" value="0" oninput="updateLabelOffset(this.value)" aria-describedby="labelOffsetXHint" class="w-full accent-accent-400">
+                        <div class="flex justify-between text-xs text-slate-400"><span>← Left</span><button type="button" onclick="updateLabelOffset(0)" class="text-accent-300 hover:text-accent-300">Reset</button><span>Right →</span></div>
+                        <p id="labelOffsetXHint" class="text-xs text-slate-400 mt-2">Moves every country label horizontally. Click Re-Paint to apply without another AI request.</p>
+                    </div>
+
+                </form>
+            </div>
+
+            <!-- Live CLI Command Builder Preview Card -->
+            <div class="cyber-card border border-slate-800/90 rounded-2xl p-4 ">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-200">
+                        <span class="w-2 h-2 rounded-full bg-slate-800"></span>
+                        <i class="fa-solid fa-terminal text-slate-400"></i>
+                        <span>Generated CLI Command</span>
+                    </div>
+                    <button type="button" onclick="copyCliCommand()" class="text-xs px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition flex items-center gap-2">
+                        <i id="copyIcon" class="fa-regular fa-copy"></i>
+                        <span id="copyText">Copy</span>
+                    </button>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-950/95 border border-slate-800/90 font-mono text-xs text-slate-400 overflow-x-auto whitespace-nowrap select-all " id="cliCommandDisplay">
+                    python cli.py make "" -m text -mp default -gsm 15 -eop none --model gemini-2.5-flash --font "Bips.ttf"
+                </div>
+            </div>
+
+            <!-- Video Studio Card -->
+            <div class="cyber-card border border-slate-800/90 rounded-2xl p-5 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
+                            <i class="fa-solid fa-clapperboard text-sm"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-display font-semibold text-sm text-slate-100">Video Studio</h2>
+                            <p class="text-xs text-slate-400">Audio cutter, soundtrack sync &amp; MP4 renderer</p>
+                        </div>
+                    </div>
+                    <code class="text-xs font-mono px-2 py-1 rounded bg-slate-900 text-slate-400 border border-slate-800">/studio</code>
+                </div>
+                <a href="/studio" class="w-full py-3 px-4 rounded-xl bg-slate-800 text-slate-100 font-semibold text-xs transition-colors flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-film"></i>
+                    <span>Launch Video Studio</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-xs opacity-80"></i>
+                </a>
+            </div>
+
+</div>
+<div class="workspace-actions">                    <!-- Submit / Generate Button -->
+                    <button type="submit" form="cliForm" id="generateBtn" class="relative w-full py-4 px-5 rounded-xl bg-slate-800 text-slate-100 font-display font-semibold text-sm border border-slate-700 transition-colors flex items-center justify-center gap-3 group overflow-hidden">
+                        <i id="generateBtnIcon" class="fa-solid fa-play transition-transform group-hover:translate-x-0.5"></i>
+                        <span id="generateBtnText">Generate map</span>
+                    </button>
+                    <button type="button" id="restyleCurrentMapBtn" onclick="restyleCurrentMapFromStudio()" class="w-full justify-center px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-semibold transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-wait">
+                        <i id="mapRepaintIcon" class="fa-solid fa-paintbrush" aria-hidden="true"></i>
+                        <span id="mapRepaintButtonLabel">Apply &amp; Re-Paint Current Map</span>
+                    </button>
+                <div id="mapRepaintStatus" role="status" aria-live="polite" class="hidden w-full text-xs text-slate-400 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-notch animate-spin" aria-hidden="true"></i>
+                    <span>Re-painting map… Please wait while colors and labels are rendered.</span>
+                </div>
+                    <p id="generationError" role="alert" class="hidden text-xs text-slate-400 bg-slate-800 border border-slate-700 rounded-xl p-3"></p>
+</div>
+        </section>

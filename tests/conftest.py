@@ -12,7 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Shared isolation: tests never use real credentials or external services."""
+"""Provide isolated Flask apps, media storage and fake external services.
+
+The web fixture creates a fresh app through the real launcher; the worker fixture
+loads a fresh media.worker module and redirects its file directories to tmp_path.
+The autouse fixture blocks accidental HTTP/AI calls and captures noisy logging.
+Patch dependencies where they are used, such as webapp.generation.auto_map or
+webapp.http_client.worker_http. Real media tests still exercise local encoders.
+"""
 import importlib.util
 import io
 import os
@@ -56,8 +63,8 @@ def isolate_external_services(monkeypatch):
 
 @pytest.fixture
 def worker(tmp_path, monkeypatch):
-    # Load a fresh worker module because its filename cannot be imported normally.
-    spec = importlib.util.spec_from_file_location('video_worker', ROOT / 'yt-dlp_serv.py')
+    # Load a fresh worker application so storage and render state stay isolated.
+    spec = importlib.util.spec_from_file_location('video_worker', ROOT / 'media' / 'worker.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     # Keep each test's media files separate from shared worker storage.
@@ -73,7 +80,7 @@ def worker(tmp_path, monkeypatch):
 def web(monkeypatch, tmp_path):
     import dotenv
 
-    # Ignore the developer's .env and avoid main.py changing the test cwd.
+    # Build a fresh app with isolated credentials and configuration for each test.
     monkeypatch.setattr(dotenv, 'dotenv_values', lambda *args, **kwargs: {})
     monkeypatch.delenv('GEMINI_API_KEY', raising=False)
     monkeypatch.setenv('SERVER', 'TRUE')

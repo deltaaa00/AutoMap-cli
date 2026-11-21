@@ -1,0 +1,60 @@
+{#
+   Studio navigation and authenticated logout. Uses agent_url, config, and session. Keep
+   IDs and inline handlers aligned with static/video scripts.
+#}
+<!-- Top Navigation Bar -->
+<header class="border-b border-slate-800/80 bg-slate-950/75 sticky top-0 z-30">
+    <div class="studio-navigation max-w-[1640px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        <!-- Brand & Studio Status -->
+        <div class="flex items-center gap-4">
+            <div class="relative group">
+                <div class="relative w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden">
+                    <!-- Shared folded-map mark -->
+                    <svg class="w-7 h-7 automap-mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AutoMap folded map">
+                        <path d="M4 8l8-4 8 4 8-4v20l-8 4-8-4-8 4V8Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                        <path d="M12 4v20M20 8v20" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center gap-3">
+                    <h1 class="font-display font-medium text-lg text-slate-100">AutoMap Video Studio</h1>
+                    <span class="hidden md:inline-flex items-center gap-2 text-xs font-mono px-3 py-1 rounded-full bg-slate-900/90 text-slate-400 border border-slate-800">
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-800"></span>
+                        FFmpeg / YT-DLP Pipeline
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400 hidden sm:block">Add audio, compose frames and render map videos</p>
+            </div>
+        </div>
+
+        <!-- Right Studio Controls & Navigation -->
+        <div class="studio-navigation-actions flex items-center gap-3">
+            <!-- Workflow Step Indicator -->
+            <div class="hidden xl:flex items-center gap-2 bg-slate-900/90 border border-slate-800/90 rounded-xl px-3 py-2 text-xs font-mono text-slate-400">
+                <span class="text-slate-400 font-semibold">01 Audio</span>
+                <i class="fa-solid fa-chevron-right text-xs text-slate-600"></i>
+                <span id="headerSliceStepBadge" class="text-slate-400 font-semibold">02 Slice 8s</span>
+                <i class="fa-solid fa-chevron-right text-xs text-slate-600"></i>
+                <span class="text-accent-300 font-semibold">03 Frame &amp; Render</span>
+            </div>
+
+            <a href="/api-manager" class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-xs font-semibold">API Manager</a>
+            <button type="button" id="clearAllDataBtn" onclick="clearAllUserData(this)" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-semibold transition-colors shrink-0">Clear all data</button>
+            {% if config.WEB_AUTH_ENABLED and session.get('web_identity') %}
+            <form method="post" action="{{ url_for('web_logout') }}">
+                <input type="hidden" name="csrf_token" value="{{ session.get('logout_csrf', '') }}">
+                <button type="submit" class="px-4 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 text-xs font-semibold">Log out</button>
+            </form>
+            {% endif %}
+            <a href="{{ agent_url }}" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-200 border border-emerald-500/35 text-xs font-semibold transition-colors flex items-center gap-1.5">
+                <i class="fa-solid fa-robot"></i>
+                <span>Agent</span>
+            </a>
+            <a href="/" class="px-4 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 hover:border-accent-500/50 text-xs font-semibold transition-colors flex items-center gap-2 group">
+                <i class="fa-solid fa-arrow-left text-accent-300 transition-transform group-hover:-translate-x-0.5"></i>
+                <span>Back to Map Studio</span>
+            </a>
+        </div>
+    </div>
+</header>

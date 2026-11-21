@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Pixel coordinates, label sizes, and prompt template for the world countries map."""
+"""World-country seeds, label sizes, and the AI response-key template.
+
+Coordinates target resources/maps/world_countries_map.png at 3424 by 2027
+pixels. The first seed anchors a country label; subsequent seeds represent
+islands or disconnected territory. Label sizes are pixel-based renderer
+inputs, with small countries filtered by constants._WORLD_COUNTRIES_MIN_LABEL.
+
+Keep country keys consistent across seeds, label sizes, and the prompt
+mapping. Add alternate AI spellings to constants._WORLD_COUNTRY_ALIASES;
+normalization is handled by auto_map before values are painted.
+"""
 
 # Pixel coordinates in resources/maps/world_countries_map.png (3424x2027).
 # The first point anchors the label inside the main territory;

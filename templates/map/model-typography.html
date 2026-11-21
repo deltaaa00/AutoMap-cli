@@ -1,0 +1,99 @@
+{# AI provider/model selection, font controls and bounded DeepSeek web-search preferences. Provider discovery lives in providers.js and batch.js. #}
+<details class="settings-group" open><summary><span>03</span> Model and typography</summary><div class="settings-group-body">                    <!-- 5. Flag: --model & 6. Flag: --font in a responsive 2-col or stacked layout -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Flag: --model -->
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <label for="modelSelect" class="text-xs font-semibold text-slate-200">AI Model</label>
+                            </div>
+                            <div class="flex gap-2">
+                                <div class="relative flex-1 min-w-0">
+                                    <select id="modelSelect" onchange="onAiModelChange(this.value)"
+                                        class="w-full appearance-none px-3 py-3 bg-slate-950/90 border border-slate-800 rounded-xl text-xs font-mono text-slate-100 focus:outline-none focus:border-accent-500 transition pr-7 truncate">
+                                        <optgroup id="geminiModelsGroup" label="Gemini">
+                                        <option value="gemini-3.8-flash">gemini-3.8-flash</option>
+                                        <option value="gemini-4-hydrogen">gemini-4-hydrogen</option>
+                                        <option value="gemini-4-carbon">gemini-4-carbon</option>
+                                        <option value="gemini-4-argon">gemini-4-argon</option>
+                                        <option value="gemini-3.6-flash">gemini-3.6-flash</option>
+                                        <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite</option>
+                                        <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite</option>
+                                        <option value="gemini-3.1-pro-preview">gemini-3.1-pro-preview</option>
+                                        <option value="gemini-3-flash-preview">gemini-3-flash-preview</option>
+                                        <option value="gemma-4-31b-it">gemma-4-31b-it</option>
+                                        <option value="gemma-4-26b-a4b-it">gemma-4-26b-a4b-it</option>
+                                        </optgroup>
+                                        <optgroup id="deepseekModelsGroup" label="DeepSeek">
+                                        <option value="deepseek-flash">deepseek-flash</option>
+                                        <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+                                        </optgroup>
+                                    </select>
+                                    <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none"></i>
+                                </div>
+                                <button type="button" onclick="toggleCustomModelInput()" class="px-3 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition shrink-0" title="Add custom Model ID">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
+                            <!-- Add custom model input -->
+                            <div id="customModelBox" class="hidden mt-2 flex gap-2">
+                                <input type="text" id="newModelInput" placeholder="Custom model ID..."
+                                    onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomModel();}"
+                                    class="flex-1 min-w-0 px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-slate-100 focus:outline-none focus:border-accent-500">
+                                <button type="button" onclick="addCustomModel()" class="px-3 py-2 rounded-lg bg-accent-600 hover:bg-accent-500 text-slate-100 text-xs font-medium">Add</button>
+                            </div>
+                        </div>
+
+                        <!-- Flag: --font -->
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <label for="fontSelect" class="text-xs font-semibold text-slate-200">Map Font</label>
+                            </div>
+                            <div class="flex gap-2">
+                                <div class="relative flex-1 min-w-0">
+                                    <select id="fontSelect" onchange="updateCommandPreview()"
+                                        class="w-full appearance-none px-3 py-3 bg-slate-950/90 border border-slate-800 rounded-xl text-xs font-mono text-slate-100 focus:outline-none focus:border-accent-500 transition pr-7 truncate">
+                                        <option value="Bips.ttf">Bips.ttf</option>
+                                        <option value="DIN Condensed.ttf">DIN Condensed.ttf</option>
+                                        <option value="arialroundedmtbold.ttf">arialroundedmtbold.ttf</option>
+                                        <option value="kodchasan.ttf">kodchasan.ttf</option>
+                                    </select>
+                                    <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 pointer-events-none"></i>
+                                </div>
+                                <button type="button" onclick="fetchFontsFromServer()" class="px-3 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition shrink-0 flex items-center justify-center" title="Refresh font list from resources/fonts">
+                                    <i id="fontRefreshIcon" class="fa-solid fa-sync"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="aiTemperaturePanel" class="p-4 rounded-xl border border-accent-400/50 bg-slate-800 ">
+                        <div class="flex justify-between items-center gap-3 mb-3">
+                            <label for="aiTemperature" class="text-sm font-semibold text-accent-300 flex items-center gap-2">
+                                <i class="fa-solid fa-sliders text-accent-300" aria-hidden="true"></i>
+                                AI Temperature
+                            </label>
+                            <output id="aiTemperatureValue" for="aiTemperature" class="px-3 py-1 rounded-lg border border-accent-400/40 bg-accent-500/20 text-base font-semibold font-mono tabular-nums text-accent-300">0.75</output>
+                        </div>
+                        <input id="aiTemperature" type="range" min="0" max="2" step="0.05" value="0.75"
+                            aria-describedby="aiTemperatureHint" oninput="updateAiTemperature(this.value)"
+                            class="w-full h-2.5 rounded-full appearance-none cursor-pointer accent-accent-400">
+                        <div class="flex justify-between text-xs text-accent-300/90 mt-2"><span>0 · More consistent</span><span>2 · More varied</span></div>
+                        <button type="button" onclick="updateAiTemperature(0.75)" class="mt-2 text-xs font-medium text-accent-300 hover:text-accent-300 underline underline-offset-2">Reset to 0.75</button>
+                        <p id="aiTemperatureHint" class="text-xs text-slate-300 mt-2">Controls response randomness, not factual accuracy. Lower values do not prevent AI hallucinations.</p>
+                        <label class="mt-3 pt-2.5 border-t border-accent-400/20 flex items-center gap-2 text-xs text-accent-300 cursor-pointer select-none">
+                            <input type="checkbox" id="deepseekWebSearchToggle" onchange="try { localStorage.setItem('automap-deepseek-web-search', this.checked ? '1' : '0'); } catch {}"
+                                class="rounded border-slate-700 bg-slate-900 text-accent-500 focus:ring-accent-500">
+                            <span>DeepSeek Web Search <span class="text-xs text-slate-400">(search across websites)</span></span>
+                        </label>
+                        <p class="text-xs text-slate-400 mt-1">Configure the search connection in API Manager. Source URLs and snippets are passed to DeepSeek.</p>
+                        <a href="/api-manager#searchHeading" class="inline-block mt-2 text-xs text-accent-300 underline">Manage search API connection</a>
+                        <div class="mt-2 flex items-center gap-3 text-xs text-slate-300">
+                            <label for="deepseekMaxSearchInput" class="shrink-0">Max searches:</label>
+                            <input type="range" id="deepseekMaxSearchInput" min="1" max="10" step="1" value="5"
+                                oninput="document.getElementById('deepseekMaxSearchVal').textContent = this.value; try { localStorage.setItem('automap-deepseek-max-search', this.value); } catch {}"
+                                class="flex-1 accent-accent-500 cursor-pointer">
+                            <span id="deepseekMaxSearchVal" class="font-mono text-accent-300 w-5 text-right">5</span>
+                        </div>
+                    </div>
+
+</div></details>

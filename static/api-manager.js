@@ -1,3 +1,12 @@
+/**
+ * API Manager page controller, loaded by templates/api_manager.html.
+ *
+ * Uses the same localStorage keys as static/map/ controllers for browser-saved
+ * Gemini, DeepSeek and Tavily keys. Server configuration is exposed only as presence
+ * flags. YouTube configuration uses webapp/youtube.py and server-held credentials;
+ * refresh its CSRF token before changes. When renaming keys or IDs, update the map
+ * page and browser storage tests together.
+ */
 'use strict';
 const managerKeys = {gemini: 'automap-gemini-api-key', deepseek: 'automap-deepseek-api-key', tavily: 'automap-tavily-api-key'};
 const managerElement = id => document.getElementById(id);

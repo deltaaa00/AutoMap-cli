@@ -12,8 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import csv
-import io
+"""AI requests, idea suggestions, and filling configuration used by CLI and web.
+
+Model names select Gemini or DeepSeek credentials. Map requests provide the
+region-key template and parse returned JSON into a dictionary; suggestion
+requests validate idea text and rendering options separately. Optional search
+uses web_search transports and a bounded tool-call budget. AIServiceError
+carries messages/status codes suitable for callers to display.
+
+Batch CSV parsing is implemented in batch_ideas and re-exported here for
+existing callers. Rendering colors belong in styling; edit load_filling here
+for the local filling.json/template fallback.
+"""
 import json
 import math
 import os
@@ -33,6 +43,17 @@ from google.genai import types
 from pathlib import Path
 
 from . import constants, log
+from .batch_ideas import (
+    BATCH_CSV_ALL_COLUMNS,
+    BATCH_CSV_OPTIONAL_COLUMNS,
+    BATCH_CSV_REQUIRED_COLUMNS,
+    _ALLOWED_EXTRA_OPTIONS,
+    _ALLOWED_MAP_TYPES,
+    _ALLOWED_MODES,
+    load_ideas_from_file,
+    parse_ideas_content,
+    slugify_prompt,
+)
 from .web_search import SearchError, normalize_query, search_config, search_web
 from ast import literal_eval
 
@@ -56,7 +77,9 @@ def configured_api_key(provider, settings=None):
     """Return the configured API key for ``provider``, ignoring empty or ``your_*`` placeholders."""
     name = provider_key_name(provider)
     value = (os.environ.get(name) or (settings or {}).get(name) or '').strip()
-    return value if value and not value.lower().startswith('your_') else None
+    if not value or value.lower().startswith('your_'):
+        return None
+    return value
 
 
 class AIServiceError(RuntimeError):
@@ -112,13 +135,22 @@ def list_deepseek_models(api_key):
     models = result.get('data')
     if not isinstance(models, list):
         raise AIServiceError('DeepSeek returned an invalid model list.', 502)
-    return sorted({model['id'] for model in models if isinstance(model, dict)
-                   and isinstance(model.get('id'), str) and model['id'].startswith('deepseek-')})
+    model_ids = set()
+    for model in models:
+        if not isinstance(model, dict):
+            continue
+        model_id = model.get('id')
+        if isinstance(model_id, str) and model_id.startswith('deepseek-'):
+            model_ids.add(model_id)
+    return sorted(model_ids)
 
 
 def _web_search(query, max_results=5, *, tavily_api_key=None):
+    search_options = {}
+    if tavily_api_key:
+        search_options['api_key'] = tavily_api_key
     try:
-        return search_web(query, max_results, **({"api_key": tavily_api_key} if tavily_api_key else {}))
+        return search_web(query, max_results, **search_options)
     except SearchError as error:
         raise AIServiceError(str(error), 503) from None
 
@@ -192,33 +224,49 @@ def _deepseek_request(prompt, model, api_key=None, *, temperature=None, web_sear
         # Subsequent searches are optional, within the shared request budget.
         payload.pop('tool_choice', None)
         messages.append(msg)
-        for tc in tool_calls:
+        for tool_call in tool_calls:
             if budget <= 0:
-                messages.append({'role': 'tool', 'tool_call_id': tc['id'], 'content': json.dumps({
+                exhausted_result = {
                     'error': 'Search budget reached. Return final JSON now.',
-                    'search_budget': {'total': total_searches, 'used': total_searches, 'remaining': 0}})})
+                    'search_budget': {
+                        'total': total_searches,
+                        'used': total_searches,
+                        'remaining': 0,
+                    },
+                }
+                messages.append({
+                    'role': 'tool',
+                    'tool_call_id': tool_call['id'],
+                    'content': json.dumps(exhausted_result),
+                })
                 log.research(f'[Web search {research_id}] Skipped tool call: search budget reached ({total_searches}/{total_searches})')
                 continue
-            if tc.get('function', {}).get('name') != 'web_search':
+            function_call = tool_call.get('function', {})
+            if function_call.get('name') != 'web_search':
                 raise AIServiceError('DeepSeek requested an unsupported research tool.', 502)
             budget -= 1
             try:
-                args = json.loads(tc.get('function', {}).get('arguments') or '{}')
-                q = args.get('query') if isinstance(args, dict) else None
-                if not isinstance(q, str) or not q.strip():
-                    q = prompt
+                arguments = json.loads(function_call.get('arguments') or '{}')
+                query = None
+                if isinstance(arguments, dict):
+                    query = arguments.get('query')
+                if not isinstance(query, str) or not query.strip():
+                    query = prompt
             except (ValueError, TypeError):
-                q = prompt
-            q = normalize_query(q)
-            safe_query = q
+                query = prompt
+            query = normalize_query(query)
+            safe_query = query
             for credential in (api_key, tavily_api_key, configured_api_key('deepseek'), configured_api_key('gemini'),
                                os.getenv('TAVILY_API_KEY'), os.getenv('BRAVE_SEARCH_API_KEY')):
                 if credential:
                     safe_query = safe_query.replace(credential, '[REDACTED]')
             prefix = f'[Web search {research_id}] {total_searches - budget}/{total_searches}'
             log.research(f'{prefix} query={json.dumps(safe_query, ensure_ascii=False)} remaining={budget}')
+            search_options = {}
+            if tavily_api_key:
+                search_options['tavily_api_key'] = tavily_api_key
             try:
-                evidence = _web_search(q, **({'tavily_api_key': tavily_api_key} if tavily_api_key else {}))
+                evidence = _web_search(query, **search_options)
             except AIServiceError:
                 log.research(f'{prefix} Failed; remaining={budget}')
                 raise
@@ -226,11 +274,23 @@ def _deepseek_request(prompt, model, api_key=None, *, temperature=None, web_sear
                 evidence = json.loads(evidence)
             except (ValueError, TypeError):
                 pass
-            count = len(evidence['results']) if isinstance(evidence, dict) and isinstance(evidence.get('results'), list) else 'unknown'
+            count = 'unknown'
+            if isinstance(evidence, dict) and isinstance(evidence.get('results'), list):
+                count = len(evidence['results'])
             log.research(f'{prefix} Completed: results={count}, remaining={budget}')
-            messages.append({'role': 'tool', 'tool_call_id': tc['id'], 'content': json.dumps({
+            tool_result = {
                 'search': evidence,
-                'search_budget': {'total': total_searches, 'used': total_searches - budget, 'remaining': budget}}, ensure_ascii=False)})
+                'search_budget': {
+                    'total': total_searches,
+                    'used': total_searches - budget,
+                    'remaining': budget,
+                },
+            }
+            messages.append({
+                'role': 'tool',
+                'tool_call_id': tool_call['id'],
+                'content': json.dumps(tool_result, ensure_ascii=False),
+            })
 
         # Once the search budget is spent, strip `tools` so DeepSeek must return the final JSON.
         if budget <= 0:
@@ -371,7 +431,13 @@ def _ai_request(prompt, mode, ai_model, api_key=None, *, temperature=None, web_s
 
 def ai_request(prompt: str, mode: str, ai_model: str, api_key: str | None = None, _ai_answer = None,
                *, temperature: float | None = None, web_search: bool = False, max_search_requests: int = 5, tavily_api_key: str | None = None) -> dict | None:
-    "handle the AI request and parse the response into a dictionary."
+    """Return a region-to-value dictionary from model text, or None on parse failure.
+
+    mode identifies the map type, not text-versus-number rendering. An explicit
+    _ai_answer bypasses the provider for supplied responses/tests. Markdown
+    fences are stripped before JSON parsing, and non-object results are logged
+    and rejected. Provider service errors can still propagate to the caller.
+    """
     if _ai_answer is not None:
         request = _ai_answer
     else:
@@ -531,6 +597,7 @@ IDEA_CATEGORIES = (
 
 
 def _normalize_idea_key(text: str) -> str:
+    """Normalize English idea wording for duplicate checks, ignoring punctuation."""
     return re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).strip()
 
 
@@ -546,7 +613,14 @@ def generate_map_idea(
     avoid_ideas: list[str] | tuple[str, ...] | None = None,
     top_channel_topics: list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, object]:
-    """Generate map ideas and optional parameters; multiple candidates share one model request."""
+    """Suggest one idea or a batch of up to five, optionally with rendering options.
+
+    A single result contains idea and optional params; batches contain an ideas
+    list. Supplied themes/fonts constrain normalized parameters. Recent ideas
+    guide duplicate avoidance, and channel topics guide the prompt. Single-idea
+    generation gets one retry for a duplicate; invalid/duplicate batch responses
+    raise AIServiceError rather than returning a partial batch.
+    """
     if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= 5:
         raise ValueError('Idea count must be an integer from 1 to 5.')
     sampled_examples = random.sample(IDEA_EXAMPLES, min(6, len(IDEA_EXAMPLES)))
@@ -575,12 +649,14 @@ def generate_map_idea(
     if count > 1:
         themes = [str(t) for t in (available_themes or list(constants._PALETTE_THEMES.keys()))]
         fonts = list(available_fonts or ["Bips.ttf", "DIN Condensed.ttf", "kodchasan.ttf", "arialroundedmtbold.ttf"])
-        fields = (
-            'Each item must include mode (text or number), map_type (default, flag, world, world_countries), '
-            f'palette_theme from {themes}, font from {fonts}, '
-            'extra_option (none, show_most_least, show_short_form), and show_legend (boolean). '
-            'Use extra options only for number mode outside world maps.'
-        ) if with_params else ''
+        fields = ''
+        if with_params:
+            fields = (
+                'Each item must include mode (text or number), map_type (default, flag, world, world_countries), '
+                f'palette_theme from {themes}, font from {fonts}, '
+                'extra_option (none, show_most_least, show_short_form), and show_legend (boolean). '
+                'Use extra options only for number mode outside world maps.'
+            )
         raw = _call_model_text(
             'Generate engaging short map questions in English. Return only valid JSON.',
             f'Generate exactly {count} distinct ideas covering different subjects. '
@@ -605,7 +681,10 @@ def generate_map_idea(
             if key in seen:
                 raise AIServiceError('AI returned duplicate ideas. Please try again.', 502)
             seen.add(key)
-            results.append(_normalize_map_idea(item, idea, themes, fonts) if with_params else {'idea': idea})
+            if with_params:
+                results.append(_normalize_map_idea(item, idea, themes, fonts))
+            else:
+                results.append({'idea': idea})
         return {'ideas': results}
 
     if not with_params:
@@ -694,6 +773,12 @@ def generate_map_idea(
 
 
 def _normalize_map_idea(parsed, idea, themes, fonts):
+    """Normalize a parsed idea's rendering options to supported caller choices.
+
+    Missing or unsupported values fall back to text/default and the supplied
+    theme/font lists. Numeric extras are disabled for text mode and continents.
+    The caller has already validated idea text and the parsed object.
+    """
     allowed_modes = ("text", "number")
     allowed_map_types = ("default", "flag", "world", "world_countries")
     allowed_extras = ("none", "show_most_least", "show_short_form")
@@ -776,134 +861,3 @@ def load_filling():
     
 
     return filling_txt, filling_num
-
-
-_SLUG_RE = re.compile(r'[^a-zA-Z0-9]+')
-
-BATCH_CSV_REQUIRED_COLUMNS: tuple[str, ...] = ("prompt",)
-BATCH_CSV_OPTIONAL_COLUMNS: tuple[str, ...] = (
-    "mode",
-    "map_type",
-    "gsm",
-    "extra_option",
-    "model",
-    "font",
-    "palette_theme",
-    "output",
-)
-BATCH_CSV_ALL_COLUMNS: tuple[str, ...] = BATCH_CSV_REQUIRED_COLUMNS + BATCH_CSV_OPTIONAL_COLUMNS
-_ALLOWED_MODES = frozenset({"text", "number"})
-_ALLOWED_MAP_TYPES = frozenset({"default", "flag", "world", "world_countries"})
-_ALLOWED_EXTRA_OPTIONS = frozenset({"none", "show_most_least", "short_form", "show_most_least,short_form", "short_form,show_most_least"})
-
-
-def slugify_prompt(prompt: str, max_len: int = 48) -> str:
-    """Convert a map prompt into a safe, concise filename stem."""
-    slug = _SLUG_RE.sub('_', prompt.strip().lower()).strip('_')
-    return (slug[:max_len].strip('_') or 'map')
-
-
-def parse_ideas_content(content: str, filename: str = "") -> list[dict[str, object]]:
-    """Parse and validate map ideas from a .csv file."""
-    if filename and Path(filename).suffix.lower() != ".csv":
-        raise ValueError("Only .csv files are supported for batch ideas.")
-
-    text = (content or "").lstrip("\ufeff").strip()
-    if not text:
-        raise ValueError("CSV file is empty.")
-
-    reader = csv.DictReader(io.StringIO(text))
-    if not reader.fieldnames:
-        raise ValueError("CSV file is missing a header row.")
-
-    headers = [str(h).strip().lower() for h in reader.fieldnames]
-    if any(not h for h in headers):
-        raise ValueError("CSV header contains an empty column name.")
-    if len(set(headers)) != len(headers):
-        raise ValueError("CSV header contains duplicate column names.")
-
-    unknown_cols = [h for h in headers if h not in BATCH_CSV_ALL_COLUMNS]
-    if unknown_cols:
-        raise ValueError(
-            f"Unknown CSV column(s): {', '.join(unknown_cols)}. "
-            f"Allowed columns: {', '.join(BATCH_CSV_ALL_COLUMNS)}."
-        )
-
-    missing_cols = [c for c in BATCH_CSV_REQUIRED_COLUMNS if c not in headers]
-    if missing_cols:
-        raise ValueError(f"Missing required CSV column(s): {', '.join(missing_cols)}.")
-
-    reader.fieldnames = headers
-    ideas: list[dict[str, object]] = []
-    for row_num, row in enumerate(reader, start=2):
-        if None in row:
-            raise ValueError(f"Row {row_num}: malformed CSV row (unexpected extra columns).")
-
-        prompt = str(row.get("prompt") or "").strip()
-        if not prompt:
-            raise ValueError(f"Row {row_num}: 'prompt' is required and cannot be empty.")
-
-        entry: dict[str, object] = {"prompt": prompt}
-
-        mode_val = str(row.get("mode") or "").strip().lower()
-        if mode_val:
-            if mode_val not in _ALLOWED_MODES:
-                raise ValueError(
-                    f"Row {row_num}: invalid mode '{mode_val}'. Allowed: {', '.join(sorted(_ALLOWED_MODES))}."
-                )
-            entry["mode"] = mode_val
-
-        map_type_val = str(row.get("map_type") or "").strip().lower()
-        if map_type_val:
-            if map_type_val not in _ALLOWED_MAP_TYPES:
-                raise ValueError(
-                    f"Row {row_num}: invalid map_type '{map_type_val}'. Allowed: {', '.join(sorted(_ALLOWED_MAP_TYPES))}."
-                )
-            entry["map_type"] = map_type_val
-
-        extra_val = str(row.get("extra_option") or "").strip().lower()
-        if extra_val:
-            if extra_val not in _ALLOWED_EXTRA_OPTIONS:
-                raise ValueError(
-                    f"Row {row_num}: invalid extra_option '{extra_val}'. Allowed: {', '.join(sorted(_ALLOWED_EXTRA_OPTIONS))}."
-                )
-            entry["extra_option"] = extra_val
-
-        gsm_raw = str(row.get("gsm") or "").strip()
-        if gsm_raw:
-            try:
-                gsm_val = int(gsm_raw)
-            except ValueError as exc:
-                raise ValueError(
-                    f"Row {row_num}: invalid gsm '{gsm_raw}'. Must be an integer between 1 and 100."
-                ) from exc
-            if gsm_val < 1 or gsm_val > 100:
-                raise ValueError(
-                    f"Row {row_num}: invalid gsm '{gsm_raw}'. Must be an integer between 1 and 100."
-                )
-            entry["gsm"] = gsm_val
-
-        for key in ("model", "font", "palette_theme", "output"):
-            val = str(row.get(key) or "").strip()
-            if val:
-                entry[key] = val
-
-        ideas.append(entry)
-
-    if not ideas:
-        raise ValueError("CSV file contains no data rows.")
-
-    return ideas
-
-
-def load_ideas_from_file(file_path: str | Path) -> list[dict[str, object]]:
-    """Read and parse map ideas from a .csv file."""
-    path = Path(file_path)
-    if path.suffix.lower() != ".csv":
-        raise ValueError("Only .csv files are supported for batch ideas.")
-    content = path.read_text(encoding="utf-8")
-    return parse_ideas_content(content, filename=path.name)
-
-
-
-

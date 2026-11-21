@@ -1,0 +1,33 @@
+{#
+   YouTube upload settings. Keep its public IDs aligned with unchanged static/youtube-
+   upload.js. Keep IDs and inline handlers aligned with static/video scripts.
+#}
+<details class="p-4 rounded-xl bg-slate-950/80 border border-slate-700 space-y-3" id="youtubePanel">
+    <summary class="cursor-pointer text-sm font-semibold text-slate-400"><i class="fa-brands fa-youtube mr-2"></i>YouTube upload <span id="youtubeConnectionBadge" role="status" class="ml-2 text-xs font-normal text-slate-400">Checking sign-in…</span></summary>
+    <a href="/api-manager#youtubeHeading" class="inline-block mt-3 text-sm text-slate-300 underline">Manage YouTube connection in API Manager</a>
+    <div class="space-y-3 mt-3 text-xs">
+        <p class="text-slate-400">Connect your channel once, then upload automatically after rendering. Credentials stay on the server.</p>
+        <p class="text-slate-400">Rendered videos are vertical 9:16 and up to 30 seconds long, ready for Shorts. YouTube classifies them automatically after processing.</p>
+        <p id="youtubeConnection" role="status" class="text-slate-300">Checking connection…</p>
+        <label class="flex items-center gap-2"><input id="youtubeAuto" type="checkbox">Automatically upload after rendering</label>
+        <label class="flex items-center gap-2"><input id="youtubeUseTopic" type="checkbox" checked>Use the video topic as the YouTube title</label>
+        <label class="block">YouTube title <span class="text-slate-400">(up to 100 characters)</span>
+            <input id="youtubeTitle" maxlength="100" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700" placeholder="Automatically filled from the video topic" readonly>
+        </label>
+        <label class="block">Description
+            <textarea id="youtubeDescription" rows="3" maxlength="5000" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700"></textarea>
+        </label>
+        <label class="block">Tags <span class="text-slate-400">(separated by commas)</span>
+            <input id="youtubeTags" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700" placeholder="maps, geography, shorts">
+        </label>
+        <label class="block">Visibility
+            <select id="youtubePrivacy" class="w-full mt-1 p-2 rounded-lg bg-slate-900 border border-slate-700">
+                <option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option>
+            </select>
+        </label>
+        <label class="flex items-center gap-2"><input id="youtubeKids" type="checkbox">Made for kids</label>
+        <button type="button" id="youtubeUpload" onclick="uploadToYouTube()" disabled class="px-3 py-2 rounded-lg bg-slate-800 disabled:opacity-50">Upload rendered Short to YouTube</button>
+        <p id="youtubeUploadStatus" role="status" aria-live="polite" class="text-slate-300"></p>
+        <a id="youtubeVideoLink" class="hidden text-slate-400 underline" target="_blank" rel="noopener noreferrer">Open YouTube Short</a>
+    </div>
+</details>

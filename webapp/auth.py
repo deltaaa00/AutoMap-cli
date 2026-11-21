@@ -12,7 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Password gate and persistent browser sessions for the web interface."""
+"""Install login, logout and signed browser-session rules for the web app.
+
+create_app calls init_web_auth before registering protected routes. Exact
+SERVER=TRUE enables the login gate; local mode skips it. Credentials come from
+environment or supplied .env settings. Their keyed digest identifies a session,
+so credential rotation invalidates old logins without putting passwords in cookies.
+
+The signing key is configured or atomically persisted under the instance directory
+for worker/restart consistency. Redirect targets stay local, and logout requires
+a session token. YouTube has its own request tokens in webapp.youtube. Keep
+instance data persistent in deployments that must retain sessions and uploads.
+"""
 import hashlib
 import hmac
 import os
@@ -30,8 +41,11 @@ def _session_secret(app, settings):
     configured = os.environ.get('WEB_SECRET_KEY') or settings.get('WEB_SECRET_KEY')
     if configured:
         return configured
-    secret_path = Path(os.environ.get('WEB_AUTH_SECRET_FILE') or settings.get('WEB_AUTH_SECRET_FILE')
-                       or Path(app.instance_path) / 'web-session-secret')
+    configured_path = os.environ.get('WEB_AUTH_SECRET_FILE') or settings.get('WEB_AUTH_SECRET_FILE')
+    if configured_path:
+        secret_path = Path(configured_path)
+    else:
+        secret_path = Path(app.instance_path) / 'web-session-secret'
     secret_path.parent.mkdir(parents=True, exist_ok=True)
     if not secret_path.exists():
         # Publish a completely written file atomically for multiple WSGI workers.
@@ -52,11 +66,17 @@ def _session_secret(app, settings):
 
 def _safe_next(value):
     """Validate a post-login redirect target so it stays on the same origin."""
-    if (not value or not value.startswith('/') or value.startswith('//') or '\\' in value
-            or any(ord(char) < 32 or ord(char) == 127 for char in value)):
+    if not value or not value.startswith('/'):
+        return '/'
+    # Reject protocol-relative URLs and browser-dependent path separators.
+    if value.startswith('//') or '\\' in value:
+        return '/'
+    if any(ord(char) < 32 or ord(char) == 127 for char in value):
         return '/'
     parts = urlsplit(value)
-    return value if not parts.scheme and not parts.netloc else '/'
+    if parts.scheme or parts.netloc:
+        return '/'
+    return value
 
 
 def init_web_auth(app, env_values=None):
@@ -75,8 +95,9 @@ def init_web_auth(app, env_values=None):
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE='Lax',
     )
-    identity = hmac.new(str(app.secret_key).encode(),
-                        (login + '\0' + password).encode(), hashlib.sha256).hexdigest()
+    signing_key = str(app.secret_key).encode()
+    credentials = (login + '\0' + password).encode()
+    identity = hmac.new(signing_key, credentials, hashlib.sha256).hexdigest()
 
     def authenticated():
         value = session.get('web_identity', '')
@@ -113,15 +134,19 @@ def init_web_auth(app, env_values=None):
                 session['logout_csrf'] = secrets.token_urlsafe(32)
                 return redirect(target)
             error = 'Invalid username or password.'
-        response = app.make_response((render_template('login.html', error=error, next_url=target),
-                                      401 if error else 200))
+        status_code = 200
+        if error:
+            status_code = 401
+        page = render_template('login.html', error=error, next_url=target)
+        response = app.make_response((page, status_code))
         response.headers['Cache-Control'] = 'no-store'
         return response
 
     @app.post('/logout')
     def web_logout():
         csrf = request.form.get('csrf_token', '')
-        if not csrf or not hmac.compare_digest(csrf.encode(), session.get('logout_csrf', '').encode()):
+        expected_csrf = session.get('logout_csrf', '')
+        if not csrf or not hmac.compare_digest(csrf.encode(), expected_csrf.encode()):
             return jsonify(error='Invalid logout token.'), 400
         session.clear()
         return redirect(url_for('web_login'))

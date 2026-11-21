@@ -1,3 +1,8 @@
+# Build the private media worker launched by yt-dlp_serv.py.
+# The Rust stage builds the optional automap_rs wheel; the runtime needs FFmpeg,
+# Deno, Python media dependencies, media/ and bundled fonts. Compose persists media
+# under /tmp/automap_storage. Keep COPY paths synchronized with package moves;
+# this image intentionally does not need the web templates or map artwork.
 # Copyright 2025-2026 deltaaa00
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,7 +44,8 @@ COPY --from=rust-builder /wheels/*.whl /tmp/
 RUN pip install --no-cache-dir /tmp/*.whl && rm -f /tmp/*.whl
 
 
-COPY yt-dlp_serv.py sticker_themes.py extra_stickers.py server_runtime.py render_progress.py video_text.py video_stickers.py video_render.py ./
+COPY yt-dlp_serv.py server_runtime.py render_progress.py ./
+COPY media/ media/
 COPY resources/fonts/ resources/fonts/
 
 EXPOSE 8080

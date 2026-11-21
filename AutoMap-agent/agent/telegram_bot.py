@@ -1,4 +1,12 @@
-"""Lightweight Telegram Bot API client for 1-click Short approvals and competitor music suggestions."""
+"""Telegram Bot API transport for approval buttons, media, and text ideas.
+
+AgentRunner calls this client to deliver candidate videos/music suggestions
+and poll callbacks or messages. TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are
+constructor defaults; the runner can replace them from saved database settings.
+Updates are filtered to the configured chat and consumed using an in-memory
+offset. Transport failures generally return no result rather than stopping the
+runner. Business actions and idea validation belong in ``runner.py``; this
+module formats Telegram requests and response identifiers."""
 
 from __future__ import annotations
 
@@ -125,7 +133,11 @@ class TelegramBot:
         return self.send_message(text, reply_markup=keyboard)
 
     def poll_updates(self, *, timeout: int = 1) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """Poll pending inline button callbacks and text messages from the authorized chat only."""
+        """Return authorized callbacks and text messages while advancing the offset.
+
+        Consume updates from other chats without dispatching them. Buffered messages
+        from poll_callbacks are returned first; unavailable/disabled transport returns
+        no new callbacks and preserves those buffered messages for the caller."""
         buffered = list(self._buffered_messages)
         self._buffered_messages.clear()
         if not self.enabled:

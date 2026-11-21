@@ -12,15 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Sticker selection and raster artwork shared by previews and rendering.
+
+``media.worker`` resolves named, automatic, generated, or uploaded overlays before
+assembling clips. Theme rules live in ``sticker_themes`` and extra procedural
+icons in ``extra_stickers``. Builders return uint8 RGBA arrays; unsupported or
+explicitly disabled sticker kinds return None. Library art may use a local PNG
+cache and optionally fetch Twemoji artwork; procedural drawing is the fallback.
+Shadows enlarge the requested artwork bounds when visual effects are enabled.
+"""
+
 import io
 import os
 import re
 
-from video_text import TITLE_FONT_PATH, _with_shadow
+from .text import TITLE_FONT_PATH, _with_shadow
 
 STORAGE_DIR = "/tmp/automap_storage"
 
-from sticker_themes import (
+from .sticker_themes import (
     ALLOWED_STICKERS,
     TWEMOJI_CODEPOINTS,
     AUTO_STICKER_THEMES as _AUTO_STICKER_THEMES,
@@ -56,7 +66,7 @@ def _resolve_auto_stickers(title: str) -> tuple[str, str]:
 
 
 def _star_polygon(cx: float, cy: float, outer_r: float, inner_r: float) -> list[tuple[float, float]]:
-    """Return the 10 vertices of a 5-pointed star centered at (cx, cy)."""
+    """Return ten alternating outer/inner vertices for a five-point star in pixel coordinates."""
     import math
 
     points: list[tuple[float, float]] = []
@@ -69,7 +79,7 @@ def _star_polygon(cx: float, cy: float, outer_r: float, inner_r: float) -> list[
 
 def _draw_heart(draw, cx: float, cy: float, size: float, fill: tuple[int, int, int, int],
                 outline: tuple[int, int, int, int] = (0, 0, 0, 255), width: int = 4) -> None:
-    """Draw a smooth vector heart icon centered at (cx, cy)."""
+    """Draw the normalized heart outline at the requested pixel center and size."""
     import math
 
     pts: list[tuple[float, float]] = []
@@ -206,17 +216,28 @@ def _stars_row_image(color: str = '#ffffff', effects: bool = True):
 
 
 def _parse_sticker_spec(raw_kind: str, title: str = '', side: str = 'left') -> tuple[str | None, str]:
-    """Parse a sticker specification into ``(gen_style_or_none, base_kind)``."""
+    """Resolve an API sticker string to ``(generated_style_or_none, base_kind)``.
+
+    ``gen`` means die-cut; named generated styles retain their prefix. ``auto``
+    chooses the left or right entry from the title's highest-scoring theme.
+    This parser does not validate that the resolved base kind is drawable.
+    """
     raw = (raw_kind or 'none').strip().lower()
     gen_style: str | None = None
     if ':' in raw:
         prefix, _, base_kind = raw.partition(':')
         if prefix in ('gen', 'gen_diecut', 'gen_neon', 'gen_stamp'):
-            gen_style = 'diecut' if prefix == 'gen' else prefix.removeprefix('gen_')
+            if prefix == 'gen':
+                gen_style = 'diecut'
+            else:
+                gen_style = prefix.removeprefix('gen_')
             raw = base_kind or 'auto'
     if raw == 'auto':
         left_auto, right_auto = _resolve_auto_stickers(title)
-        raw = right_auto if side == 'right' else left_auto
+        if side == 'right':
+            raw = right_auto
+        else:
+            raw = left_auto
     return gen_style, raw
 
 
@@ -274,16 +295,22 @@ def _style_generated_sticker(icon_canvas, gen_style: str, size: int):
     return stamp.resize((size, size), Image.Resampling.LANCZOS)
 
 
-from extra_stickers import draw_extra_sticker
+from .extra_stickers import draw_extra_sticker
 
 
 def _draw_extra_sticker(kind, draw, s, outline, ow):
-    """Delegate extended procedural sticker drawing to extra_stickers.py."""
+    """Delegate extended procedural icons to the extra sticker collection."""
     return draw_extra_sticker(kind, draw, s, outline, ow, star_polygon_fn=_star_polygon)
 
 
 def _sticker_image(kind: str, size: int = 140, effects: bool = True, allow_remote: bool = False):
-    """Render a decorative top-corner sticker (library Twemoji or procedural generated style)."""
+    """Return uint8 RGBA sticker artwork, or None for unsupported/disabled kinds.
+
+    Unstyled library icons first try a local Twemoji cache. Network fetching
+    occurs only when ``allow_remote`` is true; fetch/cache failures fall back
+    to procedural art. Generated styles always use procedural artwork.
+    ``size`` is the artwork square before optional shadow padding.
+    """
     import numpy as np
     from PIL import Image, ImageDraw, ImageOps
 
@@ -292,7 +319,9 @@ def _sticker_image(kind: str, size: int = 140, effects: bool = True, allow_remot
         return None
 
     # Library stickers (without a gen_ prefix) use Twemoji cache/CDN when available.
-    codepoint = None if gen_style else TWEMOJI_CODEPOINTS.get(kind)
+    codepoint = None
+    if not gen_style:
+        codepoint = TWEMOJI_CODEPOINTS.get(kind)
     if codepoint:
         stickers_dir = os.path.join(STORAGE_DIR, 'stickers')
         cache_path = os.path.join(stickers_dir, f'{kind}.png')

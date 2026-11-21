@@ -1,3 +1,7 @@
+# Deploy the configured branch through SSH using repository secrets.
+# The script updates the existing checkout and rebuilds/restarts Compose services.
+# Review triggers, remote branch and persistence settings before changing deployment
+# behavior; this workflow affects the live host rather than a test environment.
 # Copyright 2025-2026 deltaaa00
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

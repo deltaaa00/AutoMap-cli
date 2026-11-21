@@ -1,3 +1,7 @@
+# Test environment layered on top of the runtime requirements.
+# Install with python -m pip install -r requirements-test.txt. Browser tests also
+# need a Playwright Chromium installation; real media tests need local FFmpeg.
+# AutoMap-agent has a separate requirements file and test invocation.
 # Copyright 2025-2026 deltaaa00
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

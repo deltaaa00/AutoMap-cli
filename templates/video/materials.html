@@ -1,0 +1,85 @@
+{#
+   Map and background file dropzones. Owned by materials.js. Keep IDs and inline handlers
+   aligned with static/video scripts.
+#}
+<!-- SLIDE / FRAME BUILDER CARDS (2-Column Grid) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+    <!-- FRAME LAYER 01: Upload Map Slide (drag & drop) -->
+    <div class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 hover:border-accent-500/40 transition-colors flex flex-col gap-3 group">
+        <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                <span class="w-5 h-5 rounded-md bg-accent-500/20 border border-accent-500/40 text-accent-300 font-mono text-xs font-medium flex items-center justify-center">F1</span>
+                <i class="fa-solid fa-map text-accent-300"></i>
+                <span>Map image</span>
+            </label>
+            <span class="text-xs font-mono px-2 py-1 rounded bg-accent-500/10 text-accent-300 border border-accent-500/20">Layer 01 &bull; Image</span>
+        </div>
+
+        <div id="mapDropzone" data-input="mapFileInput"
+            class="dropzone relative flex-1 min-h-[132px] rounded-xl border border-dashed border-slate-700/90 bg-slate-950/90 hover:border-accent-500/80 hover:bg-slate-900/60 transition cursor-pointer px-4 py-4 flex flex-col justify-center text-center">
+            <input type="file" id="mapFileInput" accept="image/*" class="hidden">
+            <div class="dropzone-empty flex flex-col items-center gap-2 pointer-events-none">
+                <div class="w-10 h-10 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center text-accent-300 mb-1">
+                    <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
+                </div>
+                <p class="text-xs text-slate-300"><span class="text-accent-300 font-semibold">Drop map image</span> or click to browse</p>
+                <p class="text-xs text-slate-500 font-mono">PNG / JPG &middot; max 15 MB</p>
+            </div>
+            <div class="dropzone-filled hidden items-center justify-between gap-3 text-left w-full">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-9 h-9 rounded-lg bg-accent-500/15 border border-accent-500/30 flex items-center justify-center shrink-0 overflow-hidden">
+                        <img id="mapThumbPreview" src="" alt="" class="hidden w-full h-full object-cover">
+                        <i id="mapThumbIcon" class="fa-solid fa-image text-accent-300"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="text-xs font-mono text-accent-300">Map Slide Ready</div>
+                        <span class="dropzone-name block text-xs font-mono text-slate-200 truncate">map.png</span>
+                    </div>
+                </div>
+                <button type="button" class="dropzone-clear w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 transition flex items-center justify-center shrink-0" title="Remove">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FRAME LAYER 02: Background Motion Video (drag & drop) -->
+    <div class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/90 hover:border-slate-700 transition-colors flex flex-col gap-3 group">
+        <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-slate-200 flex items-center gap-2">
+                <span class="w-5 h-5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 font-mono text-xs font-medium flex items-center justify-center">F2</span>
+                <i class="fa-solid fa-video text-slate-400"></i>
+                <span>Background video</span>
+            </label>
+            <span class="text-xs font-mono px-2 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">Layer 02 &bull; Video</span>
+        </div>
+
+        <div id="bgDropzone" data-input="bgFileInput"
+            class="dropzone relative flex-1 min-h-[132px] rounded-xl border border-dashed border-slate-700/90 bg-slate-950/90 hover:border-slate-700 hover:bg-slate-900/60 transition cursor-pointer px-4 py-4 flex flex-col justify-center text-center">
+            <input type="file" id="bgFileInput" accept="video/*" class="hidden">
+            <div class="dropzone-empty flex flex-col items-center gap-2 pointer-events-none">
+                <div class="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400 mb-1">
+                    <i class="fa-solid fa-film text-lg"></i>
+                </div>
+                <p class="text-xs text-slate-300"><span class="text-slate-400 font-semibold">Drop background video</span> or click to browse</p>
+                <p class="text-xs text-slate-500 font-mono">MP4 / MOV / WEBM &middot; max 15 MB</p>
+            </div>
+            <div class="dropzone-filled hidden items-center justify-between gap-3 text-left w-full">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                        <i class="fa-solid fa-video text-slate-400"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="text-xs font-mono text-slate-400">Motion Backdrop Ready</div>
+                        <span class="dropzone-name block text-xs font-mono text-slate-200 truncate">background.mp4</span>
+                    </div>
+                </div>
+                <button type="button" class="dropzone-clear w-7 h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-400 border border-slate-800 transition flex items-center justify-center shrink-0" title="Remove">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>

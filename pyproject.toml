@@ -1,3 +1,8 @@
+# Package/build metadata for the automap CLI and map renderer.
+# The project script points to cli.main; setuptools includes the map package and
+# its filling data. Runtime dependencies are also declared in requirements.txt
+# for Docker/manual installs; update both lists together. Pytest configuration
+# below defines the core test root and the optional browser marker.
 # Copyright 2025-2026 deltaaa00
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

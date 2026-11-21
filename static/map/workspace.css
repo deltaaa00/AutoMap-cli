@@ -1,0 +1,69 @@
+/* Map workspace controls, loading animation, and responsive overrides. Loaded before shared studio.css to preserve cascade order. */
+
+@keyframes radarSweep { to { transform: rotate(360deg); } }
+.radar-spin { animation: radarSweep 2s linear infinite; }
+/* Custom Color Picker Input */
+input[type="color"] {
+    -webkit-appearance: none;
+    border: none;
+    padding: 0;
+    background: transparent;
+}
+input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+input[type="color"]::-webkit-color-swatch {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.5rem;
+}
+/* Avoid large composited blur layers while scrolling or opening a touch keyboard. */
+@media (max-width: 1023px), (pointer: coarse) {
+
+    .cyber-card, [class*="backdrop-blur"] {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+    header { position: relative !important; }
+}
+
+/* Phone layouts keep controls reachable without shrinking form text. */
+@media (max-width: 639px) {
+    header > div { height: auto !important; min-height: 64px; flex-wrap: wrap; gap: 12px !important; padding-block: 12px; }
+    header > div > div:last-child { width: 100%; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+    header a, header button { min-height: 44px; }
+    #headerApiText { font-size: 12px; }
+    main { padding: 12px !important; gap: 16px !important; }
+    main > section, #cliForm, #fillingStudioModal .flex-1 { min-width: 0; }
+    main > section > .p-5 { padding: 16px; }
+    #cliForm input:not([type=radio]):not([type=checkbox]):not([type=range]):not([type=color]),
+    #cliForm textarea, #cliForm select,
+    #fillingStudioModal input:not([type=checkbox]):not([type=range]):not([type=color]),
+    #fillingStudioModal select { font-size: 16px; min-height: 44px; }
+    main button, #fillingStudioModal button { min-height: 44px; }
+    #cliForm input[type=range], #fillingStudioModal input[type=range] { min-width: 0; min-height: 28px; }
+    #cliForm .justify-between:has(> label) { flex-wrap: wrap; gap: 8px; }
+    #cliForm code { overflow-wrap: anywhere; }
+    .mobile-style-entry { flex-wrap: wrap; }
+    .mobile-style-entry > div:last-child { width: 100%; justify-content: flex-end; }
+    #mapStage { min-height: 440px; scroll-margin-top: 145px; }
+    #mapStage > div:first-child { padding: 12px; }
+    #mapStage > div:first-child > div { flex-wrap: wrap; gap: 8px; }
+    #mapStage button { min-width: 44px; }
+    #mapViewport { min-height: 340px; padding: 12px 12px 60px; }
+    #serverMapImage { max-width: 100%; max-height: 60svh; }
+    #emptyState { padding: 20px 12px; }
+    #fillingStudioModal { padding: 8px; }
+    #fillingStudioModal > div { max-height: calc(100dvh - 16px); }
+    #fillingStudioModal > div > div { padding: 12px; }
+    #fillingStudioModal > div > div:first-child { flex-shrink: 0; gap: 8px; }
+    #fillingStudioModal > div > div:first-child > div { gap: 12px; min-width: 0; }
+    #fillingStudioModal h3 + code { display: none; }
+    #fillingStudioModal h3 { font-size: 14px; }
+    #fillingStudioModal > div > div:first-child p { font-size: 12px; }
+    #fillingStudioModal button[onclick="closeFillingStudio()"] { min-width: 44px; flex-shrink: 0; }
+    #fillingStudioModal > div > div:last-child { flex-shrink: 0; }
+    #fillingNumList input[type=number] { width: 0; flex: 1; min-width: 0; padding-inline: 4px; }
+    #fillingNumList button, #fillingTxtList button { min-width: 36px; flex-shrink: 0; }
+    #fillingNumList input[type=color], #fillingTxtList input[type=color] { width: 32px; height: 44px; }
+    #toast { left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); overflow-wrap: anywhere; }
+}

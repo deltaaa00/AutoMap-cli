@@ -1,0 +1,87 @@
+{#
+   Portrait preview, transport, render action, and result dock. Shares 1080x1920 layout
+   with media rendering. Keep IDs and inline handlers aligned with static/video scripts.
+#}
+<aside id="videoPreviewRail" aria-label="Video preview and export">                    <!-- CINEMA-GRADE VIDEO PREVIEW STAGE -->
+                    <div id="videoPreview" class="relative rounded-2xl bg-slate-950 border border-slate-800/90 overflow-hidden p-4 canvas-grid">
+                        <!-- Ambient Cinema Glow -->
+
+                        <div class="relative z-10 flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-slate-800"></span>
+                                <span class="text-xs font-display font-semibold text-slate-200 ">Video Preview</span>
+                                <span id="stageModeLabel" class="text-xs font-mono px-2 py-1 rounded bg-slate-900 text-slate-400 border border-slate-800">Live Frame Composite</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs font-mono text-slate-400">
+                                <span id="stageCodecBadge" class="px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400">libx264</span>
+                                <span id="stageDurationBadge" class="px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400">00:08.00</span>
+                            </div>
+                        </div>
+
+                        <!-- Stage Screen -->
+                        <div class="video-preview-stage effects-on relative z-10 mx-auto rounded-xl bg-slate-950 border border-slate-800/90 overflow-hidden flex items-center justify-center">
+                            <!-- Background video live preview (when user selects bgFileInput) -->
+                            <video id="stageBgPreview" class="hidden absolute inset-0 w-full h-full object-cover" muted loop playsinline></video>
+                            <div class="stage-scrim absolute inset-0 pointer-events-none"></div>
+
+                            <!-- Composite Foreground (Title + Map preview before final render) -->
+                            <div id="stageCompositeBox" class="relative z-10 flex flex-col items-center justify-center text-center w-full h-full">
+                                <div id="stageTopLeftSticker" class="hidden"></div>
+                                <div id="stageTopRightSticker" class="hidden"></div>
+                                <div id="stageTitleBanner" class="text-white hidden"></div>
+                                <div id="stageAccentRow" class="hidden">
+                                    <div id="stageSubscribeBanner" class="hidden"></div>
+                                </div>
+                                <div id="stageMapArea">
+                                    <img id="stageMapPreview" alt="Map frame preview" class="hidden object-contain">
+                                    <canvas id="stageRevealCanvas" class="hidden pointer-events-none absolute inset-0 w-full h-full z-10"></canvas>
+                                    <div id="stageEmptyPlaceholder" class="flex flex-col items-center gap-2 text-slate-500">
+                                        <div class="w-12 h-12 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-center text-slate-400 ">
+                                            <i class="fa-solid fa-photo-film text-xl text-accent-400/80"></i>
+                                        </div>
+                                        <p class="text-xs font-medium text-slate-400">Add a map and background video to preview</p>
+                                        <p class="text-xs font-mono text-slate-600">Your rendered video will appear here</p>
+                                    </div>
+                                </div>
+                                <img id="stageWatermarkImage" alt="Watermark logo preview" class="hidden">
+                                <div id="stageWatermarkText" class="hidden"></div>
+                                <div id="stageWatermarkStars" class="hidden"></div>
+                            </div>
+
+                            <!-- Intro Fade Veil -->
+                            <div id="stageIntroVeil" class="hidden pointer-events-none absolute inset-0 z-[15] bg-black"></div>
+
+                            <!-- Watermarks share the same 1080×1920 coordinate space as the map. -->
+                            <!-- Rendered Final Video Player (revealed when /api/render_video succeeds) -->
+                            <video id="renderedVideoPlayer" class="hidden absolute inset-0 z-20 w-full h-full object-contain bg-black" controls playsinline></video>
+                        </div>
+
+                        <!-- Live Animation Transport Bar -->
+                        <div id="previewPlaybackBar" class="relative z-10 mt-3 flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-slate-900/85 border border-slate-800/90 text-xs font-mono">
+                            <div class="flex items-center gap-2">
+                                <button type="button" id="previewPlayPauseBtn" onclick="togglePreviewAnimation()"
+                                    class="px-3 py-1 rounded-lg bg-accent-500/20 hover:bg-accent-500/30 text-accent-300 border border-accent-500/40 transition flex items-center gap-2">
+                                    <i id="previewPlayPauseIcon" class="fa-solid fa-pause text-xs"></i>
+                                    <span id="previewPlayPauseLabel">Pause</span>
+                                </button>
+                                <button type="button" id="previewRestartBtn" onclick="restartPreviewAnimation()"
+                                    class="px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1" title="Restart preview animation">
+                                    <i class="fa-solid fa-rotate-left text-xs"></i>
+                                    <span>Restart</span>
+                                </button>
+                            </div>
+                            <span id="previewTimeIndicator" class="text-slate-300 tabular-nums">00:00.0 / 00:08.0</span>
+                        </div>
+                    </div>
+
+<div class="workspace-actions">                    <!-- Render button & Master Action Bar -->
+                    <div class="mt-auto pt-1 flex flex-col gap-3">
+                        <button type="submit" form="renderForm" id="renderBtn" class="w-full py-4 px-6 rounded-xl bg-slate-800 text-slate-100 font-display font-semibold text-sm transition-colors flex items-center justify-center gap-3 group">
+                            <i id="renderBtnIcon" class="fa-solid fa-film transition-transform "></i>
+                            <span id="renderBtnText">Render video</span>
+                        </button>
+                        <div id="renderResultDock"></div>
+
+
+                    </div>
+</div></aside>

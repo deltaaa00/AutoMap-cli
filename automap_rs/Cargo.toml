@@ -12,14 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Native Python extension built by maturin. Python owns the HTTP API and files;
+# this crate accelerates map painting, alpha composition, and video frame work.
 [package]
 name = "automap_rs"
 version = "0.1.0"
 edition = "2021"
 
+# A cdylib exposes the PyO3 module, rather than a standalone Rust executable.
 [lib]
 name = "automap_rs"
 crate-type = ["cdylib"]
 
+# Keep the extension ABI usable on Python 3.10+ without a wheel per minor version.
+# FFmpeg is an external runtime process, not a linked Cargo dependency.
 [dependencies]
 pyo3 = { version = "0.23", features = ["extension-module", "abi3-py310"] }

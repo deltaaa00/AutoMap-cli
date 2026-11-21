@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Browser coverage for uploaded music; keep a unique pytest module name."""
+"""Check uploaded music selection, restoration and render payloads in Chromium.
+
+Uses the real Video Studio page through the shared studio fixture. Cases cover
+file type/size errors, upload failures and retaining the previous selection.
+Actual audio decoding is tested by test_audio_upload rather than a live server.
+"""
 import base64
 
 import pytest

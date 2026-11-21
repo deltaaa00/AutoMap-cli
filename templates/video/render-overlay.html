@@ -1,0 +1,35 @@
+{#
+   Busy overlay and progress controls for render.js. Keep IDs and inline handlers aligned
+   with static/video scripts.
+#}
+<!-- Rendering overlay with Animated Equalizer & Timeline Scanner -->
+<div id="renderOverlay" class="hidden absolute inset-0 bg-slate-950/90 z-20 flex flex-col items-center justify-center gap-5 rounded-b-2xl p-6">
+    <div class="relative w-20 h-20 flex items-center justify-center">
+        <div class="absolute inset-0 rounded-full border-4 border-accent-500/20"></div>
+        <div class="absolute inset-0 rounded-full border-4 border-accent-500 border-t-transparent animate-spin"></div>
+        <i class="fa-solid fa-clapperboard text-accent-300 text-2xl "></i>
+    </div>
+
+    <div class="text-center max-w-md">
+        <div class="text-base font-display font-medium text-slate-100 ">Rendering video…</div>
+        <div class="text-xs text-slate-400 mt-1 font-mono">Compositing map frame, motion backdrop &amp; audio track via FFmpeg</div>
+    </div>
+
+    <!-- Animated Equalizer Bars during Render -->
+    <div class="eq-active flex items-end gap-2 h-7 px-4 py-2 rounded-xl bg-slate-900/90 border border-accent-500/30">
+        <span class="eq-bar w-1.5 h-full rounded-full bg-accent-400"></span>
+        <span class="eq-bar w-1.5 h-4 rounded-full bg-slate-800"></span>
+        <span class="eq-bar w-1.5 h-full rounded-full bg-slate-800"></span>
+        <span class="eq-bar w-1.5 h-3.5 rounded-full bg-accent-400"></span>
+        <span class="eq-bar w-1.5 h-full rounded-full bg-slate-800"></span>
+        <span class="eq-bar w-1.5 h-4 rounded-full bg-slate-800"></span>
+        <span class="eq-bar w-1.5 h-full rounded-full bg-accent-400"></span>
+        <span class="eq-bar w-1.5 h-3.5 rounded-full bg-slate-800"></span>
+    </div>
+
+    <div class="w-full max-w-md space-y-2">
+        <div class="flex justify-between text-xs text-accent-300"><span id="renderProgressPhase">Preparing materials</span><span id="renderProgressPercent">0%</span></div>
+        <progress id="renderProgressBar" max="100" value="0" aria-label="Video render progress" class="w-full h-3 accent-accent-500"></progress>
+        <p id="renderProgressHint" class="text-xs text-slate-400" role="status">Progress will update when the worker starts encoding.</p>
+    </div>
+</div>

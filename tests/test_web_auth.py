@@ -12,13 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Check the login boundary using a real Flask session cookie."""
+"""Verify the web login gate with real signed Flask session cookies.
+
+Small test apps exercise local/server modes, credential rotation, environment
+precedence, persisted signing keys and safe redirect targets. No browser or
+listening server is needed; temporary files hold test-only session secrets.
+"""
 from pathlib import Path
 
 import pytest
 from flask import Flask
 
-from web_auth import init_web_auth
+from webapp.auth import init_web_auth
 
 
 @pytest.fixture

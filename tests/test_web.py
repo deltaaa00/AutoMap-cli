@@ -12,6 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Exercise browser-facing route contracts with Flask clients and fake providers.
+
+Covers generation settings, repainting, map analysis, model discovery, worker
+proxies, streaming cleanup and map progress. Renderer/HTTP dependencies are
+patched at their new webapp module locations; no external service is contacted.
+For actual browser interactions see tests/browser; for pixels see test_auto_map.
+"""
+
+from webapp import http_client
+from webapp import generation, analysis as map_analysis, media
 import base64
 import io
 from unittest.mock import Mock
@@ -41,7 +51,7 @@ def generation_request():
 
 def test_generate_forwards_options_and_encodes_png(web, monkeypatch, generation_request):
     generate = Mock(return_value=io.BytesIO(b'png-data'))
-    monkeypatch.setattr(web, 'auto_map', generate)
+    monkeypatch.setattr(generation, 'auto_map', generate)
     response = web.app.test_client().post('/api/generate', json={**generation_request,
         'font': 'DIN Condensed.ttf', 'gsm': '22', 'extra_option': 'show_most_least'})
     assert response.status_code == 200
@@ -54,7 +64,7 @@ def test_generate_forwards_options_and_encodes_png(web, monkeypatch, generation_
 
 def test_generate_forwards_temperature_including_zero(web, monkeypatch, generation_request):
     generate = Mock(return_value=io.BytesIO(b'png'))
-    monkeypatch.setattr(web, 'auto_map', generate)
+    monkeypatch.setattr(generation, 'auto_map', generate)
     client = web.app.test_client()
     for temperature in (0, 0.4, 2):
         response = client.post('/api/generate', json={**generation_request, 'temperature': temperature})
@@ -65,7 +75,7 @@ def test_generate_forwards_temperature_including_zero(web, monkeypatch, generati
 
 def test_generate_rejects_invalid_temperature_before_rendering(web, monkeypatch, generation_request):
     generate = Mock()
-    monkeypatch.setattr(web, 'auto_map', generate)
+    monkeypatch.setattr(generation, 'auto_map', generate)
     client = web.app.test_client()
     for temperature in (-1, 3, 'NaN', 'Infinity', True, None, 'invalid', {}):
         response = client.post('/api/generate', json={**generation_request, 'temperature': temperature})
@@ -76,7 +86,7 @@ def test_generate_rejects_invalid_temperature_before_rendering(web, monkeypatch,
 
 def test_generate_defaults_and_invalid_font_fallback(web, monkeypatch, generation_request):
     generate = Mock(return_value=io.BytesIO(b'png'))
-    monkeypatch.setattr(web, 'auto_map', generate)
+    monkeypatch.setattr(generation, 'auto_map', generate)
     client = web.app.test_client()
     for gsm in (None, 'bad', 15):
         for extra in ('none', '', None):
@@ -91,16 +101,16 @@ def test_generate_defaults_and_invalid_font_fallback(web, monkeypatch, generatio
 
 def test_generate_requires_key_without_server_key(web, monkeypatch, generation_request):
     generate = Mock()
-    monkeypatch.setattr(web, 'auto_map', generate)
+    monkeypatch.setattr(generation, 'auto_map', generate)
     generation_request.pop('api_key')
     assert web.app.test_client().post('/api/generate', json=generation_request).status_code == 400
     generate.assert_not_called()
 
 
 def test_generate_server_key_does_not_require_form_key(web, monkeypatch, generation_request):
-    monkeypatch.setattr(web, 'needs_api_key', False)
+    monkeypatch.setitem(web.app.config, 'NEEDS_API_KEY', False)
     generate = Mock(return_value=io.BytesIO(b'png'))
-    monkeypatch.setattr(web, 'auto_map', generate)
+    monkeypatch.setattr(generation, 'auto_map', generate)
     generation_request.pop('api_key')
     assert web.app.test_client().post('/api/generate', json=generation_request).status_code == 200
     assert generate.call_args.kwargs['api_key'] is None
@@ -120,7 +130,7 @@ def test_json_proxy_passes_response(web, monkeypatch):
             upstream = Mock(status_code=status)
             upstream.json.return_value = {'status': 'success' if status == 200 else 'error', 'file': 'data'}
             post = Mock(return_value=upstream)
-            monkeypatch.setattr(requests, 'post', post)
+            monkeypatch.setattr(http_client.worker_http, 'post', post)
             response = client.post(path, json=payload)
             assert response.status_code == status and response.json == upstream.json.return_value
             assert post.call_args.kwargs['timeout'] == timeout
@@ -141,7 +151,7 @@ def test_proxy_failure_returns_bad_gateway(web, monkeypatch):
                 if failure == 'network'
                 else Mock(return_value=upstream)
             )
-            monkeypatch.setattr(requests, 'post', post)
+            monkeypatch.setattr(http_client.worker_http, 'post', post)
             assert client.post(path, json=payload).status_code == 502, (path, failure)
 
 
@@ -156,14 +166,14 @@ def test_cut_duration_normalization(web, monkeypatch):
     client = web.app.test_client()
     for raw, expected in ((0, 1), (100, 30), ('bad', 8), (None, 8), ('12', 12)):
         post = Mock(return_value=Mock(status_code=200, json=lambda: {}))
-        monkeypatch.setattr(requests, 'post', post)
+        monkeypatch.setattr(http_client.worker_http, 'post', post)
         client.post('/api/music_cut', json={'title': 'song', 'duration': raw})
         assert post.call_args.kwargs['json']['duration'] == expected, raw
 
 
 def test_render_forwards_title_style_and_legacy_title(web, monkeypatch):
     post = Mock(return_value=Mock(status_code=200, json=lambda: {}))
-    monkeypatch.setattr(requests, 'post', post)
+    monkeypatch.setattr(http_client.worker_http, 'post', post)
     web.app.test_client().post('/api/render_video', json={
         'title': ' Legacy ', 'title_font': 'Bips.ttf', 'title_font_size': 72,
         'title_first_line_color': '#ff6600', 'title_other_lines_color': '#3366ff',
@@ -193,10 +203,10 @@ def test_render_forwards_title_style_and_legacy_title(web, monkeypatch):
 ])
 def test_country_reveal_requires_zoom(web, monkeypatch, zoom, reveal, expected):
     post = Mock(return_value=Mock(status_code=200, json=lambda: {}))
-    monkeypatch.setattr(requests, 'post', post)
+    monkeypatch.setattr(http_client.worker_http, 'post', post)
     extract = Mock(return_value='mask')
-    monkeypatch.setattr(web, '_decode_image_size', lambda _: (100, 100))
-    monkeypatch.setattr(web, '_extract_country_reveal_mask', extract)
+    monkeypatch.setattr(media, '_decode_image_size', lambda _: (100, 100))
+    monkeypatch.setattr(media, '_extract_country_reveal_mask', extract)
     response = web.app.test_client().post('/api/render_video', json={
         'map_file': 'map', 'zoom_enabled': zoom, 'reveal_enabled': reveal,
     })
@@ -212,7 +222,7 @@ def test_title_preview_proxy_preserves_content(web, monkeypatch):
     for status in (200, 400):
         upstream = Mock(status_code=status, content=b'png-or-error', headers={'Content-Type': 'image/png'})
         post = Mock(return_value=upstream)
-        monkeypatch.setattr(requests, 'post', post)
+        monkeypatch.setattr(http_client.worker_http, 'post', post)
         response = client.post('/api/video_title_preview', json={
             'video_title': 'Title', 'title_font': 'Bips.ttf', 'title_font_size': 72, 'ignore': True,
             'title_first_line_color': '#ff6600', 'title_other_lines_color': '#3366ff'})
@@ -224,7 +234,7 @@ def test_title_preview_proxy_preserves_content(web, monkeypatch):
 
 
 def test_title_preview_unavailable(web, monkeypatch):
-    monkeypatch.setattr(requests, 'post', Mock(side_effect=requests.Timeout()))
+    monkeypatch.setattr(http_client.worker_http, 'post', Mock(side_effect=requests.Timeout()))
     assert web.app.test_client().post('/api/video_title_preview', json={}).status_code == 502
 
 
@@ -232,7 +242,7 @@ def test_video_download_streaming(web, monkeypatch):
     upstream = Mock(status_code=200, headers={'Content-Disposition': 'attachment; filename="clip.mp4"'})
     upstream.iter_content.return_value = iter([b'first', b'', b'last'])
     get = Mock(return_value=upstream)
-    monkeypatch.setattr(requests, 'get', get)
+    monkeypatch.setattr(http_client.worker_http, 'get', get)
     response = web.app.test_client().get('/api/download_video?path=/tmp/clip.mp4')
     assert response.status_code == 200 and response.data == b'firstlast'
     assert response.mimetype == 'video/mp4'
@@ -252,13 +262,13 @@ def test_video_download_errors(web, monkeypatch):
         if kind == 'invalid-json':
             upstream.json.side_effect = ValueError()
         get = Mock(side_effect=requests.ConnectionError()) if kind == 'network' else Mock(return_value=upstream)
-        monkeypatch.setattr(requests, 'get', get)
+        monkeypatch.setattr(http_client.worker_http, 'get', get)
         response = client.get('/api/download_video?path=clip.mp4')
         assert response.status_code == (502 if kind == 'network' else 404), kind
 
 
 def test_codec_proxy_returns_worker_capabilities(web, monkeypatch):
-    monkeypatch.setattr(requests, 'get', Mock(return_value=Mock(
+    monkeypatch.setattr(http_client.worker_http, 'get', Mock(return_value=Mock(
         status_code=200, json=lambda: {'codecs': ['libx264']})))
     assert web.app.test_client().get('/api/codecs').json == {'codecs': ['libx264']}
 
@@ -267,7 +277,7 @@ def test_worker_url_environment_override(monkeypatch, request):
     monkeypatch.setenv('YTDLP_URL', 'http://127.0.0.1:9090/')
     web = request.getfixturevalue('web')
     get = Mock(return_value=Mock(status_code=200, json=lambda: {'codecs': []}))
-    monkeypatch.setattr(requests, 'get', get)
+    monkeypatch.setattr(http_client.worker_http, 'get', get)
     assert web.app.test_client().get('/api/codecs').status_code == 200
     get.assert_called_once_with('http://127.0.0.1:9090/api/codecs', timeout=20)
 
@@ -277,7 +287,7 @@ def test_codec_proxy_failure(web, monkeypatch):
     for failure in (requests.Timeout(), ValueError('bad JSON')):
         response = Mock()
         response.json.side_effect = failure
-        monkeypatch.setattr(requests, 'get', Mock(return_value=response))
+        monkeypatch.setattr(http_client.worker_http, 'get', Mock(return_value=response))
         assert client.get('/api/codecs').status_code == 502
 
 
@@ -313,7 +323,7 @@ def test_restyle_map_repaints_without_ai_request(web, monkeypatch):
         },
     }
     mock_auto_map = Mock(return_value=fake_buf)
-    monkeypatch.setattr(web, 'auto_map', mock_auto_map)
+    monkeypatch.setattr(generation, 'auto_map', mock_auto_map)
 
     res = client.post('/api/restyle_map', json={
         'topic': 'Test',
@@ -406,7 +416,7 @@ def test_generate_returns_request_values_and_effective_style(web, monkeypatch, g
         'label_style': {'text_color': '#abcdef'},
     }
     generate = Mock(return_value=output)
-    monkeypatch.setattr(web, 'auto_map', generate)
+    monkeypatch.setattr(generation, 'auto_map', generate)
     style = {'filling_txt': {}, 'filling_num': {'(0, 100)': '#38bdf8'},
              'label_style': {'text_color': '#abcdef'}, 'auto_style': False,
              'palette_theme': 'oceanic'}
@@ -427,7 +437,7 @@ def test_restyle_reports_renderer_failure(web, monkeypatch):
     client = web.app.test_client()
     for failure in (None, RuntimeError('repaint failed')):
         generate = Mock(side_effect=failure) if failure else Mock(return_value=None)
-        monkeypatch.setattr(web, 'auto_map', generate)
+        monkeypatch.setattr(generation, 'auto_map', generate)
         response = client.post('/api/restyle_map', json={'map_values': {'ukraine': 'Yes'}})
         assert response.status_code == 500
         assert response.json['status'] == 'error'
@@ -474,14 +484,14 @@ def test_generate_displays_upstream_service_reason(web, monkeypatch, generation_
     from map.functions import AIServiceError
     client = web.app.test_client()
     for code, phrase in ((503, 'overloaded'), (429, 'quota'), (504, '45 seconds')):
-        monkeypatch.setattr(web, 'auto_map', Mock(side_effect=AIServiceError(phrase, code)))
+        monkeypatch.setattr(generation, 'auto_map', Mock(side_effect=AIServiceError(phrase, code)))
         response = client.post('/api/generate', json=generation_request)
         assert response.status_code == code
         assert response.json['error'] == phrase
 
 
 def test_analysis_preserves_fractional_values_and_rendered_bounds(web):
-    analysis = web._build_analysis_from_ai(
+    analysis = map_analysis._build_analysis_from_ai(
         {'ukraine': 0.1, 'poland': 0.4}, mode='number',
         render_meta={'used_num': {'(0.1, 0.4)': (12, 34, 56, 255)}},
     )
@@ -512,19 +522,19 @@ def test_model_discovery_excludes_non_text_models_and_keeps_new_versions(web, mo
 def test_map_progress_tracks_stages_and_expires_old_entries(web, monkeypatch, generation_request):
     def generate(**kwargs):
         kwargs['progress_callback'](2, 'Painting')
-        assert web._MAP_PROGRESS['render-id']['stage'] == 2
+        assert generation._MAP_PROGRESS['render-id']['stage'] == 2
         buf = io.BytesIO(b'png')
         buf.map_meta = {'ai_answer': {'a': '1k'}, 'raw_ai_answer': {'a': 1049}}
         return buf
-    monkeypatch.setattr(web, 'auto_map', generate)
-    web._MAP_PROGRESS['old'] = {'updated_at': 0}
-    web._set_map_progress('', 1, 'ignored')
+    monkeypatch.setattr(generation, 'auto_map', generate)
+    generation._MAP_PROGRESS['old'] = {'updated_at': 0}
+    generation._set_map_progress('', 1, 'ignored')
     client = web.app.test_client()
     response = client.post('/api/generate', json={**generation_request, 'progress_id': 'render-id', 'show_legend': True})
     assert response.status_code == 200
     assert response.json['map_values'] == {'a': 1049}
     assert '--legend' in response.json['command']
-    assert 'old' not in web._MAP_PROGRESS
+    assert 'old' not in generation._MAP_PROGRESS
     progress = client.get('/api/generate_progress/render-id')
     assert progress.json['status'] == 'done' and progress.json['stage'] == 4
     assert progress.headers['Cache-Control'] == 'no-store'
@@ -534,7 +544,7 @@ def test_map_progress_tracks_stages_and_expires_old_entries(web, monkeypatch, ge
 def test_map_progress_records_generation_failure(web, monkeypatch, generation_request):
     client = web.app.test_client()
     for error, status in ((KeyError('x'), 400), (RuntimeError('failed'), 500), (None, 500)):
-        monkeypatch.setattr(web, 'auto_map', Mock(side_effect=error, return_value=None))
+        monkeypatch.setattr(generation, 'auto_map', Mock(side_effect=error, return_value=None))
         no_progress = client.post('/api/generate', json=generation_request)
         assert no_progress.status_code == status
         assert no_progress.json['status'] == 'error'

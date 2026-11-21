@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Malformed client requests and interrupted downloads stay controlled."""
+"""Check the web request boundary and streamed connection cleanup.
+
+Malformed/non-object JSON, invalid shared string fields and body-size limits
+should return controlled client errors before route field access. Fake upstream
+responses verify that both successful streams and error downloads close.
+"""
+from webapp import http_client
 from unittest.mock import Mock
 
 
@@ -53,7 +59,7 @@ def test_video_proxy_releases_connection(web, monkeypatch):
         upstream = Mock(status_code=status, headers={'Content-Type': 'application/json'})
         upstream.json.return_value = {'error': 'missing'}
         upstream.iter_content.return_value = iter([b'video'])
-        monkeypatch.setattr(web.requests, 'get', Mock(return_value=upstream))
+        monkeypatch.setattr(http_client.worker_http, 'get', Mock(return_value=upstream))
         response = client.get('/api/download_video?path=clip.mp4', buffered=True)
         assert response.status_code == status
         if status == 200:

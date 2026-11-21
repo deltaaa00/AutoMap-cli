@@ -1,4 +1,12 @@
-"""SQLite storage shared between the autonomous agent runner and the web dashboard."""
+"""SQLite persistence shared by the dashboard and the standalone runner.
+
+AgentDB stores configuration, credentials, experiments, competitor statistics,
+and queued commands in AGENT_DB_PATH or the agent instance directory. Creating
+an AgentDB initializes/migrates its schema. Each operation opens a connection
+with WAL and foreign keys, commits on success, and rolls back on exceptions.
+Experiment-action claims are conditional database updates before external
+uploads; command consumers and publish workflows are in ``runner.py``.
+Keep serialized field decoding here so callers receive ordinary Python values."""
 
 from __future__ import annotations
 
@@ -57,6 +65,10 @@ class AgentDB:
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
+        """Open one transactional connection and always release it.
+
+        Successful callers commit their writes; exceptions roll back before propagating.
+        WAL permits the dashboard and runner to share a database across processes."""
         conn = sqlite3.connect(str(self.path), timeout=30.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL;")
@@ -595,7 +607,10 @@ class AgentDB:
         return self._decode_experiment(row)
 
     def claim_experiment_action(self, exp_id: int, action: str) -> bool:
-        """Reserve an approval decision before any external side effect."""
+        """Atomically reserve a pending experiment before an upload or other action.
+
+        Return False if another worker already claimed it or a video is already linked.
+        Callers must stop on False so a repeated approval cannot publish twice."""
         with self._connect() as conn:
             result = conn.execute(
                 """

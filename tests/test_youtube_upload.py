@@ -1,4 +1,11 @@
-"""YouTube integration contracts; no Google accounts or network calls required."""
+"""Check Google OAuth and background upload contracts without real accounts.
+
+Fake OAuth flows, credentials and YouTube API objects exercise state/PKCE, CSRF,
+render-token ownership, encrypted storage, resumable uploads and slot cleanup.
+Two-browser tests ensure tokens remain isolated across restarts. Failures must
+never expose provider tokens or secrets to the client.
+"""
+from webapp import http_client
 import io
 import json
 import time
@@ -8,7 +15,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 import requests
 
-from youtube_upload import client_config, metadata
+from webapp.youtube import client_config, metadata
 
 CLIENT = {'web': {'client_id': 'test.apps.googleusercontent.com', 'client_secret': 'test-secret',
                   'auth_uri': 'https://accounts.google.com/o/oauth2/auth',
@@ -24,12 +31,13 @@ def setup_client(web, tmp_path):
 
 
 def authorize(web, client):
+    uploads = web.app.extensions['youtube_uploads']
     with client.session_transaction() as stored:
         owner = stored['youtube_owner']
         identity = stored.get('web_identity', '')
     import hashlib
     owner = hashlib.sha256((owner + identity).encode()).hexdigest()
-    web.youtube_uploads.save_secret(web.youtube_uploads.token_path(owner), {
+    uploads.save_secret(uploads.token_path(owner), {
         'refresh_token': 'refresh-test', 'token': 'token-test',
         'client_id': CLIENT['web']['client_id'], 'client_secret': 'test-secret',
         'token_uri': CLIENT['web']['token_uri'], 'expiry': '2099-01-01T00:00:00Z',
@@ -62,15 +70,16 @@ def test_untrusted_oauth_endpoints_are_rejected():
 
 
 def test_status_and_csrf_do_not_expose_credentials(web, tmp_path):
+    uploads = web.app.extensions['youtube_uploads']
     client, headers = setup_client(web, tmp_path)
     assert not client.get('/api/youtube/status').json['connected']
     owner = authorize(web, client)
     response = client.get('/api/youtube/status')
     assert response.json['connected'] and response.headers['Cache-Control'] == 'no-store'
     assert b'token-test' not in response.data and b'test-secret' not in response.data
-    assert 'refresh-test' not in web.youtube_uploads.token_path(owner).read_text()
-    assert 'test-secret' not in web.youtube_uploads.token_path(owner).read_text()
-    assert web.youtube_uploads.token_path(owner).stat().st_mode & 0o777 == 0o600
+    assert 'refresh-test' not in uploads.token_path(owner).read_text()
+    assert 'test-secret' not in uploads.token_path(owner).read_text()
+    assert uploads.token_path(owner).stat().st_mode & 0o777 == 0o600
     assert client.post('/api/youtube/disconnect').status_code == 403
     assert client.post('/api/youtube/disconnect', headers=headers).status_code == 200
     assert not client.get('/api/youtube/status').json['connected']
@@ -122,6 +131,7 @@ def test_upload_rejects_forged_render_token(web, tmp_path):
 
 
 def test_background_upload_metadata_progress_and_deduplication(web, tmp_path, monkeypatch):
+    uploads = web.app.extensions['youtube_uploads']
     from googleapiclient import discovery
     client, headers = setup_client(web, tmp_path)
     authorize(web, client)
@@ -133,13 +143,13 @@ def test_background_upload_metadata_progress_and_deduplication(web, tmp_path, mo
     upstream.__enter__ = Mock(return_value=upstream)
     upstream.__exit__ = Mock(return_value=False)
     upstream.iter_content.return_value = [b'fake rendered video']
-    monkeypatch.setattr(requests, 'get', Mock(return_value=upstream))
+    monkeypatch.setattr(http_client.worker_http, 'get', Mock(return_value=upstream))
     with web.app.test_request_context():
         # Copy the same signed session into this context to generate its render token.
         with client.session_transaction() as cookie:
             from flask import session
             session.update(cookie)
-        token = web.youtube_uploads.render_token('/renders/test.mp4')
+        token = uploads.render_token('/renders/test.mp4')
     payload = {'upload_token': token, 'youtube': {'title': 'Test', 'description': 'My description', 'tags': 'maps,earth', 'privacy': 'private'}}
     response = client.post('/api/youtube/upload', headers=headers, json=payload)
     assert response.status_code == 202
@@ -162,12 +172,13 @@ def test_background_upload_metadata_progress_and_deduplication(web, tmp_path, mo
 
 
 def test_auto_upload_starts_only_after_successful_render(web, tmp_path, monkeypatch):
+    uploads = web.app.extensions['youtube_uploads']
     client, headers = setup_client(web, tmp_path)
     authorize(web, client)
     post = Mock()
-    monkeypatch.setattr(requests, 'post', post)
+    monkeypatch.setattr(http_client.worker_http, 'post', post)
     start = Mock(return_value='job-test')
-    monkeypatch.setattr(web.youtube_uploads, 'start', start)
+    monkeypatch.setattr(uploads, 'start', start)
     data = {'map_file': 'map', 'background_video': 'bg', 'video_title': 'Map', 'youtube': {'title': 'YouTube title'}}
     assert client.post('/api/render_video', json=data).status_code == 403
     assert client.post('/api/render_video', headers=headers, json={**data, 'youtube': {'title': ''}}).status_code == 400
@@ -185,15 +196,16 @@ def test_auto_upload_starts_only_after_successful_render(web, tmp_path, monkeypa
 
 
 def test_two_people_keep_separate_encrypted_tokens_across_server_restart(web, tmp_path):
+    uploads = web.app.extensions['youtube_uploads']
     from flask import Flask
-    from youtube_upload import YouTubeUploads
+    from webapp.youtube import YouTubeUploads
     first, first_headers = setup_client(web, tmp_path)
     second, second_headers = setup_client(web, tmp_path)
     first_owner = authorize(web, first)
     second_owner = authorize(web, second)
-    second_secret = web.youtube_uploads.load_secret(web.youtube_uploads.token_path(second_owner))
+    second_secret = uploads.load_secret(uploads.token_path(second_owner))
     second_secret['refresh_token'] = 'second-person-refresh'
-    web.youtube_uploads.save_secret(web.youtube_uploads.token_path(second_owner), second_secret)
+    uploads.save_secret(uploads.token_path(second_owner), second_secret)
     assert first_owner != second_owner
     restarted = Flask('youtube-restart')
     restarted.secret_key = web.app.secret_key
@@ -208,17 +220,18 @@ def test_two_people_keep_separate_encrypted_tokens_across_server_restart(web, tm
 
 
 def test_failed_upload_never_exposes_secrets_and_releases_slot(web, tmp_path, monkeypatch):
+    uploads = web.app.extensions['youtube_uploads']
     from google.oauth2.credentials import Credentials
     client, headers = setup_client(web, tmp_path)
     authorize(web, client)
     credentials = Credentials(token='valid-token')
-    monkeypatch.setattr(web.youtube_uploads, 'credentials', lambda owner: credentials)
-    monkeypatch.setattr(requests, 'get', Mock(side_effect=RuntimeError('SENSITIVE-secret-token')))
+    monkeypatch.setattr(uploads, 'credentials', lambda owner: credentials)
+    monkeypatch.setattr(http_client.worker_http, 'get', Mock(side_effect=RuntimeError('SENSITIVE-secret-token')))
     with web.app.test_request_context():
         with client.session_transaction() as cookie:
             from flask import session
             session.update(cookie)
-        token = web.youtube_uploads.render_token('/renders/failure.mp4')
+        token = uploads.render_token('/renders/failure.mp4')
     result = client.post('/api/youtube/upload', headers=headers, json={'upload_token': token, 'youtube': {'title': 'Test'}})
     job_id = result.json['job_id']
     for _ in range(100):
@@ -227,10 +240,10 @@ def test_failed_upload_never_exposes_secrets_and_releases_slot(web, tmp_path, mo
             break
         time.sleep(.01)
     assert status.json['status'] == 'error' and b'SENSITIVE' not in status.data
-    assert web.youtube_uploads.slots.acquire(blocking=False)
-    assert web.youtube_uploads.slots.acquire(blocking=False)
-    web.youtube_uploads.slots.release()
-    web.youtube_uploads.slots.release()
+    assert uploads.slots.acquire(blocking=False)
+    assert uploads.slots.acquire(blocking=False)
+    uploads.slots.release()
+    uploads.slots.release()
 
 
 def test_studio_initializes_youtube_session_before_parallel_requests(web, tmp_path):
@@ -259,18 +272,20 @@ def test_csrf_rejection_identifies_safe_to_retry_requests(web, tmp_path):
 
 @pytest.mark.parametrize('origin', ['http://localhost:3000', 'http://127.0.0.1:5000'])
 def test_local_mode_uses_local_callback_even_with_hosted_override(web, monkeypatch, origin):
+    uploads = web.app.extensions['youtube_uploads']
     web.app.config['WEB_AUTH_ENABLED'] = False
     web.app.config['YOUTUBE_REDIRECT_URI'] = 'https://hosted.example/api/youtube/callback'
     monkeypatch.setenv('YOUTUBE_REDIRECT_URI', 'https://old-host.example/api/youtube/callback')
     with web.app.test_request_context(base_url=origin):
-        assert web.youtube_uploads.callback_uri() == origin + '/api/youtube/callback'
+        assert uploads.callback_uri() == origin + '/api/youtube/callback'
 
 
 def test_server_mode_keeps_external_callback_behind_reverse_proxy(web, monkeypatch):
+    uploads = web.app.extensions['youtube_uploads']
     web.app.config['WEB_AUTH_ENABLED'] = True
     monkeypatch.setenv('YOUTUBE_REDIRECT_URI', 'https://auto-map.duckdns.org/api/youtube/callback')
     with web.app.test_request_context(base_url='http://localhost:5000'):
-        assert web.youtube_uploads.callback_uri() == 'https://auto-map.duckdns.org/api/youtube/callback'
+        assert uploads.callback_uri() == 'https://auto-map.duckdns.org/api/youtube/callback'
     web.app.config['YOUTUBE_REDIRECT_URI'] = 'https://configured.example/api/youtube/callback'
     with web.app.test_request_context(base_url='http://localhost:5000'):
-        assert web.youtube_uploads.callback_uri() == 'https://configured.example/api/youtube/callback'
+        assert uploads.callback_uri() == 'https://configured.example/api/youtube/callback'

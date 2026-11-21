@@ -1,4 +1,12 @@
 <!DOCTYPE html>
+<!--
+Agent dashboard sign-in form rendered by web.py's login_page route.
+POST fields username/password are checked by the parent Flask app, which owns
+the session and authentication policy for all registered Blueprints. The error
+variable is server-rendered feedback; successful login redirects to the dashboard.
+This template does not store credentials or call the AutoMap service.
+Tailwind is loaded from its external CDN.
+-->
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">

@@ -12,6 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Native acceleration for map coloring and portrait video composition.
+//!
+//! Python callers are `map.auto_map` for indexed region painting and
+//! `media.worker`/`media.native_layers` for rendering and static alpha composition.
+//! Image buffers are packed, row-major, straight-alpha RGBA8: four bytes per
+//! pixel with no row padding. Widths, heights, target positions, and crop bounds
+//! are pixels; animation timestamps and durations are seconds.
+//!
+//! The render path validates buffer lengths, releases the Python GIL, and streams
+//! reusable frame buffers between an FFmpeg decoder and encoder. Static visible
+//! spans are prepared once; dynamic layers, reveal frames, camera motion, and
+//! impact effects are applied per frame. Python provides already prepared local
+//! background footage and owns its input/output file lifecycle. Pipes are closed
+//! before child processes are waited on so unread decoder frames cannot deadlock
+//! shutdown. Encoding failures become Python exceptions; the worker decides when
+//! to fall back to MoviePy. Map painting and alpha composition return new bytes
+//! rather than modifying buffers owned by Python.
+
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
@@ -75,6 +93,12 @@ impl<'py> FromPyObject<'py> for RevealSpec {
 /// Composites the background video, static foreground, country reveal animation,
 /// dynamic overlays, intro veil, camera zoom, and impact FX frame-by-frame in reusable
 /// RGBA buffers, streaming directly to/from `ffmpeg`.
+///
+/// `static_rgba` covers the full `width * height` canvas. Dynamic/reveal buffers
+/// use their own declared dimensions and may be clipped at canvas edges. `fps`
+/// is frames per second; all durations and animation tuple timestamps are seconds.
+/// `draft` keeps composition geometry intact and scales only the encoded output.
+/// FFmpeg is resolved from `FFMPEG_BINARY`, with `ffmpeg` on PATH as the fallback.
 #[pyfunction]
 #[pyo3(signature = (bg_video_path, static_rgba, dynamic_layers, veil_duration, audio_path, output_path, width, height, fps, duration, codec, preset=None, draft=false, zoom_params=None, reveal_spec=None))]
 #[allow(clippy::too_many_arguments)]
@@ -751,6 +775,12 @@ fn blend_pixel_scaled(bg: &mut [u8], fg: &[u8], op_u8: u32) {
 
 /// Copies `base_rgba` and paints pixels at `flat_indices` (native-endian `u32` bytes)
 /// using `region_ids` (native-endian `u16` bytes) into `lut_rgba` where `use_mask[rid] != 0`.
+///
+/// The map renderer supplies matching index/region arrays and a four-byte RGBA
+/// lookup entry per region. Invalid byte alignment or mismatched array counts
+/// raises ValueError, as does a lookup table shorter than the region mask. Region
+/// and pixel indices outside the supplied ranges are skipped during painting.
+/// Input buffers stay unchanged and the returned Python bytes own the result.
 #[pyfunction]
 fn paint_regions_rs(
     py: Python<'_>,
@@ -805,6 +835,11 @@ fn paint_regions_rs(
 }
 
 /// Fast integer Porter-Duff "over" compositing for straight RGBA buffers of equal length.
+///
+/// Both buffers must have equal byte counts divisible by four. Dimensions are
+/// intentionally absent: callers must ensure both buffers describe the same
+/// canvas geometry. The returned bytes preserve transparent and partially opaque
+/// pixels, unlike the video frame blend helpers that assume an opaque background.
 #[pyfunction]
 fn alpha_composite_rs(
     py: Python<'_>,

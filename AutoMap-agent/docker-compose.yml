@@ -1,3 +1,9 @@
+# Run the dashboard and polling worker as separate processes over shared storage.
+# Both services use the same image and instance/media mounts; queued commands in
+# SQLite connect HTTP requests to runner actions. .env supplies credentials and
+# AutoMap URLs. Keep mounts aligned so both services see tokens and rendered MP4s.
+# The web command serves web:app; agent-runner invokes python -m agent.runner.
+
 services:
   agent-web:
     build:

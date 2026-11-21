@@ -12,24 +12,57 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ast
-import hashlib
+"""Orchestrate one map render for CLI commands and web generation endpoints.
+
+The render flow loads artwork and seed coordinates, resolves AI or supplied
+region values, selects filling rules, paints regions, and composites labels,
+highlights, relief, borders, and the optional legend. Pixel coordinates refer
+to bundled artwork, not latitude/longitude. Cached images from geometry are
+shared and must not be modified directly.
+
+Edit styling for palette/number rules, geometry for country masks and caches,
+and legend for legend layout. This module owns render options, layer order,
+metadata, and the optional Rust acceleration fallback.
+"""
 import logging
-import os
 import random
 import io
-import tempfile
-import threading
 import math
 import re
 import unicodedata
-from collections import Counter
 from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from . import constants
+from .geometry import (
+    _RESERVED_HIGHLIGHT_COLORS,
+    _build_extrema_highlight_layer,
+    _compute_region_ids,
+    _file_key,
+    _floodfill_bool_mask,
+    _load_rgba,
+    _prepared_relief,
+    _region_cache_dir,
+    _region_index,
+    _region_thresh,
+)
+from .legend import _draw_legend_overlay
+from .styling import (
+    _auto_fill_from_ai,
+    _format_legend_bound,
+    _format_legend_range,
+    _format_number_value,
+    _format_short_number,
+    _format_text_label,
+    _hex_to_rgba,
+    _numeric_extrema,
+    _parse_filling_overrides,
+    _parse_short_number,
+    _resolve_theme_name,
+    _to_rgba_tuple,
+)
 
 from .functions import ai_request, load_filling, _warning as showwarning, _error as showerror
 from . import log
@@ -61,154 +94,6 @@ def _load_world_countries() -> tuple[dict[str, list[tuple[int, int]]], dict[str,
     from .world_countries_coords import world_countries_coords, world_countries_label_sizes
 
     return world_countries_coords, world_countries_label_sizes
-
-
-# ---------------------------------------------------------------------------
-# Per-process caches for decoded artwork, prepared overlays and region-ID maps.
-# Cached images are shared; callers must copy them before mutating.
-# ---------------------------------------------------------------------------
-
-_REGION_CACHE_VERSION = 1
-_CACHE_LOCK = threading.Lock()
-_IMAGE_CACHE: dict[tuple, Image.Image] = {}
-_RELIEF_CACHE: dict[tuple, Image.Image] = {}
-_REGION_CACHE: dict[tuple, tuple[np.ndarray, np.ndarray]] = {}
-
-
-def _file_key(path: Path) -> tuple | None:
-    """Identity of an artwork file; None when it cannot be stat'ed (no caching)."""
-    try:
-        st = os.stat(path)
-    except OSError:
-        return None
-    return (str(Path(path).resolve()), st.st_mtime_ns, st.st_size)
-
-
-def _load_rgba(path: Path) -> Image.Image:
-    """Decode ``path`` as RGBA once per process. Returned image is shared: copy before mutating."""
-    key = _file_key(path)
-    if key is not None:
-        with _CACHE_LOCK:
-            cached = _IMAGE_CACHE.get(key)
-        if cached is not None:
-            return cached
-    img = Image.open(path).convert("RGBA")
-    if key is not None:
-        img.load()
-        with _CACHE_LOCK:
-            _IMAGE_CACHE[key] = img
-    return img
-
-
-def _prepared_relief(path: Path, size: tuple[int, int]) -> Image.Image:
-    """Relief overlay resized to ``size`` with reduced opacity (shared, do not mutate)."""
-    key = _file_key(path)
-    ckey = None if key is None else (key, tuple(size))
-    if ckey is not None:
-        with _CACHE_LOCK:
-            cached = _RELIEF_CACHE.get(ckey)
-        if cached is not None:
-            return cached
-    relief = _load_rgba(path)
-    relief = relief.resize(size) if relief.size != tuple(size) else relief.copy()
-    _, _, _, a = relief.split()
-    relief.putalpha(a.point(constants._RELIEF_ALPHA_LUT))
-    if ckey is not None:
-        with _CACHE_LOCK:
-            _RELIEF_CACHE[ckey] = relief
-    return relief
-
-
-def _region_thresh(name: str) -> int:
-    """Return the flood-fill color tolerance for a region."""
-    # Tolerances are tuned to the shading in the source map images.
-    if name == "south_america":
-        return 15
-    if name == "asia":
-        return 20
-    return 30
-
-
-def _region_cache_dir() -> Path:
-    """Return the directory used to cache precomputed region-ID maps on disk."""
-    env = os.environ.get("AUTOMAP_REGION_CACHE_DIR")
-    return Path(env) if env else Path(tempfile.gettempdir()) / "automap-region-cache"
-
-
-def _compute_region_ids(base: Image.Image, coords: dict) -> np.ndarray:
-    """Flood fill every seed once, on a scratch copy, with a unique sentinel per region.
-
-    Fills run in the same order and with the same tolerances as the original
-    per-render flood fill. Sentinels use alpha 128 so they differ by more than
-    any tolerance from both opaque and transparent artwork, which keeps
-    already-claimed regions acting as boundaries for later fills.
-    Returns an array of region indices (1-based, 0 = unpainted).
-    """
-    work = base.copy()
-    for idx, (name, points) in enumerate(coords.items(), start=1):
-        sentinel = (idx & 0xFF, (idx >> 8) & 0xFF, 77, 128)
-        thresh = _region_thresh(name)
-        for coord in points:
-            ImageDraw.floodfill(work, xy=coord, value=sentinel, thresh=thresh)
-    orig = np.asarray(base)
-    new = np.asarray(work)
-    changed = np.any(orig != new, axis=2)
-    ids = new[..., 0].astype(np.uint16) | (new[..., 1].astype(np.uint16) << 8)
-    ids[~changed] = 0
-    return ids
-
-
-def _region_index(map_path: Path, base: Image.Image, coords: dict) -> tuple[np.ndarray, np.ndarray]:
-    """Return (flat pixel indices, region ids) for every pixel belonging to a region.
-
-    Cached in memory per (artwork file, seeds) and on disk keyed by a hash of the
-    decoded pixels, seeds, and tolerances, so artwork or seed edits regenerate it.
-    """
-    seeds = tuple((str(n), _region_thresh(n), tuple(tuple(map(int, c)) for c in pts))
-                  for n, pts in coords.items())
-    fkey = _file_key(map_path)
-    mkey = None if fkey is None else (fkey, base.size, seeds)
-    if mkey is not None:
-        with _CACHE_LOCK:
-            hit = _REGION_CACHE.get(mkey)
-        if hit is not None:
-            return hit
-
-    disk_path = None
-    if mkey is not None:
-        h = hashlib.sha256()
-        h.update(f"v{_REGION_CACHE_VERSION}|{base.size}|{seeds!r}|".encode())
-        h.update(base.tobytes())
-        disk_path = _region_cache_dir() / f"{h.hexdigest()}.npz"
-        try:
-            with np.load(disk_path) as data:
-                result = (data["flat"], data["ids"])
-            log.info("Loaded cached region map")
-        except (OSError, KeyError, ValueError):
-            result = None
-        if result is not None:
-            with _CACHE_LOCK:
-                _REGION_CACHE[mkey] = result
-            return result
-
-    log.info("Building region map (one-time per base map)")
-    ids = _compute_region_ids(base, coords).ravel()
-    flat = np.flatnonzero(ids)
-    id_dtype = np.uint8 if len(coords) < 256 else np.uint16
-    result = (flat.astype(np.uint32), ids[flat].astype(id_dtype))
-
-    if mkey is not None:
-        with _CACHE_LOCK:
-            _REGION_CACHE[mkey] = result
-        try:
-            disk_path.parent.mkdir(parents=True, exist_ok=True)
-            fd, tmp = tempfile.mkstemp(dir=disk_path.parent, suffix=".npz.tmp")
-            with os.fdopen(fd, "wb") as fh:
-                np.savez(fh, flat=result[0], ids=result[1])
-            os.replace(tmp, disk_path)
-        except OSError:
-            pass
-    return result
 
 
 _RUST_WARNED = False
@@ -292,372 +177,6 @@ def _paint_regions(img: Image.Image, flat: np.ndarray, ids: np.ndarray,
     return Image.fromarray(arr)
 
 
-def _resolve_theme_name(palette_theme: str = "auto", prompt: str = "", mode: str = "text") -> str:
-    """Pick a palette theme name from an explicit choice, prompt keywords, or mode."""
-    theme = (palette_theme or "auto").strip().lower()
-    if theme in constants._PALETTE_THEMES and theme != "auto":
-        return theme
-    low = (prompt or "").lower()
-    if any(w in low for w in ("nicholas", "christmas", "santa", "holiday", "xmas")):
-        return "festive"
-    if any(w in low for w in ("sea", "ocean", "water", "cold", "ice", "winter")):
-        return "ocean"
-    if any(w in low for w in ("hot", "heat", "sun", "fire", "summer")):
-        return "sunset"
-    if mode == "number":
-        return "viridis"
-    return "auto"
-
-
-def _hex_to_rgba(val: object, default: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
-    """Parse a ``#RRGGBB`` hex string into an opaque RGBA tuple, or return ``default``."""
-    if not isinstance(val, str):
-        return default
-    clean = val.strip().lstrip("#")
-    if not re.fullmatch(r"[0-9a-fA-F]{6}", clean):
-        return default
-    return (int(clean[0:2], 16), int(clean[2:4], 16), int(clean[4:6], 16), 255)
-
-
-def _to_rgba_tuple(val: object) -> tuple[int, int, int, int] | None:
-    """Coerce an RGB/RGBA sequence or ``#RRGGBB`` hex string into a clamped RGBA tuple."""
-    if isinstance(val, (list, tuple)) and len(val) in (3, 4):
-        try:
-            r, g, b = int(val[0]), int(val[1]), int(val[2])
-            a = int(val[3]) if len(val) == 4 else 255
-            return (max(0, min(255, r)), max(0, min(255, g)), max(0, min(255, b)), max(0, min(255, a)))
-        except (ValueError, TypeError, OverflowError):
-            return None
-    if isinstance(val, str) and val.strip().startswith("#"):
-        return _hex_to_rgba(val, (99, 102, 241, 255))
-    return None
-
-
-def _parse_filling_overrides(
-    raw_txt: object,
-    raw_num: object,
-) -> tuple[dict[str, tuple[int, int, int, int]], dict[tuple[float, float], tuple[int, int, int, int]]]:
-    """Normalize optional text and numeric filling overrides into RGBA lookup dicts."""
-    txt_out: dict[str, tuple[int, int, int, int]] = {}
-    num_out: dict[tuple[float, float], tuple[int, int, int, int]] = {}
-
-    def add_range(low, high, rgba):
-        if isinstance(low, bool) or isinstance(high, bool):
-            return
-        low, high = float(low), float(high)
-        if math.isfinite(low) and math.isfinite(high) and low < high:
-            # Keep integer keys stable in metadata without truncating fractions.
-            bounds = tuple(int(v) if v.is_integer() else v for v in (low, high))
-            num_out[bounds] = rgba
-    if isinstance(raw_txt, dict):
-        for k, v in raw_txt.items():
-            key_str = str(k).strip()
-            rgba = _to_rgba_tuple(v)
-            if key_str and rgba is not None:
-                txt_out[key_str] = rgba
-    if isinstance(raw_num, dict):
-        for k, v in raw_num.items():
-            rgba = _to_rgba_tuple(v)
-            if rgba is None:
-                continue
-            try:
-                bounds = k if isinstance(k, tuple) else ast.literal_eval(str(k))
-                if isinstance(bounds, (list, tuple)) and len(bounds) == 2:
-                    add_range(bounds[0], bounds[1], rgba)
-            except (ValueError, SyntaxError, TypeError, OverflowError):
-                continue
-    elif isinstance(raw_num, list):
-        for item in raw_num:
-            if not isinstance(item, dict):
-                continue
-            rgba = _to_rgba_tuple(item.get("color") or item.get("hex"))
-            if rgba is None:
-                continue
-            try:
-                add_range(item["low"], item["high"], rgba)
-            except (KeyError, ValueError, TypeError, OverflowError):
-                continue
-    return txt_out, num_out
-
-
-_SHORT_UNITS: tuple[tuple[float, str], ...] = (
-    (1_000_000_000_000.0, "T"),
-    (1_000_000_000.0, "B"),
-    (1_000_000.0, "M"),
-    (1_000.0, "k"),
-)
-
-
-def _parse_short_number(val: object) -> float | None:
-    """Parse plain numbers or English short-form numbers like '10k', '30K', '4M', '10B', '13T'."""
-    if isinstance(val, bool) or val is None:
-        return None
-    s = str(val).replace(",", "").replace(" ", "").strip()
-    if not s:
-        return None
-    mult = 1.0
-    low = s.lower()
-    if low.endswith("k"):
-        mult, s = 1_000.0, s[:-1]
-    elif low.endswith("m"):
-        mult, s = 1_000_000.0, s[:-1]
-    elif low.endswith("b"):
-        mult, s = 1_000_000_000.0, s[:-1]
-    elif low.endswith("t"):
-        mult, s = 1_000_000_000_000.0, s[:-1]
-    try:
-        num = float(s) * mult
-    except ValueError:
-        return None
-    return num if math.isfinite(num) else None
-
-
-def _format_number_value(num: float) -> str:
-    """Format a finite float (>= 1,000 in magnitude) using compact English k/M/B/T suffixes."""
-    abs_num = abs(num)
-    for idx, (threshold, suffix) in enumerate(_SHORT_UNITS):
-        if abs_num >= threshold:
-            scaled = round(num / threshold, 1)
-            if abs(scaled) >= 1_000.0 and idx > 0:
-                prev_threshold, prev_suffix = _SHORT_UNITS[idx - 1]
-                scaled = round(num / prev_threshold, 1)
-                suffix = prev_suffix
-            if float(scaled).is_integer():
-                return f"{int(scaled)}{suffix}"
-            return f"{scaled:.1f}".rstrip("0").rstrip(".") + suffix
-    return str(int(num)) if float(num).is_integer() else str(round(num, 2))
-
-
-def _format_short_number(val: object) -> object:
-    """Abbreviate large numeric values (>= 1,000) into compact English k/M/B/T strings."""
-    if val is None or isinstance(val, bool):
-        return val
-    if isinstance(val, str):
-        clean = val.strip()
-        if clean and clean[-1].lower() in ("k", "m", "b", "t"):
-            try:
-                coeff = float(clean[:-1].replace(",", "").replace(" ", ""))
-                if math.isfinite(coeff) and 0 < abs(coeff) < 1_000.0:
-                    return clean
-            except ValueError:
-                pass
-    parsed = _parse_short_number(val)
-    if parsed is None:
-        return val.strip() if isinstance(val, str) else val
-    if abs(parsed) >= 1_000.0:
-        return _format_number_value(parsed)
-    return val.strip() if isinstance(val, str) else val
-
-
-def _auto_fill_from_ai(
-    ai_answer: dict[str, object],
-    mode: str,
-    palette_theme: str = "auto",
-    prompt: str = "",
-) -> tuple[dict[str, tuple[int, int, int, int]], dict[tuple[float, float], tuple[int, int, int, int]]]:
-    """Inspect AI response values (numbers, short-form numbers, or words) and pick colors."""
-    auto_txt: dict[str, tuple[int, int, int, int]] = {}
-    auto_num: dict[tuple[float, float], tuple[int, int, int, int]] = {}
-    resolved = _resolve_theme_name(palette_theme, prompt=prompt, mode=mode)
-    palette = constants._PALETTE_THEMES.get(resolved, constants._AUTO_PALETTE)
-    use_semantic = (palette_theme or "auto").strip().lower() == "auto"
-
-    if mode == "number":
-        nums: list[float] = []
-        for val in ai_answer.values():
-            parsed = _parse_short_number(val)
-            if parsed is not None:
-                nums.append(parsed)
-        if nums:
-            nums.sort()
-            unique_nums = sorted(set(nums))
-            low_start = min(0, nums[0] - 1) if nums[0] <= 10 else nums[0] - 1
-            if low_start >= nums[0]:
-                low_start = math.nextafter(nums[0], -math.inf)
-            if len(unique_nums) <= 5:
-                bounds = [low_start] + unique_nums
-                buckets = len(unique_nums)
-            else:
-                # Quantiles can repeat when countries share a measurement.
-                # Deduplicate thresholds instead of adding 1, which erases
-                # sub-unit differences and can push bounds above the maximum.
-                thresholds = {
-                    nums[int(round((len(nums) - 1) * (i / 5)))]
-                    for i in range(1, 5)
-                }
-                bounds = [low_start] + sorted(thresholds - {nums[-1]}) + [nums[-1]]
-                buckets = len(bounds) - 1
-            bounds = [int(v) if math.isfinite(v) and float(v).is_integer() else v for v in bounds]
-            for i in range(buckets):
-                auto_num[(bounds[i], bounds[i + 1])] = palette[i % len(palette)]
-    else:
-        labels = [str(v).strip() for v in ai_answer.values() if v is not None and str(v).strip()]
-        parsed_pairs = [(lbl, _parse_short_number(lbl)) for lbl in labels]
-        numeric_vals = sorted(num for _, num in parsed_pairs if num is not None)
-
-        # In text mode with short_form (e.g. '10k', '2.5M'), group numeric labels into
-        # gradient buckets instead of giving every distinct number its own random color.
-        if numeric_vals and len(numeric_vals) >= max(2, int(len(labels) * 0.6)):
-            buckets = min(5, max(1, len(set(numeric_vals))))
-            thresholds = [
-                numeric_vals[int(round((len(numeric_vals) - 1) * (i / buckets)))]
-                for i in range(1, buckets)
-            ]
-            for lbl, num in parsed_pairs:
-                if num is not None:
-                    b_idx = sum(1 for t in thresholds if num > t)
-                    auto_txt[lbl] = palette[b_idx % len(palette)]
-                else:
-                    auto_txt.setdefault(lbl, constants._SEMANTIC_COLORS.get(lbl.lower(), palette[-1]))
-        else:
-            canonical: dict[str, str] = {}
-            for lbl in labels:
-                canonical.setdefault(lbl.lower(), lbl)
-            idx = 0
-            for low_lbl, _ in Counter(lbl.lower() for lbl in labels).most_common():
-                orig = canonical[low_lbl]
-                if use_semantic and low_lbl in constants._SEMANTIC_COLORS:
-                    auto_txt[orig] = constants._SEMANTIC_COLORS[low_lbl]
-                else:
-                    auto_txt[orig] = palette[idx % len(palette)]
-                    idx += 1
-
-    return auto_txt, auto_num
-
-
-def _numeric_extrema(values):
-    """Return region names for finite numeric extrema, or None if absent."""
-    numeric = {}
-    for name, value in values.items():
-        number = _parse_short_number(value)
-        if number is not None:
-            numeric[name] = number
-    if not numeric:
-        return None
-    return max(numeric, key=numeric.get), min(numeric, key=numeric.get)
-
-
-def _format_text_label(value: object) -> str:
-    """Uppercase the first character while preserving acronyms and other casing."""
-    label = "" if value is None else str(value).strip()
-    return label[:1].upper() + label[1:]
-
-
-def _format_legend_bound(val: float) -> str:
-    """Format a numeric legend bound compactly so ranges fit in open sea space."""
-    abs_val = abs(val)
-    if abs_val >= 1_000_000_000:
-        scaled, suffix = val / 1_000_000_000, "B"
-    elif abs_val >= 1_000_000:
-        scaled, suffix = val / 1_000_000, "M"
-    elif abs_val >= 10_000:
-        scaled, suffix = val / 1_000, "k"
-    elif float(val).is_integer():
-        return str(int(val))
-    else:
-        return f"{val:g}"
-    rounded = round(scaled, 1)
-    if float(rounded).is_integer():
-        return f"{int(rounded)}{suffix}"
-    return f"{rounded:g}{suffix}"
-
-
-def _format_legend_range(lo: float, hi: float) -> str:
-    """Format a ``(lo, hi)`` numeric interval for the floating map legend."""
-    if lo <= -1e12 and hi >= 1e12:
-        return "All"
-    if lo <= -1e12:
-        return f"< {_format_legend_bound(hi)}"
-    if hi >= 1e12:
-        return f"{_format_legend_bound(lo)}+"
-    return f"{_format_legend_bound(lo)} - {_format_legend_bound(hi)}"
-
-
-def _draw_legend_overlay(
-    size: tuple[int, int],
-    entries: list[tuple[tuple[int, int, int, int], str]],
-    get_font,
-    label_fill: tuple[int, int, int, int],
-    label_stroke_fill: tuple[int, int, int, int],
-    label_stroke_width: int,
-    map_type: str,
-    has_most_least: bool,
-) -> Image.Image | None:
-    """Render a floating color legend in the open sea on the left side of the map."""
-    if not entries:
-        return None
-    w, h = size
-    is_world = map_type in ("world", "world_countries")
-    if is_world:
-        x = int(w * 0.025)
-        start_y = int(h * (0.44 if has_most_least else 0.56))
-        max_h = int(h * (0.34 if has_most_least else 0.40))
-        max_w = int(w * 0.22)
-        base_size = max(20, int(h * 0.032))
-        min_size = 14
-    else:
-        x = 80
-        start_y = 1640 if has_most_least else 1240
-        max_h = max(300, 2750 - start_y)
-        max_w = 560
-        base_size = 86
-        min_size = 32
-
-    measure = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-    count = len(entries)
-    font_size = base_size
-    while font_size > min_size:
-        fits_height = count * int(font_size * 1.32) <= max_h
-        swatch_try = max(14, int(font_size * 0.76))
-        gap_try = max(10, int(font_size * 0.30))
-        font_try = get_font(font_size)
-        widest = max(measure.textlength(text, font=font_try) for _, text in entries)
-        fits_width = swatch_try + gap_try + widest <= max_w
-        if fits_height and fits_width:
-            break
-        font_size -= 4
-
-    row_step = int(font_size * 1.28)
-    swatch = max(14, int(font_size * 0.76))
-    gap = max(10, int(font_size * 0.30))
-    radius = max(4, swatch // 5)
-    stroke_w = min(label_stroke_width, max(2, font_size // 5)) if label_stroke_width > 0 else 0
-    outline_w = max(2, min(6, font_size // 14))
-
-    layer = Image.new("RGBA", size, (255, 255, 255, 0))
-    draw = ImageDraw.Draw(layer)
-    font = get_font(font_size)
-
-    for idx, (color, text) in enumerate(entries):
-        row_y = start_y + idx * row_step
-        if row_y + swatch > h - 10:
-            break
-        swatch_y = row_y + max(0, (font_size - swatch) // 2)
-        rgba = (int(color[0]), int(color[1]), int(color[2]), 255)
-        draw.rounded_rectangle(
-            (x, swatch_y, x + swatch, swatch_y + swatch),
-            radius=radius,
-            fill=rgba,
-            outline=label_stroke_fill,
-            width=outline_w,
-        )
-        draw.text(
-            (x + swatch + gap, row_y),
-            text,
-            font=font,
-            fill=label_fill,
-            stroke_width=stroke_w,
-            stroke_fill=label_stroke_fill,
-        )
-    return layer
-
-
-_RESERVED_HIGHLIGHT_COLORS: tuple[tuple[int, int, int], ...] = (
-    (0, 229, 255),   # Electric cyan (highest)
-    (255, 45, 170),  # Neon magenta (lowest)
-)
-
-
 def _random_region_color() -> tuple[int, int, int, int]:
     """Pick a random bright RGBA color that stays distinct from reserved highlight colors."""
     for _ in range(16):
@@ -665,141 +184,6 @@ def _random_region_color() -> tuple[int, int, int, int]:
         if all(sum((c[i] - r[i]) ** 2 for i in range(3)) >= 90 ** 2 for r in _RESERVED_HIGHLIGHT_COLORS):
             return (*c, 255)
     return (120, 180, 120, 255)
-
-
-def _floodfill_bool_mask(interior: np.ndarray, seeds: list, max_pixels: int) -> np.ndarray | None:
-    """4-connected BFS flood fill on a boolean ``(H, W)`` interior mask, aborting if it exceeds ``max_pixels``."""
-    from collections import deque
-
-    h, w = interior.shape
-    visited = np.zeros((h, w), dtype=bool)
-    q: deque[tuple[int, int]] = deque()
-    for coord in seeds:
-        cx, cy = int(round(coord[0])), int(round(coord[1]))
-        seed = None
-        for dy in (0, -2, 2, -4, 4, -8, 8):
-            for dx in (0, -2, 2, -4, 4, -8, 8):
-                nx, ny = cx + dx, cy + dy
-                if 0 <= nx < w and 0 <= ny < h and interior[ny, nx]:
-                    seed = (nx, ny)
-                    break
-            if seed is not None:
-                break
-        if seed is not None and not visited[seed[1], seed[0]]:
-            visited[seed[1], seed[0]] = True
-            q.append(seed)
-
-    if not q:
-        return None
-
-    count = 0
-    while q:
-        x, y = q.popleft()
-        count += 1
-        if count > max_pixels:
-            return None
-        if x > 0 and interior[y, x - 1] and not visited[y, x - 1]:
-            visited[y, x - 1] = True
-            q.append((x - 1, y))
-        if x + 1 < w and interior[y, x + 1] and not visited[y, x + 1]:
-            visited[y, x + 1] = True
-            q.append((x + 1, y))
-        if y > 0 and interior[y - 1, x] and not visited[y - 1, x]:
-            visited[y - 1, x] = True
-            q.append((x, y - 1))
-        if y + 1 < h and interior[y + 1, x] and not visited[y + 1, x]:
-            visited[y + 1, x] = True
-            q.append((x, y + 1))
-
-    return visited
-
-
-def _build_extrema_highlight_layer(
-    size: tuple[int, int],
-    highest_idx: int | None,
-    lowest_idx: int | None,
-    map_type: str,
-    dict_: dict,
-    flat: np.ndarray | None,
-    ids: np.ndarray | None,
-    borders: Image.Image | None,
-    base_map: Image.Image | None = None,
-    high_rgb: tuple[int, int, int] = _RESERVED_HIGHLIGHT_COLORS[0],
-    low_rgb: tuple[int, int, int] = _RESERVED_HIGHLIGHT_COLORS[1],
-) -> Image.Image | None:
-    """Create a soft tint + inner glow highlight layer for the highest and lowest regions."""
-    from PIL import ImageChops, ImageFilter
-
-    targets: list[tuple[int, tuple[int, int, int]]] = []
-    if highest_idx is not None:
-        targets.append((highest_idx, high_rgb))
-    if lowest_idx is not None and lowest_idx != highest_idx:
-        targets.append((lowest_idx, low_rgb))
-    if not targets:
-        return None
-
-    w, h = size
-    layer = Image.new("RGBA", size, (0, 0, 0, 0))
-    coords_list = list(dict_.values())
-
-    if map_type == "flag" and (flat is None or ids is None):
-        mask_path = Path(__file__).parent.parent / "resources" / "maps" / "default_map.png"
-        flat, ids = _region_index(mask_path, _load_rgba(mask_path), dict_)
-
-    inner_size = 37 if w >= 3000 else 21
-    outer_size = 25 if w >= 3000 else 15
-    wc_interior_crisp: np.ndarray | None = None
-    wc_base_alpha: np.ndarray | None = None
-    wc_border_alpha: np.ndarray | None = None
-    if map_type == "world_countries" and base_map is not None:
-        base_arr = np.asarray(base_map)
-        wc_base_alpha = base_arr[..., 3]
-        # Crisp dark country borders on world_countries_map.png cleanly separate adjacent nations.
-        wc_interior_crisp = (wc_base_alpha >= 128) & (base_arr[..., :3].max(axis=2) > 12)
-        if borders is not None:
-            wc_border_alpha = np.asarray(borders)[..., 3]
-
-    for region_idx, rgb in targets:
-        mask: Image.Image | None = None
-        if flat is not None and ids is not None:
-            pix_mask = np.zeros(w * h, dtype=np.uint8)
-            pix_mask[flat[ids == region_idx]] = 255
-            if pix_mask.any():
-                mask = Image.fromarray(pix_mask.reshape((h, w)), mode="L")
-        elif wc_interior_crisp is not None and 1 <= region_idx <= len(coords_list):
-            max_px = int(0.08 * w * h)
-            filled = _floodfill_bool_mask(wc_interior_crisp, coords_list[region_idx - 1], max_px)
-            if (filled is None or not filled.any()) and wc_base_alpha is not None and wc_border_alpha is not None:
-                for thr in (45, 65):
-                    interior = (wc_base_alpha >= 128) & (wc_border_alpha < thr)
-                    filled = _floodfill_bool_mask(interior, coords_list[region_idx - 1], max_px)
-                    if filled is not None and filled.any():
-                        break
-            if filled is not None and filled.any():
-                mask = Image.fromarray((filled.astype(np.uint8) * 255), mode="L")
-
-        if mask is None:
-            continue
-
-        # Downscale the binary mask before morphological filters so MinFilter/MaxFilter
-        # run in milliseconds instead of O(k^2) over 16M full-res pixels.
-        ds = 4 if w >= 2400 else 2
-        small_size = (max(1, w // ds), max(1, h // ds))
-        small_mask = mask.resize(small_size, Image.Resampling.BILINEAR)
-        small_inner = small_mask.filter(ImageFilter.MinFilter(9))
-        small_outer = small_mask.filter(ImageFilter.MaxFilter(7))
-        inner_ring = ImageChops.subtract(small_mask, small_inner).filter(ImageFilter.GaussianBlur(2))
-        outer_halo = ImageChops.subtract(small_outer, small_mask).filter(ImageFilter.GaussianBlur(2.5))
-        glow_small = ImageChops.lighter(inner_ring, outer_halo.point(lambda p: min(255, int(p * 0.95))))
-        glow_alpha = glow_small.resize((w, h), Image.Resampling.BILINEAR)
-        tint_alpha = mask.point(lambda p: 95 if p else 0)
-        combined_alpha = ImageChops.lighter(tint_alpha, glow_alpha)
-
-        overlay = Image.new("RGBA", size, (*rgb, 255))
-        overlay.putalpha(combined_alpha)
-        layer = Image.alpha_composite(layer, overlay)
-
-    return layer
 
 
 def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
@@ -862,19 +246,29 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
     # lower-cased so that AI answers like "Yes", "yes" or " yes " all match.
     filling_txt_ci = {str(k).strip().lower(): v for k, v in filling_txt.items()}
 
-    ls = label_style if isinstance(label_style, dict) else {}
-    label_fill = _hex_to_rgba(ls.get("text_color"), (255, 255, 255, 255))
-    label_stroke_fill = _hex_to_rgba(ls.get("stroke_color"), (0, 0, 0, 255))
+    label_options = {}
+    if isinstance(label_style, dict):
+        label_options = label_style
+
+    label_fill = _hex_to_rgba(label_options.get("text_color"), (255, 255, 255, 255))
+    label_stroke_fill = _hex_to_rgba(label_options.get("stroke_color"), (0, 0, 0, 255))
     try:
-        raw_sw = ls.get("stroke_width", 15)
-        label_stroke_width = max(0, min(40, int(15 if raw_sw is None else raw_sw)))
+        raw_stroke_width = label_options.get("stroke_width", 15)
+        if raw_stroke_width is None:
+            raw_stroke_width = 15
+        label_stroke_width = max(0, min(40, int(raw_stroke_width)))
     except (ValueError, TypeError, OverflowError):
         label_stroke_width = 15
-    label_auto_fit = bool(ls.get("auto_fit", False)) if "auto_fit" in ls else False
+
+    label_auto_fit = bool(label_options.get("auto_fit", False))
+    label_offset_x = 0
     try:
-        raw_offset = ls.get('offset_x', 0)
-        offset = float(raw_offset) if not isinstance(raw_offset, bool) else 0
-        label_offset_x = max(-500, min(500, round(offset))) if math.isfinite(offset) else 0
+        raw_offset = label_options.get('offset_x', 0)
+        # Booleans are numeric in Python, but are not meaningful pixel offsets.
+        if not isinstance(raw_offset, bool):
+            offset = float(raw_offset)
+            if math.isfinite(offset):
+                label_offset_x = max(-500, min(500, round(offset)))
     except (TypeError, ValueError, OverflowError):
         label_offset_x = 0
 
@@ -992,13 +386,18 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
     if is_painted_map and auto_style is True:
         if mode == "text":
             merged_txt = dict(auto_txt)
-            req_keys_low = {k.strip().lower() for k in req_txt}
-            if req_txt and (not theme_requested or req_keys_low != constants._DEFAULT_UI_TXT_KEYS):
-                ci_to_orig = {k.strip().lower(): k for k in merged_txt}
-                for rk, rv in req_txt.items():
-                    short_rk = str(_format_short_number(rk)).strip() if has_short_form else rk
-                    target_k = ci_to_orig.get(short_rk.lower(), ci_to_orig.get(rk.strip().lower(), short_rk))
-                    merged_txt[target_k] = rv
+            requested_keys = {key.strip().lower() for key in req_txt}
+            uses_default_text_rules = requested_keys == constants._DEFAULT_UI_TXT_KEYS
+            if req_txt and (not theme_requested or not uses_default_text_rules):
+                original_keys = {key.strip().lower(): key for key in merged_txt}
+                for requested_key, requested_color in req_txt.items():
+                    display_key = requested_key
+                    if has_short_form:
+                        display_key = str(_format_short_number(requested_key)).strip()
+                    # Prefer a compact-label match, then the original label, then a new rule.
+                    fallback_key = original_keys.get(requested_key.strip().lower(), display_key)
+                    target_key = original_keys.get(display_key.lower(), fallback_key)
+                    merged_txt[target_key] = requested_color
             filling_txt = merged_txt
             filling_txt_ci = {str(k).strip().lower(): v for k, v in filling_txt.items()}
         elif mode == "number":
@@ -1096,11 +495,13 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
             if map_type == "world_countries"
             else str(name).strip().lower().replace(" ", "_").replace("-", "_")
         )
-        '''Number mode'''
+        # Resolve numeric values against explicit ranges before automatic colors.
         if mode == 'number':
             try:
                 info = ai_answer_norm[name_key]
-                color = _random_region_color() if is_painted_map else (0, 0, 0, 0)
+                color = (0, 0, 0, 0)
+                if is_painted_map:
+                    color = _random_region_color()
                 num_value = _parse_short_number(info)
                 raw_num_value = _parse_short_number(raw_ai_answer_norm.get(name_key))
                 if num_value is None and is_painted_map:
@@ -1108,13 +509,18 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
 
                 if num_value is not None:
                     if highlight_extrema:
-                        numeric_region_values[index] = float(raw_num_value if raw_num_value is not None else num_value)
+                        highlight_value = num_value
+                        if raw_num_value is not None:
+                            highlight_value = raw_num_value
+                        numeric_region_values[index] = float(highlight_value)
                     if is_painted_map:
                         # Pick the colour of the first matching range. Ranges are
                         # treated as (low < value <= high) per the docs.
                         matched_bounds = None
                         for candidate in (num_value, raw_num_value):
-                            if candidate is None or matched_bounds is not None:
+                            if matched_bounds is not None:
+                                break
+                            if candidate is None:
                                 continue
                             for (low_lim, high_lim), color_tup in filling_num.items():
                                 if low_lim < candidate <= high_lim:
@@ -1139,7 +545,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
                     color = (0, 0, 0, 0)
 
         elif mode == 'text':
-            '''Text mode'''
+            # Repeated text categories share a color, including fallback colors.
             raw_info = ai_answer_norm.get(name_key)
             info = _format_text_label(raw_info)
             if not info:

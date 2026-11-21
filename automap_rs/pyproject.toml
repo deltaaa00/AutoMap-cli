@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Build/install this directory with maturin; Cargo.toml defines the native module.
 [build-system]
 requires = ["maturin>=1.7,<2.0"]
 build-backend = "maturin"
 
+# Python imports automap_rs optionally. The media worker falls back to MoviePy
+# when the extension is absent or native rendering fails. FFmpeg is still required
+# for either renderer and is supplied by the worker runtime, not this wheel.
 [project]
 name = "automap_rs"
 version = "0.1.0"

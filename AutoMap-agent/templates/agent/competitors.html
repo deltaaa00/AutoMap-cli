@@ -1,0 +1,22 @@
+{# Competitor outlier and music suggestion table shell. overview.js renders rows and actions.js queues competitor music imports. #}
+<section class="glass rounded-2xl p-5 space-y-3">
+    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+        <i class="fa-solid fa-fire text-rose-400"></i>
+        Competitor Viral Outliers &amp; Music Suggestions
+    </h2>
+    <div class="overflow-x-auto">
+        <table class="w-full text-xs text-left">
+            <thead class="text-slate-400 border-b border-slate-800">
+                <tr>
+                    <th class="py-2 pr-3">Channel</th>
+                    <th class="py-2 px-2">Title / Idea</th>
+                    <th class="py-2 px-2">Views</th>
+                    <th class="py-2 px-2">Outlier</th>
+                    <th class="py-2 px-2">Music</th>
+                    <th class="py-2 pl-2 text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody id="competitorsBody" class="divide-y divide-slate-800/70"></tbody>
+        </table>
+    </div>
+</section>

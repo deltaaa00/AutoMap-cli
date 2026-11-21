@@ -1,4 +1,12 @@
-"""Local media pool manager for backgrounds and music with 4-video series rotation."""
+"""Manage local background/music files and deterministic series rotation.
+
+MediaPool is used by dashboard media routes and CandidateVideoGenerator.
+AGENT_MEDIA_DIR or an explicit root contains backgrounds/ and music/; valid
+files must match the allowed extensions and per-file byte limit. Selection
+uses the created-video index and configured series size, not random sampling.
+Duration probing and background splitting invoke local ffprobe/ffmpeg.
+Splitting writes sibling clips and removes the source only after success;
+HTTP upload handling and path containment checks live in ``web_media.py``."""
 
 from __future__ import annotations
 
@@ -160,7 +168,11 @@ def split_background_video(
     min_tail_seconds: int = 8,
     min_duration_to_split: float = 22.0,
 ) -> list[Path]:
-    """Split a long background video into <=15s H.264 MP4 clips and remove the original."""
+    """Split long footage into H.264 MP4 siblings, then remove the original.
+
+    Return the original path unchanged when duration is unknown or below threshold.
+    Clip naming avoids existing files; failed splitting cleans newly created clips
+    and keeps the source. ffprobe/ffmpeg must be available on PATH."""
     duration = probe_video_duration(source_path)
     if duration is None or duration < min_duration_to_split:
         return [source_path]

@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Verify image preparation tools on temporary inputs, never repository assets."""
+"""Check asset preparation and bundled resources using temporary inputs.
+
+Run the standalone border/alpha scripts against disposable artwork, then verify
+coordinate bounds and font loading. These tests must not overwrite repository
+map images; live render behavior is covered separately.
+"""
 import runpy
 from pathlib import Path
 

@@ -12,7 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Command-line interface (`automap make` and `automap batch`) for AutoMap."""
+"""Expose the ``automap make`` and ``automap batch`` Click commands.
+
+This is the command-line adapter for ``map.auto_map.auto_map``: resolve command
+options, fonts, provider credentials and output destinations, then call the same
+renderer used by the web application. Batch rows are parsed by map.batch_ideas.
+Change CLI flags here, rendering behavior in map.auto_map, and shared AI/request
+contracts in map.functions. Invoking the commands can call external AI services
+and write PNG files; importing this module only defines the command group.
+"""
 
 import os
 from pathlib import Path

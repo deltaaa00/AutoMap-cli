@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The server switch chooses a production WSGI server without opening sockets."""
+"""Verify server selection without opening ports.
+
+Patched Flask/Waitress calls check exact SERVER=TRUE handling, environment versus
+.env precedence and different web/worker default ports. Networking and process
+launching remain outside this unit suite.
+"""
 
 import sys
 from types import SimpleNamespace

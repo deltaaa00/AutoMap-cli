@@ -1,3 +1,11 @@
+/**
+ * Layout and component styling for templates/api_manager.html.
+ *
+ * Loaded after studio.css and reuses its --workbench-* design tokens. The
+ * .api-manager scope separates these settings-page rules from map/video layouts.
+ * Update the template and its small-screen browser check when changing navigation,
+ * credential cards or status-message positioning.
+ */
 /* API settings share Map and Video Studio workbench tokens. */
 * { box-sizing: border-box; }
 .api-manager { margin: 0; font-size: 16px; line-height: 1.5; }

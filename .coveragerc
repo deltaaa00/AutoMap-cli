@@ -1,3 +1,7 @@
+# Coverage collection and the minimum accepted root-suite coverage.
+# Pytest/coverage reads this file during the CI command in overview.md. The source
+# setting follows project modules after moves; test files are excluded from the
+# report. Do not lower fail_under to hide missing behavioral coverage.
 # Copyright 2025-2026 deltaaa00
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

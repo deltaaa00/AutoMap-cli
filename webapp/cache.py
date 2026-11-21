@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""In-memory cache of AI map data so visual-only changes skip the AI request.
+"""Cache parsed AI answers so visual-only map changes avoid another AI call.
 
-Entries are keyed by a SHA-256 digest of the request-affecting inputs
-(prompt, map type, model, provider, temperature, short-form flag, search settings) plus a
-per-user scope. The scope is derived from the web session identity and a
-*hash* of any user-supplied API key; the key itself is never stored.
-Only the parsed AI answer (region -> value) is kept as cache content.
+webapp.generation uses the shared ai_cache instance. Keys hash request-affecting
+inputs and a user scope derived from session identity and credential hashes;
+raw API keys are not stored. Cached content is a region-to-value dictionary,
+not a PNG, so the renderer can change fonts, colors and labels independently.
+
+The cache is process-local, locked, size-bounded and expires by monotonic time.
+Values are copied to prevent a render from modifying a later request's answer.
+Environment settings control retention and capacity; restarting clears entries.
 """
 
 from __future__ import annotations

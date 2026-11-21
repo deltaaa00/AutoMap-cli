@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Exercise local video rendering, rasterized titles, stickers and branding.
+
+Synthetic backgrounds/audio feed the real worker pipeline; provider traffic is
+isolated. Pixel/layout assertions keep title previews aligned with final clips
+and check overlays, audio and duration. Local MoviePy/FFmpeg support is required;
+these are slower integration tests rather than mocked endpoint-only checks.
+"""
+
 import base64
 import io
 from urllib.parse import parse_qs, urlsplit

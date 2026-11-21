@@ -1,0 +1,125 @@
+{# Credential fields, Telegram test controls, and YouTube OAuth connection UI. Handlers and legacy browser persistence live in static/agent/connections.js. #}
+<section class="lg:col-span-6 glass rounded-2xl p-5 space-y-4">
+    <div class="flex items-center justify-between gap-2">
+        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-key text-amber-400"></i>
+            Connections (Telegram &amp; YouTube)
+        </h2>
+        <span id="ytOauthBadge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-amber-300">OAuth: —</span>
+    </div>
+    <div class="space-y-2.5 text-xs">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <label class="block">
+                <span class="text-slate-400 flex items-center justify-between">
+                    <span>Telegram Bot Token</span>
+                    <span id="secTgTokenBadge" class="hidden text-[10px] font-mono text-emerald-400">Saved</span>
+                </span>
+                <div class="relative mt-1">
+                    <input id="secTgToken" type="password" autocomplete="off" placeholder="123456:ABC-DEF…"
+                        class="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                    <button type="button" onclick="toggleSecretVisibility('secTgToken', 'secTgTokenEye')"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" title="Show / hide">
+                        <i id="secTgTokenEye" class="fa-solid fa-eye text-xs"></i>
+                    </button>
+                </div>
+            </label>
+            <label class="block">
+                <span class="text-slate-400 flex items-center justify-between">
+                    <span>Telegram Chat ID</span>
+                    <span id="secTgChatIdBadge" class="hidden text-[10px] font-mono text-emerald-400">Saved</span>
+                </span>
+                <div class="relative mt-1">
+                    <input id="secTgChatId" type="password" autocomplete="off" placeholder="Your numeric ID from @userinfobot"
+                        class="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                    <button type="button" onclick="toggleSecretVisibility('secTgChatId', 'secTgChatIdEye')"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" title="Show / hide">
+                        <i id="secTgChatIdEye" class="fa-solid fa-eye text-xs"></i>
+                    </button>
+                </div>
+            </label>
+        </div>
+        <label class="block">
+            <span class="text-slate-400 flex items-center justify-between">
+                <span>YouTube Data API Key (for competitors &amp; stats)</span>
+                <span id="secYtApiKeyBadge" class="hidden text-[10px] font-mono text-emerald-400">Saved</span>
+            </span>
+            <div class="relative mt-1">
+                <input id="secYtApiKey" type="password" autocomplete="off" placeholder="AIza…"
+                    class="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                <button type="button" onclick="toggleSecretVisibility('secYtApiKey', 'secYtApiKeyEye')"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" title="Show / hide">
+                    <i id="secYtApiKeyEye" class="fa-solid fa-eye text-xs"></i>
+                </button>
+            </div>
+        </label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <label class="block">
+                <span class="text-slate-400 flex items-center justify-between">
+                    <span>Gemini API Key (AI maps)</span>
+                    <span id="secGeminiApiKeyBadge" class="hidden text-[10px] font-mono text-emerald-400">Saved</span>
+                </span>
+                <div class="relative mt-1">
+                    <input id="secGeminiApiKey" type="password" autocomplete="off" placeholder="AIza…"
+                        class="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                    <button type="button" onclick="toggleSecretVisibility('secGeminiApiKey', 'secGeminiApiKeyEye')"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" title="Show / hide">
+                        <i id="secGeminiApiKeyEye" class="fa-solid fa-eye text-xs"></i>
+                    </button>
+                </div>
+            </label>
+            <label class="block">
+                <span class="text-slate-400 flex items-center justify-between">
+                    <span>DeepSeek API Key (optional)</span>
+                    <span id="secDeepseekApiKeyBadge" class="hidden text-[10px] font-mono text-emerald-400">Saved</span>
+                </span>
+                <div class="relative mt-1">
+                    <input id="secDeepseekApiKey" type="password" autocomplete="off" placeholder="sk-…"
+                        class="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                    <button type="button" onclick="toggleSecretVisibility('secDeepseekApiKey', 'secDeepseekApiKeyEye')"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" title="Show / hide">
+                        <i id="secDeepseekApiKeyEye" class="fa-solid fa-eye text-xs"></i>
+                    </button>
+                </div>
+            </label>
+        </div>
+        <label class="block">
+            <span class="text-slate-400 flex items-center justify-between">
+                <span>Tavily API Key (web search for DeepSeek, optional)</span>
+                <span id="secTavilyApiKeyBadge" class="hidden text-[10px] font-mono text-emerald-400">Saved</span>
+            </span>
+            <div class="relative mt-1">
+                <input id="secTavilyApiKey" type="password" autocomplete="off" placeholder="tvly-…"
+                    class="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white font-mono">
+                <button type="button" onclick="toggleSecretVisibility('secTavilyApiKey', 'secTavilyApiKeyEye')"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1" title="Show / hide">
+                    <i id="secTavilyApiKeyEye" class="fa-solid fa-eye text-xs"></i>
+                </button>
+            </div>
+        </label>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" onclick="saveSecrets()" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition">
+                Save Keys
+            </button>
+            <button type="button" onclick="testTelegram()" class="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 font-semibold transition">
+                <i class="fa-brands fa-telegram mr-1"></i> Test Telegram
+            </button>
+        </div>
+    </div>
+    <div class="pt-3 border-t border-slate-800/80 space-y-2.5 text-xs">
+        <div class="font-semibold text-rose-300 flex items-center gap-1.5">
+            <i class="fa-brands fa-youtube"></i> Agent YouTube OAuth (Upload + Analytics)
+        </div>
+        <p class="text-[11px] text-slate-400 break-all">
+            Web Redirect URI: <code id="agentRedirectUri" class="text-slate-200">…</code>
+        </p>
+        <div class="flex flex-wrap items-center gap-2">
+            <input id="agentYtSecretFile" type="file" accept=".json,application/json" class="text-[11px] text-slate-300 flex-1 min-w-0">
+            <button type="button" onclick="connectAgentYouTube()" class="px-3 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white font-semibold transition">
+                Connect YouTube
+            </button>
+            <button type="button" id="agentYtDisconnectBtn" onclick="disconnectAgentYouTube()" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold">
+                Disconnect
+            </button>
+        </div>
+    </div>
+</section>

@@ -11,3 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Map-generation package shared by the CLI, web application, and agent tools.
+
+The rendering entry point is auto_map.auto_map. Provider requests and idea
+suggestions live in functions; geometry, styling, and legend own rendering
+helpers. Import the focused module when adding behavior rather than putting
+unrelated utilities in this package initializer.
+"""

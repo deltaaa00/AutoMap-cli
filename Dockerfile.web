@@ -1,3 +1,7 @@
+# Build the browser-facing Python service launched by main.py.
+# Copies the webapp/map packages, templates, static files and bundled resources.
+# Compose supplies settings and persists /app/instance; the media worker is built
+# separately. Keep requirements.txt aligned with pyproject.toml before rebuilding.
 # Copyright 2025-2026 deltaaa00
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

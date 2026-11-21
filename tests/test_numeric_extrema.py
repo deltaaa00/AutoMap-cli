@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Check numeric min/max selection independently of image rendering.
+
+Cases cover short-number strings, missing values, ties and nonfinite inputs.
+This protects the numeric contract shared by highlights and Most/Least labels;
+mask pixels and animation frames are covered in test_zoom_reveal.
+"""
+
 import pytest
 
 from map.auto_map import _numeric_extrema

@@ -1,0 +1,188 @@
+{# Map viewport/loading stages plus console/history tabs. DOM IDs are shared by viewport.js, generation.js and history.js. #}
+        <!-- RIGHT COLUMN: MAP VIEWER & TERMINAL OUTPUT (7 or 8 Cols on Desktop) -->
+        <section id="mapPreviewColumn" class="lg:col-span-7 xl:col-span-8 flex flex-col gap-5">
+
+            <!-- Interactive Map Canvas Stage Card -->
+            <div id="mapStage" class="cyber-card border border-slate-800/90 rounded-2xl flex flex-col flex-1 min-h-[520px] overflow-hidden relative">
+
+                <!-- Map Viewer Toolbar -->
+                <div class="px-5 py-4 border-b border-slate-800/90 flex flex-wrap items-center justify-between gap-3 bg-slate-950/60">
+                    <div class="flex items-center gap-3">
+                        <span class="w-2.5 h-2.5 rounded-full bg-slate-800 transition-colors" id="stageStatusDot"></span>
+                        <h2 class="font-display font-semibold text-sm sm:text-base text-slate-100">Map preview</h2>
+                        <span id="mapMetaBadge" class="text-xs font-mono px-3 py-1 rounded-md bg-slate-900 text-accent-300 border border-slate-800">Ready</span>
+                    </div>
+
+                    <!-- Zoom, Pan Reset, Fullscreen & Download Controls -->
+                    <div class="flex items-center gap-2">
+                        <div class="flex items-center bg-slate-950/90 border border-slate-800 rounded-xl p-1">
+                            <button type="button" onclick="zoomMap(-0.2)" class="p-2 text-slate-400 hover:text-slate-100 transition" title="Zoom Out">
+                                <i class="fa-solid fa-magnifying-glass-minus text-xs"></i>
+                            </button>
+                            <span id="zoomLevelText" class="text-xs font-mono px-2 text-slate-200 min-w-[48px] text-center">100%</span>
+                            <button type="button" onclick="zoomMap(0.2)" class="p-2 text-slate-400 hover:text-slate-100 transition" title="Zoom In">
+                                <i class="fa-solid fa-magnifying-glass-plus text-xs"></i>
+                            </button>
+                            <button type="button" onclick="resetZoom()" class="p-2 text-slate-400 hover:text-slate-100 transition border-l border-slate-800" title="Reset Zoom &amp; Pan">
+                                <i class="fa-solid fa-compress text-xs"></i>
+                            </button>
+                        </div>
+
+                        <button type="button" onclick="toggleFullscreenMap()" class="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 transition" title="Toggle Fullscreen">
+                            <i id="fullscreenIcon" class="fa-solid fa-expand text-xs"></i>
+                        </button>
+
+                        <button type="button" onclick="downloadCurrentMap()" aria-label="Download PNG" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-100 text-xs font-semibold transition flex items-center gap-2 border border-slate-700">
+                            <i class="fa-solid fa-download"></i>
+                            <span class="hidden sm:inline">Download PNG</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Map Viewport Area -->
+                <div id="mapViewport" class="relative flex-1 bg-slate-950 canvas-grid flex items-center justify-center overflow-hidden select-none p-4 sm:p-8 cursor-grab active:cursor-grabbing">
+                    <div id="mapRepaintOverlay" role="status" aria-live="polite" class="hidden absolute inset-0 z-30 bg-slate-950/70 flex items-center justify-center p-6 cursor-wait">
+                        <div class="flex flex-col items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/95 px-8 py-6 text-center ">
+                            <i class="fa-solid fa-circle-notch animate-spin text-2xl text-slate-400" aria-hidden="true"></i>
+                            <span class="text-base font-semibold text-slate-100">Re-painting map…</span>
+                            <span class="text-xs text-slate-300">Updating colors and label positions. Please wait.</span>
+                        </div>
+                    </div>
+
+                    <!-- Subtle Cartographic Coordinate HUD Accents -->
+                    <div class="absolute top-3 left-4 pointer-events-none flex items-center gap-3 text-xs font-mono text-slate-500/80">
+                        <span>Map extent</span>
+                        <span>&bull;</span>
+                        <span id="hudCoordsText">Europe</span>
+                    </div>
+                    <div class="absolute top-3 right-4 pointer-events-none hidden sm:flex items-center gap-2 text-xs font-mono text-slate-500/80">
+                        <i class="fa-regular fa-compass text-accent-300/70"></i>
+                        <span>N 000°</span>
+                    </div>
+
+                    <!-- Multi-Stage Animated Loading Overlay -->
+                    <div id="loadingOverlay" class="hidden absolute inset-0 bg-slate-950/90 z-20 flex flex-col items-center justify-center p-6">
+                        <div class="max-w-md w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-6 flex flex-col items-center text-center relative overflow-hidden">
+                            <div class="absolute inset-x-0 top-0 h-1 bg-slate-800 "></div>
+
+                            <!-- Orbital Radar Spinner -->
+                            <div class="relative w-20 h-20 flex items-center justify-center mb-4">
+                                <div class="absolute inset-0 rounded-full border-2 border-accent-500/20"></div>
+                                <div class="absolute inset-1 rounded-full border-2 border-dashed border-slate-700 radar-spin"></div>
+                                <div class="absolute inset-0 rounded-full border-2 border-accent-500 border-t-transparent animate-spin"></div>
+                                <div class="w-11 h-11 rounded-full bg-accent-500/15 border border-accent-500/30 flex items-center justify-center">
+                                    <i class="fa-solid fa-earth-americas text-accent-300 text-xl "></i>
+                                </div>
+                            </div>
+
+                            <div class="text-base font-display font-medium text-slate-100">Synthesizing Cartographic Layer</div>
+                            <div id="loadingStepText" class="text-xs text-accent-300 mt-1 font-mono">Querying AI model and rendering map</div>
+
+                            <!-- Multi-stage Step Progress List -->
+                            <div class="w-full mt-4 space-y-2 text-left bg-slate-950/80 p-4 rounded-xl border border-slate-800/80 font-mono text-xs">
+                                <div id="loadStage1" class="flex items-center justify-between text-accent-300">
+                                    <span class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin text-xs"></i> 1. AI Geospatial Query</span>
+                                    <span class="text-xs opacity-75">Running</span>
+                                </div>
+                                <div id="loadStage2" class="flex items-center justify-between text-slate-500">
+                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-xs"></i> 2. Painting Regions &amp; Labels</span>
+                                    <span class="text-xs opacity-75">Pending</span>
+                                </div>
+                                <div id="loadStage3" class="flex items-center justify-between text-slate-500">
+                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-xs"></i> 3. Adding Relief, Borders &amp; Overlays</span>
+                                    <span class="text-xs opacity-75">Pending</span>
+                                </div>
+                                <div id="loadStage4" class="flex items-center justify-between text-slate-500">
+                                    <span class="flex items-center gap-2"><i class="fa-regular fa-circle text-xs"></i> 4. Encoding Final PNG</span>
+                                    <span class="text-xs opacity-75">Pending</span>
+                                </div>
+                            </div>
+
+                            <div class="w-full flex items-center justify-between mt-3 text-xs font-mono text-slate-400">
+                                <span>Elapsed Time</span>
+                                <span id="loadingElapsedTimer" class="text-accent-300">0.0s</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Image Container -->
+                    <div id="mapCanvasWrapper" class="transition-transform duration-150 ease-out origin-center max-w-full max-h-full flex items-center justify-center">
+
+                        <!-- Server Image (real generated map returned by Flask as a data URL) -->
+                        <img id="serverMapImage" src="" alt="Generated Map" draggable="false" class="hidden max-h-[540px] w-auto rounded-xl border border-slate-700/80 object-contain">
+
+                        <!-- Empty-state placeholder shown before the first generation -->
+                        <div id="emptyState" class="w-full max-w-[740px] rounded-2xl border border-dashed border-slate-700/80 bg-slate-900/50 p-8 flex flex-col items-center justify-center gap-4 text-center">
+                            <div class="relative w-20 h-20 rounded-2xl bg-slate-800 border border-accent-500/25 flex items-center justify-center ">
+                                <i class="fa-solid fa-map-location-dot text-accent-300 text-3xl"></i>
+                            </div>
+                            <div class="max-w-md space-y-2">
+                                <h3 class="font-display font-semibold text-base text-slate-100">Create your first map</h3>
+                                <p class="text-xs text-slate-400 leading-relaxed">
+                                    Pick a <span class="text-accent-300 font-medium">prompt preset</span> on the left or type any geographic question, then click <span class="text-accent-300 font-medium">Generate map</span>.
+                                </p>
+                            </div>
+                            <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+                                <button type="button" onclick="applyPromptPreset('Population of European countries', 'number', 'default', 'show_most_least')" class="text-xs px-3 py-2 rounded-xl bg-accent-500/15 hover:bg-accent-500/25 text-accent-300 border border-accent-500/30 transition flex items-center gap-2">
+                                    <i class="fa-solid fa-bolt text-slate-400 text-xs"></i>
+                                    <span>Try Europe population</span>
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Applied Flags Watermark Bar -->
+                    <div id="mapViewportMeta" class="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+                        <div id="activeFlagsBadges" class="flex flex-wrap gap-2">
+                            <!-- Populated by JS -->
+                        </div>
+                        <div class="text-xs font-mono text-slate-400 bg-slate-900/90 px-3 py-1 rounded-lg border border-slate-800">
+                            <span class="hidden sm:inline">Scroll to zoom &bull; Drag to pan</span><span class="sm:hidden">Use + / − to zoom</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CLI Console Output & History Tabs -->
+            <div class="cyber-card border border-slate-800/90 rounded-2xl overflow-hidden">
+                <div class="px-4 py-3 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-5">
+                        <button type="button" onclick="switchBottomTab('console')" id="tabConsoleBtn" class="text-xs font-semibold text-accent-300 border-b-2 border-accent-500 pb-2 -mb-2.5 flex items-center gap-2 transition">
+                            <i class="fa-solid fa-terminal"></i>
+                            <span>Console output</span>
+                        </button>
+                        <button type="button" onclick="switchBottomTab('history')" id="tabHistoryBtn" class="text-xs font-semibold text-slate-400 hover:text-slate-200 pb-2 -mb-2.5 flex items-center gap-2 transition">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            <span>Run history</span>
+                            <span id="historyCountBadge" class="px-2 py-0.2 rounded-full bg-slate-800 text-xs">0</span>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="clearConsoleBtn" onclick="clearConsole()" class="text-xs text-slate-400 hover:text-slate-200 transition flex items-center gap-1">
+                            <i class="fa-regular fa-trash-can text-xs"></i>
+                            <span>Clear console</span>
+                        </button>
+                        <button type="button" id="clearHistoryBtn" onclick="clearHistory()" class="hidden text-xs text-slate-400 hover:text-slate-200 transition flex items-center gap-1">
+                            <i class="fa-regular fa-trash-can text-xs"></i>
+                            <span>Clear History</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tab 1: Console Logs -->
+                <div id="consoleTabContent" class="p-4 bg-slate-950/90 font-mono text-xs h-40 overflow-y-auto space-y-2">
+                    <div class="text-slate-500">[System] AutoMap Studio initialized and ready.</div>
+                    <div class="text-slate-400">[Info] Select your desired flags <span class="text-accent-300">-m, -mp, -gsm, -eop, --model, --font</span> and click "Generate map".</div>
+                </div>
+
+                <!-- Tab 2: Generation History (saved locally for 24 hours) -->
+                <div id="historyTabContent" class="hidden p-4 bg-slate-950/90 h-40 overflow-y-auto">
+                    <p id="historyStorageStatus" role="status" class="text-xs text-slate-400 mb-2">Saved in this browser · automatically removed after 24 hours.</p>
+                    <div id="historyList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        <div class="text-xs text-slate-500 col-span-full text-center py-8">Generated maps will appear here</div>
+                    </div>
+                </div>
+            </div>
+
+        </section>

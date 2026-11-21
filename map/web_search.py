@@ -1,4 +1,15 @@
-"""Web search transports. Credentials stay on the server, separate from model keys."""
+"""Bounded Tavily/Brave search evidence for AI-assisted map research.
+
+functions invokes search_web during the model tool loop. An explicit key
+selects Tavily; otherwise provider selection and credentials come from the
+environment. Queries and result counts are bounded, redirects are disabled,
+and requests have connect/read timeouts. Responses contain sanitized snippets
+and source URLs rather than fetched full pages or generated answers.
+
+SearchError hides credential-bearing upstream details. Change provider
+transport and evidence normalization here; total search-call budgeting and
+model tool messages belong in functions.
+"""
 import html
 import json
 import os
@@ -13,6 +24,12 @@ class SearchError(RuntimeError):
 
 
 def search_config(api_key=None):
+    """Resolve provider and key without making a network request.
+
+    A nonempty explicit key selects Tavily. Otherwise WEB_SEARCH_PROVIDER wins,
+    with Tavily preferred when its environment key exists and Brave as fallback.
+    Missing credentials or unsupported provider names raise SearchError.
+    """
     if api_key and isinstance(api_key, str) and api_key.strip():
         return 'tavily', api_key.strip()
     provider = os.getenv('WEB_SEARCH_PROVIDER', '').strip().lower()
@@ -37,6 +54,7 @@ def _text(value, limit):
 
 
 def normalize_query(query):
+    """Require query text and limit it to 75 words and 600 characters."""
     if not isinstance(query, str) or not query.strip():
         raise SearchError('Web search requires a nonempty text query.')
     return ' '.join(query.split()[:75])[:600]

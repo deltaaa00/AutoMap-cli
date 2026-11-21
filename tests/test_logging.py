@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Verify user-visible and verbose-only console logging contracts.
+
+A captured Rich console checks progress suppression, persistent warnings/errors
+and spinner exception propagation. Extend this suite when changing map.log
+without coupling assertions to external terminal styling.
+"""
+
 import io
 
 import pytest

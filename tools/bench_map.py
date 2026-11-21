@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Benchmark (and optionally compare) map generation with a fixed fake AI response.
+"""Benchmark map generation using fixed fake AI data, without spending API quota.
 
-Usage:
-    python tools/bench_map.py [--runs N] [--compare OLD_AUTO_MAP_PY]
+Run from the project root:
+    python tools/bench_map.py --runs 3
+    python tools/bench_map.py --compare /tmp/old_auto_map.py
 
---compare loads another version of map/auto_map.py (e.g. from
-``git show <rev>:map/auto_map.py > /tmp/old_auto_map.py``) and reports the
-number of differing pixels between its output and the current one.
+The harness seeds random colors and supplies ai_answer_override, recording cold
+and warm render times and optionally comparing RGBA pixels across revisions.
+The alternate module must retain compatible renderer/helper/asset contracts;
+this tool is for local measurement, not a stable performance assertion in CI.
+Results are kept in memory and local map assets/fonts are required.
 """
 import argparse
 import importlib.util
@@ -41,6 +44,8 @@ FONT = "Bips.ttf"
 
 
 def fake_answer(coords, mode):
+    """Build deterministic region values so both compared renderers receive identical data.
+    """
     names = list(coords)
     if mode == "number":
         return {n: str((i * 37) % 900 + 5) for i, n in enumerate(names)}
