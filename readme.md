@@ -371,6 +371,11 @@ Login sessions are valid for up to a year. Changing the credentials or signing s
 
 Use your own credentials and HTTPS for a public deployment. If you used the old built-in password, choose a new one before upgrading. Keep the media worker private; the web application provides the login gate. After changing Compose environment values, run `docker compose up -d` to recreate affected containers: `docker compose restart` retains the old values.
 
+GitHub Actions deployment requires the repository secret `SSH_HOST_FINGERPRINT`.
+Get the SHA-256 fingerprint of the SSH host key from the trusted server console
+and store its `SHA256:...` value before deploying. For an Ed25519 host key, use
+`ssh-keygen -E sha256 -lf /etc/ssh/ssh_host_ed25519_key.pub`.
+
 ## Tests
 
 The suite mocks external AI/HTTP downloads and does not require real credentials. It covers map rendering, decimal ranges and extrema, CLI/CSV behavior, provider/key isolation, authentication, service proxies, media handling, and browser interaction. Real software-encoded video rendering is included; live model/YouTube availability and GPU encoders are not tested.
