@@ -20,7 +20,7 @@ build-backend = "setuptools.build_meta"
 name = "AutoMap"
 version = "0.1.0"
 dependencies = [
-    "pillow>=9.2.0,<12.0.0",
+    "pillow>=13.0.0,<14.0.0",
     "click>=8.0.0",
     "google-genai>=1.56.0",
     "cryptography>=43.0.0",
@@ -31,10 +31,10 @@ dependencies = [
     "rich>=13.0.0",
     "flask>=3.1.0",
     "waitress>=3.0.2,<4.0.0",
-    "yt-dlp>=2024.12.0",
+    "yt-dlp[default]>=2026.10.26",
     "requests>=2.31.0",
     "pydub>=0.25.1",
-    "moviepy>=2.0.0",
+    "moviepy @ https://github.com/Zulko/moviepy/archive/211e4b15f6ce4f34a6a9efbfff40590e43a68f77.tar.gz#sha256=8a4e08332e9ad5080ffca374a6f7081cfa65189acf5a1f93a65bb2fb227bab8a",
     "proglog>=0.1.10,<1.0.0",
 ]
 
@@ -43,10 +43,12 @@ automap = "cli:main"
 
 [tool.setuptools]
 py-modules = ["cli"]
-packages = ["map"]
+packages = ["map", "resources"]
+include-package-data = false
 
 [tool.setuptools.package-data]
-map = ["filling.json", "filling.template.json"]
+map = ["filling.template.json"]
+resources = ["fonts/*.ttf", "maps/*.png"]
 
 [tool.pytest.ini_options]
 pythonpath = "."

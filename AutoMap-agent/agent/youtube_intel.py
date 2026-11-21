@@ -13,6 +13,8 @@ from typing import Any
 
 import requests
 
+from .private_files import write_private_text
+
 from .db import AgentDB, utc_now_iso
 from .optimizer import compute_video_score
 
@@ -211,7 +213,7 @@ class YouTubeIntel:
         creds = Credentials.from_authorized_user_info(info)
         if creds.expired and creds.refresh_token:
             creds.refresh(Request())
-            self.token_path.write_text(creds.to_json(), encoding="utf-8")
+            write_private_text(self.token_path, creds.to_json())
         return creds
 
     def has_upload_credentials(self) -> bool:

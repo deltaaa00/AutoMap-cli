@@ -64,8 +64,15 @@ def init_web_auth(app, env_values=None):
     settings = env_values or {}
     server_mode = os.environ.get('SERVER', settings.get('SERVER') or 'FALSE') == 'TRUE'
     app.config['WEB_AUTH_ENABLED'] = server_mode
-    login = os.environ.get('WEB_LOGIN', settings.get('WEB_LOGIN') or 'deltaaa')
-    password = os.environ.get('WEB_PASSWORD', settings.get('WEB_PASSWORD') or 'deltaaa00!')
+    if not server_mode:
+        allowed_hosts = os.environ.get('WEB_TRUSTED_HOSTS', settings.get('WEB_TRUSTED_HOSTS') or '')
+        app.config['TRUSTED_HOSTS'] = ['localhost', '127.0.0.1', '[::1]', 'automap-web', 'host.docker.internal']
+        app.config['TRUSTED_HOSTS'].extend(host.strip() for host in allowed_hosts.split(',') if host.strip())
+    login = os.environ.get('WEB_LOGIN', settings.get('WEB_LOGIN') or '')
+    password = os.environ.get('WEB_PASSWORD', settings.get('WEB_PASSWORD') or '')
+    if server_mode and (not login.strip() or not password.strip() or password == 'deltaaa00!'):
+        raise RuntimeError('Set WEB_LOGIN and a unique WEB_PASSWORD before enabling SERVER=TRUE.')
+    cookie_secure = os.environ.get('WEB_COOKIE_SECURE', settings.get('WEB_COOKIE_SECURE'))
     app.secret_key = _session_secret(app, settings)
     app.config.update(
         PERMANENT_SESSION_LIFETIME=timedelta(days=365),
@@ -74,6 +81,7 @@ def init_web_auth(app, env_values=None):
         SESSION_REFRESH_EACH_REQUEST=False,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE='Lax',
+        SESSION_COOKIE_SECURE=(cookie_secure or str(server_mode)).lower() == 'true',
     )
     identity = hmac.new(str(app.secret_key).encode(),
                         (login + '\0' + password).encode(), hashlib.sha256).hexdigest()
@@ -81,6 +89,19 @@ def init_web_auth(app, env_values=None):
     def authenticated():
         value = session.get('web_identity', '')
         return isinstance(value, str) and hmac.compare_digest(value, identity)
+
+    @app.before_request
+    def reject_cross_origin_writes():
+        if request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return None
+        origin = request.headers.get('Origin')
+        fetch_site = request.headers.get('Sec-Fetch-Site')
+        try:
+            allowed_origin = not origin or urlsplit(origin).netloc == request.host
+        except ValueError:
+            allowed_origin = False
+        if not allowed_origin or fetch_site in ('cross-site', 'same-site'):
+            return jsonify(error='Cross-origin requests are forbidden.'), 403
 
     @app.before_request
     def require_web_login():

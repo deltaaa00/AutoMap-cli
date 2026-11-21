@@ -19,12 +19,15 @@ services:
       context: .
       dockerfile: Dockerfile.web
     ports:
-      - "3000:5000"
+      - "${AUTOMAP_BIND_ADDRESS:-127.0.0.1}:3000:5000"
     environment:
       PORT: "5000"
+      BIND_HOST: "0.0.0.0"
       SERVER: "${SERVER:-FALSE}"
-      WEB_LOGIN: "${WEB_LOGIN:-deltaaa}"
-      WEB_PASSWORD: "${WEB_PASSWORD:-deltaaa00!}"
+      WEB_LOGIN: "${WEB_LOGIN:-}"
+      WEB_PASSWORD: "${WEB_PASSWORD:-}"
+      WEB_TRUSTED_HOSTS: "${WEB_TRUSTED_HOSTS:-}"
+      WEB_COOKIE_SECURE: "${WEB_COOKIE_SECURE:-}"
       WEB_SECRET_KEY: "${WEB_SECRET_KEY:-}"
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
       DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
@@ -37,7 +40,10 @@ services:
     volumes:
       - automap-session:/app/instance
     networks:
-      - app-network
+      app-network:
+      agent-link:
+        aliases:
+          - automap-web
 
   yt-dlp-worker:
     restart: unless-stopped
@@ -46,6 +52,8 @@ services:
       dockerfile: Dockerfile.ytserver
     environment:
       - PORT=8080
+      - BIND_HOST=0.0.0.0
+      - AUTOMAP_STORAGE_DIR=/tmp/automap_storage
       - SERVER=${SERVER:-FALSE}
     volumes:
       - automap-media:/tmp/automap_storage
@@ -53,6 +61,8 @@ services:
       - app-network
 
 networks:
+  agent-link:
+    name: automap-agent-link
   app-network:
     driver: bridge
 

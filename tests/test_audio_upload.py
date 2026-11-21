@@ -105,7 +105,7 @@ def test_converted_audio_limit_and_subprocess_timeout(worker, monkeypatch):
     monkeypatch.setattr(worker, 'MAX_MATERIAL_BYTES', 8)
     def conversion(command, **kwargs):
         assert kwargs['timeout'] == 30
-        assert command[command.index('-protocol_whitelist') + 1] == 'file,pipe'
+        assert command[command.index('-protocol_whitelist') + 1] == 'file'
         Path(command[-1]).write_bytes(b'x' * 9)
         return Mock(returncode=0)
     monkeypatch.setattr(worker.subprocess, 'run', conversion)

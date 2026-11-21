@@ -18,7 +18,7 @@ import re
 
 from video_text import TITLE_FONT_PATH, _with_shadow
 
-STORAGE_DIR = "/tmp/automap_storage"
+from media_inputs import MEDIA_STORAGE_DIR, open_upload_image
 
 from sticker_themes import (
     ALLOWED_STICKERS,
@@ -294,17 +294,20 @@ def _sticker_image(kind: str, size: int = 140, effects: bool = True, allow_remot
     # Library stickers (without a gen_ prefix) use Twemoji cache/CDN when available.
     codepoint = None if gen_style else TWEMOJI_CODEPOINTS.get(kind)
     if codepoint:
-        stickers_dir = os.path.join(STORAGE_DIR, 'stickers')
+        stickers_dir = os.path.join(MEDIA_STORAGE_DIR, 'stickers')
         cache_path = os.path.join(stickers_dir, f'{kind}.png')
         if not os.path.isfile(cache_path) and allow_remote:
             try:
                 import requests
                 os.makedirs(stickers_dir, exist_ok=True)
                 url = f'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/{codepoint}.png'
-                resp = requests.get(url, timeout=1.5)
-                if resp.status_code == 200 and resp.content:
-                    with Image.open(io.BytesIO(resp.content)) as fetched:
-                        fetched.convert('RGBA').save(cache_path, format='PNG')
+                with requests.get(url, timeout=1.5, stream=True, allow_redirects=False) as response:
+                    if response.status_code == 200:
+                        data = response.raw.read(128 * 1024 + 1, decode_content=True)
+                        if len(data) <= 128 * 1024:
+                            with open_upload_image(io.BytesIO(data), ('PNG',)) as fetched:
+                                if fetched.size == (72, 72):
+                                    fetched.convert('RGBA').save(cache_path, format='PNG')
             except Exception:
                 pass
         if os.path.isfile(cache_path):

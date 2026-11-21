@@ -73,7 +73,7 @@ WEB_PASSWORD=your_password
 docker compose up --build -d
 ```
 
-Open [http://localhost:3000](http://localhost:3000). With `SERVER=TRUE`, sign in using the credentials from `.env`.
+Open [http://localhost:3000](http://localhost:3000). For local HTTP testing with `SERVER=TRUE`, set `WEB_COOKIE_SECURE=FALSE` if your browser requires it. For an HTTPS deployment, keep the default Secure cookie setting.
 
 Useful commands:
 
@@ -83,7 +83,7 @@ docker compose up --build -d    # Apply code, dependency, or configuration chang
 docker compose down            # Stop and remove containers; retain named volumes.
 ```
 
-Compose publishes only the web application (`3000` on the host to `5000` in the container). The media worker listens on `8080` inside the private Compose network. Both services use `restart: unless-stopped`.
+Compose binds the web application to `127.0.0.1:3000` by default. Set `AUTOMAP_BIND_ADDRESS` if your reverse proxy or deployment needs a different interface. The media worker listens on `8080` inside the private Compose network. Both services use `restart: unless-stopped`.
 
 The `automap-session` volume retains the generated session secret. The `automap-media` volume stores worker media, which is still subject to expiry cleanup. Removing a volume removes its contents.
 
@@ -194,7 +194,7 @@ minute while it is open. **Clear History** removes the saved history as well.
 
 1. Generate a map or select a map image in Video Studio.
 2. Supply background footage and a headline.
-3. Optionally download a music track from a supported URL or upload MP3, WAV, M4A, AAC, OGG, or FLAC audio. Uploaded music is converted to MP3.
+3. Optionally download audio from a YouTube video link or upload MP3, WAV, M4A, AAC, OGG, or FLAC audio. Uploaded music is converted to MP3.
 4. Use a full track or trim a **1–30 second** segment from an `MM:SS` start time.
 5. Configure title font, size and colors, watermarks, stickers, and other overlays, then render and download the MP4.
 
@@ -350,8 +350,12 @@ if png is not None:
 | `GEMINI_API_KEY` | Server key for Gemini/Gemma models |
 | `DEEPSEEK_API_KEY` | Server key for DeepSeek models |
 | `SERVER` | Defaults to local mode (`FALSE`). Exact `TRUE` enables Waitress and web authentication |
-| `WEB_LOGIN` | Login name; default `deltaaa` |
-| `WEB_PASSWORD` | Login password; default `deltaaa00!` |
+| `WEB_LOGIN` | Login name, required in server mode |
+| `WEB_PASSWORD` | Unique login password, required in server mode |
+| `WEB_COOKIE_SECURE` | Defaults to `TRUE` in server mode. Set `FALSE` only for a trusted HTTP-only setup |
+| `WEB_TRUSTED_HOSTS` | Additional comma-separated hostnames accepted in unauthenticated local mode |
+| `BIND_HOST` | Native listening address, default `127.0.0.1` |
+| `AUTOMAP_BIND_ADDRESS` | Compose host listening address, default `127.0.0.1` |
 | `WEB_SECRET_KEY` | Optional stable session-signing secret |
 | `WEB_AUTH_SECRET_FILE` | Native deployment override for the generated secret file |
 | `PORT` | Native service port; web default `5000`, worker default `8080` |
@@ -365,7 +369,7 @@ The server keeps `SERVER=TRUE` and its public `YOUTUBE_REDIRECT_URI` in its own
 
 Login sessions are valid for up to a year. Changing the credentials or signing secret invalidates existing sessions. Without `WEB_SECRET_KEY`, a secret is generated in `instance/web-session-secret`; keep that file across native restarts or retain the Compose session volume. For Compose, add an explicit environment entry to use `WEB_AUTH_SECRET_FILE`. Compose already fixes `YTDLP_URL` to the private worker address; edit that entry only if you change the service layout.
 
-Use your own credentials and HTTPS for a public deployment. Keep the media worker private; the web application provides the login gate. After changing Compose environment values, run `docker compose up -d` to recreate affected containers: `docker compose restart` retains the old values.
+Use your own credentials and HTTPS for a public deployment. If you used the old built-in password, choose a new one before upgrading. Keep the media worker private; the web application provides the login gate. After changing Compose environment values, run `docker compose up -d` to recreate affected containers: `docker compose restart` retains the old values.
 
 ## Tests
 

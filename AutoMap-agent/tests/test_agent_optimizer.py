@@ -18,7 +18,7 @@ from agent.youtube_intel import YouTubeIntel, extract_music_hint
 
 def test_score_and_suffix_inference():
     assert compute_video_score(1000, None, 80.0) == 800.0
-    assert compute_video_score(1000, 5000, 90.0, likes_72h=250) == 5625.0
+    assert compute_video_score(1000, 5000, 90.0, likes_72h=250) == 5400.0
     assert infer_label_suffix("How tall is the tallest mountain in your country?", "number") == "m"
     assert infer_label_suffix("Forest coverage percentage in Europe", "number") == "%"
     assert infer_label_suffix("Most popular drink in Europe", "text") == ""

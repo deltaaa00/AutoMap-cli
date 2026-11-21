@@ -12,22 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+FROM denoland/deno:bin@sha256:b507583d3c68ba69f3ed2ce5969ae5b8b70f43421c781279c7aea06435263543 AS deno
+
 FROM rust:1.83-slim AS rust-builder
 WORKDIR /build
-RUN apt-get update && apt-get install -y python3 python3-pip && rm -rf /var/lib/apt/lists/* \
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip && rm -rf /var/lib/apt/lists/* \
     && pip3 install --no-cache-dir --break-system-packages "maturin>=1.7,<2.0"
 COPY automap_rs/ ./automap_rs/
-RUN cd automap_rs && maturin build --release --interpreter python3 --out /wheels
+RUN cd automap_rs && maturin build --locked --release --interpreter python3 --out /wheels
 
 FROM python:3.12-slim
 
 
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    curl \
-    unzip \
-    && curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh \
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
+COPY --from=deno /deno /usr/local/bin/deno
+ENV FFMPEG_BINARY=/usr/bin/ffmpeg
 
 WORKDIR /app
 
@@ -39,7 +39,7 @@ COPY --from=rust-builder /wheels/*.whl /tmp/
 RUN pip install --no-cache-dir /tmp/*.whl && rm -f /tmp/*.whl
 
 
-COPY yt-dlp_serv.py sticker_themes.py extra_stickers.py server_runtime.py render_progress.py video_text.py video_stickers.py video_render.py ./
+COPY media_inputs.py yt-dlp_serv.py sticker_themes.py extra_stickers.py server_runtime.py render_progress.py video_text.py video_stickers.py video_render.py ./
 COPY resources/fonts/ resources/fonts/
 
 EXPOSE 8080

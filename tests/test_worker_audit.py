@@ -14,6 +14,7 @@
 
 """Regressions found while checking long-lived server deployments."""
 import base64
+import json
 from pathlib import Path
 import subprocess
 from unittest.mock import Mock
@@ -22,8 +23,10 @@ import pytest
 
 
 @pytest.mark.parametrize('value', [123, ['https://example.test'], '--exec=bad',
-                                  'file:///etc/passwd', 'https://[bad', 'https:///missing-host'])
-def test_download_rejects_non_http_urls_before_running_process(worker, monkeypatch, value):
+                                  'file:///example.mp3', 'https://[bad', 'https:///missing-host',
+                                  'https://example.test/audio', 'https://www.youtube.com/redirect',
+                                  'https://www.youtube.com:123/watch?v=videoId0001'])
+def test_download_rejects_unsupported_urls_before_running_process(worker, monkeypatch, value):
     run = Mock()
     monkeypatch.setattr(worker.subprocess, 'run', run)
     response = worker.app.test_client().post('/api/music_download', json={'url': value})
@@ -37,11 +40,11 @@ def test_download_timeout_releases_temporary_storage(worker, monkeypatch, tmp_pa
     monkeypatch.setattr(worker.tempfile, 'mkdtemp', lambda **_: str(folder))
     run = Mock(side_effect=subprocess.TimeoutExpired('yt-dlp', 120))
     monkeypatch.setattr(worker.subprocess, 'run', run)
-    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://example.test/song'})
+    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://www.youtube.com/watch?v=videoId0001'})
     assert response.status_code == 504
     assert not folder.exists()
     assert run.call_args.kwargs['timeout'] == 120
-    assert run.call_args.args[0][-2:] == ['--', 'https://example.test/song']
+    assert run.call_args.args[0][-2:] == ['--', 'https://www.youtube.com/watch?v=videoId0001']
 
 
 @pytest.mark.parametrize('title', ['a' * 1000, 'Найкрасивіші країни Європи ' * 20, '😀' * 1000])
@@ -49,10 +52,12 @@ def test_long_titles_fit_download_and_render_filenames(worker, monkeypatch, tmp_
     folder = tmp_path / 'download'
     folder.mkdir()
     monkeypatch.setattr(worker.tempfile, 'mkdtemp', lambda **_: str(folder))
-    monkeypatch.setattr(worker.subprocess, 'run', Mock(
-        side_effect=lambda *args, **kwargs: (folder / 'track.mp3').write_bytes(b'mp3')))
-    monkeypatch.setattr(worker, '_get_song_title', lambda _: title)
-    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://example.test/song'})
+    def download(*args, **kwargs):
+        (folder / 'track.mp3').write_bytes(b'mp3')
+        return Mock(stdout=json.dumps(title).encode())
+
+    monkeypatch.setattr(worker.subprocess, 'run', Mock(side_effect=download))
+    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://www.youtube.com/watch?v=videoId0001'})
     assert response.status_code == 200, response.json
     assert base64.b64decode(response.json['file']) == b'mp3'
     assert (Path(worker.DOWNLOADS) / (response.json['title'] + '.mp3')).exists()
@@ -91,23 +96,24 @@ def test_download_accepts_storage_relative_filename(worker):
 ])
 def test_download_identifiers_preserve_tracks_and_cuts_on_title_collisions(worker, monkeypatch, titles):
     tracks = iter((b'first-track', b'second-track'))
+    titles = iter(titles)
     temporary_folders = []
 
     def download(command, **kwargs):
         output = Path(command[command.index('-o') + 1].replace('%(ext)s', 'mp3'))
         temporary_folders.append(output.parent)
         output.write_bytes(next(tracks))
+        return Mock(stdout=json.dumps(next(titles)).encode())
 
     monkeypatch.setattr(worker.subprocess, 'run', Mock(side_effect=download))
-    monkeypatch.setattr(worker, '_get_song_title', Mock(side_effect=titles))
     client = worker.app.test_client()
-    first = client.post('/api/music_download', json={'url': 'https://example.test/first'})
+    first = client.post('/api/music_download', json={'url': 'https://www.youtube.com/watch?v=videoId0001'})
     assert first.status_code == 200, first.json
     first_title = first.json['title']
     first_cut = Path(worker.CUT_DIR) / f'{first_title}_cut.mp3'
     first_cut.write_bytes(b'first-cut')
 
-    second = client.post('/api/music_download', json={'url': 'https://example.test/second'})
+    second = client.post('/api/music_download', json={'url': 'https://www.youtube.com/watch?v=videoId0002'})
     assert second.status_code == 200, second.json
     second_title = second.json['title']
     assert first_title != second_title
@@ -129,9 +135,7 @@ def test_download_size_limit_matches_audio_upload_and_releases_temporary_files(w
         output.write_bytes(b'x' * size)
 
     monkeypatch.setattr(worker.subprocess, 'run', Mock(side_effect=download))
-    title_lookup = Mock(return_value='Track')
-    monkeypatch.setattr(worker, '_get_song_title', title_lookup)
-    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://example.test/song'})
+    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://www.youtube.com/watch?v=videoId0001'})
     if size == 3:
         assert response.status_code == 200, response.json
         assert worker._decode_audio_payload(response.json['file']) == b'xxx'
@@ -143,5 +147,28 @@ def test_download_size_limit_matches_audio_upload_and_releases_temporary_files(w
         assert 'shorter track' in response.json['error']
         assert 'file' not in response.json
         assert not list(Path(worker.DOWNLOADS).iterdir())
-        title_lookup.assert_not_called()
     assert all(not folder.exists() for folder in temporary_folders)
+
+
+@pytest.mark.parametrize('url', [
+    'https://youtu.be/videoId0001?si=share-token',
+    'http://music.youtube.com/watch?v=videoId0001',
+    'https://www.youtube.com/shorts/videoId0001',
+])
+def test_download_uses_only_the_canonical_youtube_video(worker, monkeypatch, url):
+    run = Mock(side_effect=subprocess.TimeoutExpired('yt-dlp', 120))
+    monkeypatch.setattr(worker.subprocess, 'run', run)
+    assert worker.app.test_client().post('/api/music_download', json={'url': url}).status_code == 504
+    command = run.call_args.args[0]
+    assert command[-1] == 'https://www.youtube.com/watch?v=videoId0001'
+    assert command[command.index('--use-extractors') + 1] == 'youtube'
+    assert '--ignore-config' in command
+
+
+def test_worker_rejects_non_object_and_oversized_json(worker):
+    client = worker.app.test_client()
+    assert client.post('/api/render_video', json=['test']).status_code == 400
+    worker.app.config['MAX_CONTENT_LENGTH'] = 16
+    response = client.post('/api/music_upload', json={'audio_file': 'a' * 16})
+    assert response.status_code == 413
+    assert response.is_json

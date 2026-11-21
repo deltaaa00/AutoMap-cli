@@ -39,13 +39,6 @@ import requests as _requests_module
 BASE_DIR = Path(__file__).parent
 os.chdir(BASE_DIR)
 
-STORAGE_DIR = "/tmp/automap_storage"
-DOWNLOADS = os.path.join(STORAGE_DIR, "downloads")
-CUT_DIR = os.path.join(STORAGE_DIR, "cut")
-
-os.makedirs(STORAGE_DIR, exist_ok=True)
-os.makedirs(CUT_DIR, exist_ok=True)
-
 from dotenv import dotenv_values
 from map.auto_map import (
     auto_map,
@@ -65,6 +58,7 @@ from map.functions import (
 )
 
 from flask import Flask, request, jsonify, send_file, render_template, Response, session
+from media_inputs import open_upload_image, youtube_video_url
 from web_ai_cache import ai_cache
 
 FONTS_DIR = BASE_DIR / "resources" / "fonts"
@@ -445,9 +439,9 @@ def _inspect_uploaded_map_image(
     if not decoded:
         raise ValueError("Decoded image payload is empty.")
     try:
-        with Image.open(io.BytesIO(decoded)) as opened:
+        with open_upload_image(io.BytesIO(decoded)) as opened:
             img = opened.convert("RGBA")
-    except (UnidentifiedImageError, OSError, ValueError) as exc:
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
         raise ValueError("Uploaded file is not a valid image.") from exc
 
     width, height = img.size
@@ -899,11 +893,9 @@ def download_batch_zip():
                 continue
             try:
                 image_bytes = base64.b64decode(image_url.split(',', 1)[1], validate=True)
-                with Image.open(io.BytesIO(image_bytes)) as image:
-                    if image.format != 'PNG':
-                        continue
+                with open_upload_image(io.BytesIO(image_bytes), ('PNG',)) as image:
                     image.verify()
-            except (ValueError, OSError):
+            except (ValueError, OSError, Image.DecompressionBombError):
                 continue
 
             base = re.sub(r"[^\w\-]+", "_", prompt.strip().replace(" ", "_")).strip("_") if prompt else f"map_{idx:02d}"
@@ -1288,11 +1280,14 @@ def music_download():
     """
 
     data = request.get_json(silent=True) or {}
-    url = (data.get('url') or '').strip()
-    if not url:
-        return jsonify({"status": "error", "error": "Missing 'url' in request body."}), 400
+    try:
+        url = youtube_video_url(data.get('url'))
+    except ValueError as error:
+        return jsonify(status='error', error=str(error)), 400
 
-    cookies = str(data.get('cookies') or '').strip('\r\n')
+    cookies = data.get('cookies') or ''
+    if not isinstance(cookies, str) or len(cookies.encode('utf-8')) > 256 * 1024:
+        return jsonify(status='error', error='Invalid YouTube cookies file.'), 400
     forward_payload = {"url": url, "cookies": cookies} if cookies else {"url": url}
 
     # Another service downloads music from YouTube and converts it to mp3.
@@ -1457,7 +1452,7 @@ def _region_mask_from_index(
     pix_mask[flat[ids == region_idx]] = 255
     if not pix_mask.any():
         return None
-    return Image.fromarray(pix_mask.reshape((h, w)), mode="L")
+    return Image.fromarray(pix_mask.reshape((h, w)))
 
 
 def _world_country_floodfill_mask(seeds: list[tuple[int, int]]) -> Image.Image | None:
@@ -1498,7 +1493,7 @@ def _world_country_floodfill_mask(seeds: list[tuple[int, int]]) -> Image.Image |
                 break
     if filled is None or not filled.any():
         return None
-    return Image.fromarray((filled.astype(np.uint8) * 255), mode="L")
+    return Image.fromarray(filled.astype(np.uint8) * 255)
 
 
 def _extract_country_mask_image(
@@ -1605,6 +1600,8 @@ def _extract_country_reveal_mask(
     mask.save(buf, format="PNG")
     b64_mask = base64.b64encode(buf.getvalue()).decode("ascii")
     with _ZOOM_CACHE_LOCK:
+        if cache_key not in _REVEAL_MASK_CACHE and len(_REVEAL_MASK_CACHE) >= 64:
+            _REVEAL_MASK_CACHE.pop(next(iter(_REVEAL_MASK_CACHE)))
         _REVEAL_MASK_CACHE[cache_key] = b64_mask
     return b64_mask
 
@@ -1637,7 +1634,7 @@ def _decode_image_size(image_data: object) -> tuple[int, int] | None:
     if not decoded:
         return None
     try:
-        with Image.open(io.BytesIO(decoded)) as opened:
+        with open_upload_image(io.BytesIO(decoded)) as opened:
             return opened.size
     except (UnidentifiedImageError, OSError, Image.DecompressionBombError, ValueError):
         return None
@@ -1788,6 +1785,7 @@ def make_video() -> tuple[object, int]:
                 "title_other_lines_color": data.get('title_other_lines_color', '#ffe735'),
                 "title_uppercase": data.get('title_uppercase', True),
                 "visual_effects": data.get('visual_effects', True),
+                **({"draft": data["draft"]} if "draft" in data else {}),
                 "watermark_image": data.get('watermark_image', ''),
                 "watermark_text": data.get('watermark_text', ''),
                 "watermark_color": data.get('watermark_color', '#a4e9ee'),

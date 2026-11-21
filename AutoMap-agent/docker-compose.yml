@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     command: ["gunicorn", "--bind", "0.0.0.0:4000", "--workers", "2", "--threads", "4", "--timeout", "120", "web:app"]
     ports:
-      - "${AGENT_PORT:-4000}:4000"
+      - "${AGENT_BIND_ADDRESS:-127.0.0.1}:${AGENT_PORT:-4000}:4000"
     env_file:
       - path: .env
         required: false
@@ -15,7 +15,6 @@ services:
       - AGENT_DB_PATH=/app/instance/agent.db
       - AGENT_MEDIA_DIR=/app/agent_media
       - AGENT_YOUTUBE_TOKEN_PATH=/app/instance/agent_youtube_token.json
-      - OAUTHLIB_INSECURE_TRANSPORT=${OAUTHLIB_INSECURE_TRANSPORT:-1}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

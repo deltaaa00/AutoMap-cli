@@ -78,7 +78,8 @@ def _prepare_background(src: str, dst: str, duration: float, size=(1080, 1920),
                     f'scale={w}:{h}:flags=bicubic']
     filters.append('format=yuv420p')
     command = [FFMPEG_BINARY, '-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
-               '-i', src, '-t', f'{duration:.3f}', '-an', '-vf', ','.join(filters),
+               '-protocol_whitelist', 'file', '-format_whitelist', 'mov,matroska,webm',
+               '-i', src, '-map', '0:v:0', '-t', f'{duration:.3f}', '-an', '-vf', ','.join(filters),
                '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '10',
                '-threads', str(_render_threads()), dst]
     result = subprocess.run(command, capture_output=True, text=True, timeout=600)

@@ -10,6 +10,9 @@ test('typing coalesces preview work, composition waits, blur flushes the final d
         setTimeout(fn) { callback = fn; return 1; },
         clearTimeout() { callback = undefined; },
         updateCommandPreview() { updates++; },
+        saveBrowserValue() {},
+        MAP_TOPIC_STORAGE_KEY: 'topic',
+        document: {getElementById() { return {value: 'Topic'}; }},
     });
     vm.runInContext(html.slice(html.indexOf('        let topicPreviewTimer;'),
         html.indexOf('        // Flush a pending draft')), context);

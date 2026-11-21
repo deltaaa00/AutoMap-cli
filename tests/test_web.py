@@ -107,7 +107,7 @@ def test_generate_server_key_does_not_require_form_key(web, monkeypatch, generat
 
 
 PROXIES = [
-    ('/api/music_download', {'url': 'https://example.test/song'}, 150),
+    ('/api/music_download', {'url': 'https://www.youtube.com/watch?v=videoId0001'}, 150),
     ('/api/music_cut', {'title': 'song', 'start_time': '00:01'}, 40),
     ('/api/render_video', {'map_file': 'map', 'background_video': 'bg', 'video_title': 'title'}, 300),
 ]

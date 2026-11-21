@@ -1,0 +1,17 @@
+services:
+  agent-web:
+    environment:
+      AUTOMAP_URL: http://automap-web:5000
+    networks:
+      - default
+      - automap
+  agent-runner:
+    environment:
+      AUTOMAP_URL: http://automap-web:5000
+    networks:
+      - default
+      - automap
+networks:
+  automap:
+    external: true
+    name: automap-agent-link

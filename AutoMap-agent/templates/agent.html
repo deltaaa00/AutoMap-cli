@@ -468,14 +468,19 @@
             document.getElementById('secTavilyApiKeyBadge').classList.toggle('hidden', !data.tavily_api_configured);
             if (document.activeElement?.id !== 'secTgChatId' && data.telegram_chat_id && !document.getElementById('secTgChatId').value) {
                 document.getElementById('secTgChatId').value = data.telegram_chat_id;
-                saveLocalSecret('secTgChatId', data.telegram_chat_id);
             }
             const renderFileList = (elId, kind, list) => {
                 const el = document.getElementById(elId);
                 if (!el) return;
                 el.innerHTML = (list && list.length)
-                    ? list.map(name => `<li class="flex items-center justify-between gap-1 bg-slate-900/70 px-2 py-1 rounded"><span class="truncate">${esc(name)}</span><span class="flex items-center gap-0.5 shrink-0">${kind === 'background' ? `<button type="button" onclick="splitMedia('${esc(name)}')" class="text-sky-400 hover:text-sky-200 px-1" title="Split long background into 15s clips"><i class="fa-solid fa-scissors text-[10px]"></i></button>` : ''}<button type="button" onclick="deleteMedia('${kind}', '${esc(name)}')" class="text-rose-400 hover:text-rose-200 px-1">&times;</button></span></li>`).join('')
+                    ? list.map(name => `<li class="flex items-center justify-between gap-1 bg-slate-900/70 px-2 py-1 rounded"><span class="truncate">${esc(name)}</span><span class="flex items-center gap-0.5 shrink-0">${kind === 'background' ? `<button type="button" data-action="split" data-filename="${esc(name)}" class="text-sky-400 hover:text-sky-200 px-1" title="Split long background into 15s clips"><i class="fa-solid fa-scissors text-[10px]"></i></button>` : ''}<button type="button" data-action="delete" data-filename="${esc(name)}" class="text-rose-400 hover:text-rose-200 px-1">&times;</button></span></li>`).join('')
                     : '<li class="text-slate-500">Empty</li>';
+                for (const button of el.querySelectorAll('button[data-filename]')) {
+                    button.addEventListener('click', () => {
+                        if (button.dataset.action === 'split') splitMedia(button.dataset.filename);
+                        else deleteMedia(kind, button.dataset.filename);
+                    });
+                }
             };
             renderFileList('bgFilesList', 'background', pool.backgrounds || []);
             renderFileList('musicFilesList', 'music', pool.music || []);
@@ -714,35 +719,12 @@
             loadOverview();
         }
 
-        const SECRET_STORAGE_KEYS = {
-            secTgToken: 'automap-agent-tg-token',
-            secTgChatId: 'automap-agent-tg-chat-id',
-            secYtApiKey: 'automap-agent-yt-api-key',
-            secGeminiApiKey: 'automap-gemini-api-key',
-            secDeepseekApiKey: 'automap-deepseek-api-key',
-            secTavilyApiKey: 'automap-tavily-api-key',
-        };
-
-        function saveLocalSecret(id, val) {
+        function clearLegacyAgentSecrets() {
             try {
-                const key = SECRET_STORAGE_KEYS[id];
-                if (!key) return;
-                if (val) localStorage.setItem(key, val);
-                else localStorage.removeItem(key);
+                for (const key of ['automap-agent-tg-token', 'automap-agent-tg-chat-id', 'automap-agent-yt-api-key']) {
+                    localStorage.removeItem(key);
+                }
             } catch (_) {}
-        }
-
-        function initLocalSecrets() {
-            Object.entries(SECRET_STORAGE_KEYS).forEach(([id, storageKey]) => {
-                const el = document.getElementById(id);
-                if (!el) return;
-                try {
-                    const saved = localStorage.getItem(storageKey);
-                    if (saved) el.value = saved;
-                } catch (_) {}
-                el.addEventListener('input', () => saveLocalSecret(id, el.value.trim()));
-                el.addEventListener('change', () => saveLocalSecret(id, el.value.trim()));
-            });
         }
 
         function toggleSecretVisibility(inputId, iconId) {
@@ -776,12 +758,9 @@
             });
             const data = await res.json();
             if (res.ok) {
-                if (tok) saveLocalSecret('secTgToken', tok);
-                if (cid) saveLocalSecret('secTgChatId', cid);
-                if (ytk) saveLocalSecret('secYtApiKey', ytk);
-                if (gmk) saveLocalSecret('secGeminiApiKey', gmk);
-                if (dsk) saveLocalSecret('secDeepseekApiKey', dsk);
-                if (tvk) saveLocalSecret('secTavilyApiKey', tvk);
+                for (const id of ['secTgToken', 'secYtApiKey', 'secGeminiApiKey', 'secDeepseekApiKey', 'secTavilyApiKey']) {
+                    document.getElementById(id).value = '';
+                }
                 showAgentToast('Keys saved! Agent will pick them up automatically.');
             } else {
                 showAgentToast(data.error || 'Failed to save keys', true);
@@ -882,7 +861,7 @@
             history.replaceState(null, '', location.pathname);
         }
 
-        initLocalSecrets();
+        clearLegacyAgentSecrets();
         loadOverview();
         setInterval(loadOverview, 15000);
     </script>

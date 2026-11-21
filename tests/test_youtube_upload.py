@@ -106,7 +106,7 @@ def test_desktop_client_requires_localhost(web, tmp_path):
         'client_secret': (io.BytesIO(json.dumps({'installed': CLIENT['web']}).encode()), 'secret.json')})
     # Session cookies are scoped to localhost; host change also invalidates CSRF.
     assert response.status_code == 401
-    client.post('/login', base_url='https://host.test', data={'login': 'deltaaa', 'password': 'deltaaa00!'})
+    client.post('/login', base_url='https://host.test', data={'login': 'test-admin', 'password': 'test-only-password'})
     token = client.get('/api/youtube/status', base_url='https://host.test').json['csrf_token']
     response = client.post('/api/youtube/connect', base_url='https://host.test', headers={'X-YouTube-CSRF': token}, data={
         'client_secret': (io.BytesIO(json.dumps({'installed': CLIENT['web']}).encode()), 'secret.json')})

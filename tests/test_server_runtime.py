@@ -30,7 +30,7 @@ def runtime(monkeypatch):
     monkeypatch.delenv("PORT", raising=False)
     serve = Mock()
     monkeypatch.setitem(sys.modules, "waitress", SimpleNamespace(serve=serve))
-    return SimpleNamespace(debug=True, run=Mock()), serve
+    return SimpleNamespace(debug=True, config={"MAX_CONTENT_LENGTH": 1024}, run=Mock()), serve
 
 
 def test_production_uses_waitress(runtime, monkeypatch):
@@ -40,13 +40,13 @@ def test_production_uses_waitress(runtime, monkeypatch):
     server_runtime.run_app(app)
     assert app.debug is False
     app.run.assert_not_called()
-    serve.assert_called_once_with(app, host="0.0.0.0", port=5051, threads=8, channel_timeout=600)
+    serve.assert_called_once_with(app, host="127.0.0.1", port=5051, threads=8, channel_timeout=600, max_request_body_size=1024)
 
 
 def test_development_uses_flask(runtime):
     app, serve = runtime
     server_runtime.run_app(app)
-    app.run.assert_called_once_with(host="0.0.0.0", port=5000, debug=True)
+    app.run.assert_called_once_with(host="127.0.0.1", port=5000, debug=False)
     serve.assert_not_called()
 
 
@@ -55,7 +55,7 @@ def test_only_exact_true_enables_production(runtime, monkeypatch, value):
     app, serve = runtime
     monkeypatch.setenv("SERVER", value)
     server_runtime.run_app(app)
-    app.run.assert_called_once_with(host="0.0.0.0", port=5000, debug=True)
+    app.run.assert_called_once_with(host="127.0.0.1", port=5000, debug=False)
     serve.assert_not_called()
 
 
@@ -73,5 +73,11 @@ def test_environment_overrides_dotenv(runtime, monkeypatch):
     monkeypatch.setenv("SERVER", "FALSE")
     monkeypatch.setenv("PORT", "5001")
     server_runtime.run_app(app)
-    app.run.assert_called_once_with(host="0.0.0.0", port=5001, debug=True)
+    app.run.assert_called_once_with(host="127.0.0.1", port=5001, debug=False)
     serve.assert_not_called()
+
+def test_bind_host_can_be_configured(runtime, monkeypatch):
+    app, _serve = runtime
+    monkeypatch.setenv("BIND_HOST", "0.0.0.0")
+    server_runtime.run_app(app)
+    app.run.assert_called_once_with(host="0.0.0.0", port=5000, debug=False)

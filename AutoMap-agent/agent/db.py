@@ -52,7 +52,13 @@ class AgentDB:
 
     def __init__(self, db_path: str | Path | None = None) -> None:
         self.path = Path(db_path) if db_path is not None else default_db_path()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            database = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            pass
+        else:
+            os.close(database)
         self.init_schema()
 
     @contextmanager
@@ -152,6 +158,7 @@ class AgentDB:
                 );
                 """
             )
+            conn.execute("BEGIN IMMEDIATE")
             self._ensure_column(conn, "competitor_videos", "likes", "INTEGER NOT NULL DEFAULT 0")
             self._ensure_column(conn, "competitor_videos", "comments", "INTEGER NOT NULL DEFAULT 0")
             self._ensure_column(conn, "experiments", "avg_view_duration_sec", "REAL")

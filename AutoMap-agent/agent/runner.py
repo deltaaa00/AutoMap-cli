@@ -377,9 +377,7 @@ class AgentRunner:
                 log.warning("Could not render clean reveal base map for %s", zoom_key, exc_info=True)
         if effective_reveal and not reveal_clean_map_file:
             effective_reveal = False
-            effective_zoom = False
-            effective_zoom_out = False
-            log.warning("Skipping zoom/reveal for %s because its clean map is unavailable", zoom_key)
+            log.warning("Skipping reveal for %s because its clean map is unavailable", zoom_key)
 
         duration = max(9, min(15, int(cfg.get("video_duration") or 11)))
         render_extra: dict[str, Any] = {

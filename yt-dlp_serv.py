@@ -15,6 +15,7 @@
 import base64
 import importlib
 import io
+import json
 import logging
 import math
 import os
@@ -26,12 +27,28 @@ import tempfile
 import time
 import uuid
 from functools import lru_cache
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlencode
 
 from flask import Flask, request, jsonify, send_file
+from PIL import Image, ImageOps, UnidentifiedImageError
+from media_inputs import MEDIA_STORAGE_DIR, open_upload_image, youtube_video_url
 from render_progress import RenderProgress
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 88 * 1024 * 1024
+
+
+@app.before_request
+def validate_worker_json():
+    if request.method == 'POST' and request.is_json:
+        if not isinstance(request.get_json(silent=True), dict):
+            return jsonify(status='error', error='Request body must be a JSON object.'), 400
+
+
+@app.errorhandler(413)
+def request_too_large(_error):
+    return jsonify(status='error', error='Upload exceeds the total request size limit.'), 413
+
 render_progress = RenderProgress()
 
 
@@ -43,12 +60,12 @@ def get_render_progress(render_id):
     response.headers['Cache-Control'] = 'no-store'
     return response, 200 if result else 404
 
-STORAGE_DIR = "/tmp/automap_storage"
+STORAGE_DIR = MEDIA_STORAGE_DIR
 DOWNLOADS = os.path.join(STORAGE_DIR, "downloads")
 CUT_DIR = os.path.join(STORAGE_DIR, "cut")
 RENDER_DIR = os.path.join(STORAGE_DIR, "render")
 
-os.makedirs(STORAGE_DIR, exist_ok=True)
+os.makedirs(STORAGE_DIR, mode=0o700, exist_ok=True)
 os.makedirs(DOWNLOADS, exist_ok=True)
 os.makedirs(CUT_DIR, exist_ok=True)
 os.makedirs(RENDER_DIR, exist_ok=True)
@@ -61,8 +78,6 @@ MAX_MATERIAL_BYTES = 15 * 1024 * 1024
 #   h264_nvenc         - NVIDIA GPUs
 #   h264_videotoolbox  - Apple Silicon chips
 ALLOWED_CODECS = ("libx264", "h264_nvenc", "h264_videotoolbox")
-_OG_TITLE_RE = re.compile(r'<meta\s+property="og:title"\s+content="([^"]+)"')
-_HTML_TITLE_RE = re.compile(r'<title>(.*?)</title>')
 _SAFE_TITLE_RE = re.compile(r'[^\w\-]')
 _AUDIO_TITLE_RE = re.compile(r'[\w\-]+')
 
@@ -104,7 +119,8 @@ def _convert_uploaded_audio(raw, start=None, duration=None):
         with open(source, 'wb') as stream:
             stream.write(raw)
         command = [FFMPEG_BINARY, '-hide_banner', '-loglevel', 'error', '-nostdin',
-                   '-protocol_whitelist', 'file,pipe']
+                   '-protocol_whitelist', 'file',
+                   '-format_whitelist', 'mp3,wav,mov,aac,ogg,flac,matroska,webm,aiff']
         if start is not None:
             command += ['-ss', str(start)]
         command += ['-i', source, '-map', '0:a:0', '-vn']
@@ -194,31 +210,9 @@ def cleanup_old_files(max_age_seconds=1800):
             except FileNotFoundError:
                 pass  # Another request may have removed or renamed the file.
 
-def _get_song_title(url: str) -> str | None:
-    """Try to extract the song title from the given URL."""
-    import requests
-    
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-
-        match = _OG_TITLE_RE.search(response.text)
-        if match:
-            return match.group(1)
-
-        # Fall back to the page title when Open Graph metadata is unavailable.
-        match_title = _HTML_TITLE_RE.search(response.text)
-        if match_title:
-            return match_title.group(1)
-
-    except requests.RequestException:
-        return None
-
-
 @app.route('/api/music_download/', methods=['POST'])
 @app.route('/api/music_download', methods=['POST'])
 def music_download():
-    cleanup_old_files()  # Clean up old files before processing the new request
     """Download a video's audio, convert it to mp3, and return it as base64.
 
     Request JSON:
@@ -231,47 +225,40 @@ def music_download():
         { "status": "error", "error": "<message>" }
     """
     data = request.get_json(silent=True) or {}
-    raw_url = data.get('url') or ''
-    if not isinstance(raw_url, str):
-        return jsonify(status='error', error='URL must be an HTTP or HTTPS address.'), 400
-    url = raw_url.strip()
-    if not url:
-        return jsonify({"status": "error", "error": "Missing 'url' in request body."}), 400
     try:
-        parsed_url = urlsplit(url)
-        valid_url = parsed_url.scheme in ('http', 'https') and bool(parsed_url.hostname)
-    except ValueError:
-        valid_url = False
-    if not valid_url:
-        return jsonify(status='error', error='URL must be an HTTP or HTTPS address.'), 400
+        url = youtube_video_url(data.get('url'))
+    except ValueError as error:
+        return jsonify(status='error', error=str(error)), 400
+    cookies = data.get('cookies') or ''
+    if not isinstance(cookies, str) or len(cookies.encode('utf-8')) > 256 * 1024:
+        return jsonify(status='error', error='Invalid YouTube cookies file.'), 400
 
-    # yt-dlp with `-x` writes to a temp file, so pipe through the temp dir and
-    # read the produced .mp3 back. `-o -` is unreliable when extracting audio.
-
-    cookies = str(data.get('cookies') or '').strip('\r\n')
+    cleanup_old_files()
     download_dir = tempfile.mkdtemp(prefix="automap_download_")
-    cookie_args = []
-    if cookies:
-        cookie_path = os.path.join(download_dir, "cookies.txt")
-        with open(cookie_path, "w", encoding="utf-8") as cf:
-            cf.write(cookies + "\n")
-        cookie_args = ["--cookies", cookie_path]
-    command = [
-        "yt-dlp",
-        "--remote-components", "ejs:github",
-        *cookie_args,
-        "-f", "ba[ext=m4a]/ba",
-        "-x",
-        "--audio-format", "mp3",
-        "--audio-quality", "0",
-        "--no-playlist",
-        "-o", os.path.join(download_dir, "track.%(ext)s"),
-        "--",
-        url,
-    ]
-
     try:
-        subprocess.run(command, capture_output=True, check=True, timeout=120)
+        cookie_args = []
+        if cookies:
+            cookie_path = os.path.join(download_dir, "cookies.txt")
+            with open(cookie_path, "w", encoding="utf-8") as cookie_file:
+                cookie_file.write(cookies.strip('\r\n') + "\n")
+            cookie_args = ["--cookies", cookie_path]
+        command = [
+            "yt-dlp",
+            "--ignore-config",
+            "--use-extractors", "youtube",
+            "--no-simulate", "--print", "after_move:%(title)j",
+            "--max-filesize", str(MAX_MATERIAL_BYTES),
+            *cookie_args,
+            "-f", "ba[ext=m4a]/ba",
+            "-x",
+            "--audio-format", "mp3",
+            "--audio-quality", "0",
+            "--no-playlist",
+            "-o", os.path.join(download_dir, "track.%(ext)s"),
+            "--",
+            url,
+        ]
+        result = subprocess.run(command, capture_output=True, check=True, timeout=120)
 
         # Find the produced mp3 inside the temp dir.
         mp3_path = None
@@ -296,7 +283,12 @@ def music_download():
 
         # Page titles are display labels, not unique track identifiers. Keep each
         # download independent from previous tracks and their saved cuts.
-        title = f"{_filename_stem(_get_song_title(url) or 'downloaded_audio')}_{uuid.uuid4().hex[:12]}"
+        try:
+            source_title = json.loads(result.stdout.decode('utf-8').strip())
+        except (ValueError, AttributeError):
+            source_title = None
+        stem = _filename_stem(source_title) if isinstance(source_title, str) and source_title else 'downloaded_audio'
+        title = f"{stem}_{uuid.uuid4().hex[:12]}"
         base64_audio = base64.b64encode(audio).decode("utf-8")
         new_mp3_path = os.path.join(DOWNLOADS, f"{title}.mp3")
         # Temporary downloads and persistent storage may be separate mounts.
@@ -323,6 +315,8 @@ def music_download():
                              'Upload fresh YouTube account cookies. If they are already fresh, '
                              'YouTube may also be challenging the server connection; '
                              'a correctly formatted cookies file alone cannot guarantee access.')
+        else:
+            error_message = 'Unable to download this YouTube video. Check that it is available and within the size limit.'
         return jsonify({"status": "error",
                         "error": f"yt-dlp ERROR: {error_message}"}), 500
 
@@ -330,8 +324,9 @@ def music_download():
         return jsonify({"status": "error",
                         "error": "yt-dlp not found. Please ensure yt-dlp is installed."}), 500
 
-    except Exception as e:  # noqa: BLE001 - surface any failure to the client
-        return jsonify({"status": "error", "error": f"Unexpected error: {str(e)}"}), 500
+    except Exception:
+        app.logger.exception("Audio download failed")
+        return jsonify(status="error", error="Audio download failed."), 500
     finally:
         shutil.rmtree(download_dir, ignore_errors=True)
         
@@ -564,9 +559,7 @@ def _decode_reveal_mask(raw_mask: object, box_w: int, box_h: int):
     if not raw_bytes or len(raw_bytes) > MAX_MATERIAL_BYTES:
         return None
     try:
-        with Image.open(io.BytesIO(raw_bytes)) as mask_img:
-            if mask_img.width * mask_img.height > 20_000_000:
-                return None
+        with open_upload_image(io.BytesIO(raw_bytes), ('PNG',)) as mask_img:
             mask_resized = mask_img.convert('L').resize(
                 (box_w, box_h),
                 Image.Resampling.BILINEAR,
@@ -939,7 +932,10 @@ def make_video() -> tuple[object, int]:
     try:
         map_bytes = _decode_material(map_b64, "map_file")
         bg_bytes = _decode_material(background_b64, "background_video")
-        from PIL import Image, ImageOps, UnidentifiedImageError
+        with open_upload_image(io.BytesIO(map_bytes)) as map_image:
+            if min(map_image.size) < 2 or max(map_image.size) > 16 * min(map_image.size):
+                raise ValueError('Map image proportions are unsupported.')
+            map_image = map_image.convert('RGBA')
 
         def _decode_optional_image(field: str, label: str):
             raw_val = data.get(field)
@@ -947,9 +943,7 @@ def make_video() -> tuple[object, int]:
                 return None
             raw_bytes = _decode_material(str(raw_val), field)
             try:
-                with Image.open(io.BytesIO(raw_bytes)) as uploaded:
-                    if uploaded.width * uploaded.height > 20_000_000:
-                        raise ValueError(f'{label} image must be at most 20 megapixels.')
+                with open_upload_image(io.BytesIO(raw_bytes)) as uploaded:
                     return uploaded.convert('RGBA')
             except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
                 raise ValueError(f'{label} must be a valid image.')
@@ -960,6 +954,8 @@ def make_video() -> tuple[object, int]:
         top_left_custom_img = _decode_optional_image('top_left_sticker_image', 'Top-left sticker')
         top_right_custom_img = _decode_optional_image('top_right_sticker_image', 'Top-right sticker')
         reveal_clean_map_img = _decode_optional_image('reveal_clean_map_file', 'Reveal clean map')
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        return jsonify(status='error', error='Map must be a valid image.'), 400
     except ValueError as ve:
         return jsonify({"status": "error", "error": str(ve)}), 400
 
@@ -988,6 +984,7 @@ def make_video() -> tuple[object, int]:
 
     map_path = bg_path = audio_temp_path = prepared_bg_path = None
     media_resources = []
+    render_complete = False
     try:
         from moviepy import (VideoFileClip, CompositeVideoClip,
                              ImageClip, AudioFileClip)
@@ -996,8 +993,8 @@ def make_video() -> tuple[object, int]:
 
         # Write the decoded materials to temp files on disk.
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as map_file_temp:
-            map_file_temp.write(map_bytes)
             map_path = map_file_temp.name
+            map_image.save(map_file_temp, format="PNG")
 
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as bg_video_temp:
             bg_video_temp.write(bg_bytes)
@@ -1005,8 +1002,8 @@ def make_video() -> tuple[object, int]:
 
         if audio_bytes:
             with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as audio_temp:
-                audio_temp.write(audio_bytes)
                 audio_temp_path = audio_temp.name
+                audio_temp.write(_convert_uploaded_audio(audio_bytes, duration=30))
                 audio_path = audio_temp_path
 
         # Target clip length: 1..30 seconds (default 8.0), never longer than the source clips.
@@ -1016,20 +1013,16 @@ def make_video() -> tuple[object, int]:
             TARGET = 8.0
         TARGET = max(1.0, min(30.0, TARGET))
 
-        source_video = VideoFileClip(bg_path, audio=False)
-        source_duration = source_video.duration or TARGET
-        source_video.close()
-        bg_duration = min(TARGET, source_duration)
-
         # Fill the portrait frame without stretching the source footage; FFmpeg
         # scales, crops and softens natively instead of per frame in Python.
         canvas_w, canvas_h = 1080, 1920
         effects = data.get('visual_effects', True) is not False
         with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as prepared_temp:
             prepared_bg_path = prepared_temp.name
-        _prepare_background(bg_path, prepared_bg_path, bg_duration, (canvas_w, canvas_h), effects)
+        _prepare_background(bg_path, prepared_bg_path, TARGET, (canvas_w, canvas_h), effects)
         background_video = VideoFileClip(prepared_bg_path, audio=False)
         media_resources.append(background_video)
+        bg_duration = min(TARGET, background_video.duration or TARGET)
         background_video = background_video.with_duration(bg_duration)
         dynamic_layers = {id(background_video)}
         dynamic_fade_timing = {}
@@ -1476,10 +1469,14 @@ def make_video() -> tuple[object, int]:
         }
         if rust_warning:
             payload["warning"] = rust_warning
+        render_complete = True
         return jsonify(payload), 200
-    
-    except Exception as e:
-        return jsonify({"status": "error", "error": f"Error processing video: {str(e)}"}), 500
+
+    except ValueError as error:
+        return jsonify(status='error', error=str(error)), 400
+    except Exception:
+        app.logger.exception("Video rendering failed")
+        return jsonify(status='error', error='Error processing video.'), 500
 
     finally:
         # Release FFmpeg readers before removing their input files.
@@ -1488,8 +1485,9 @@ def make_video() -> tuple[object, int]:
                 resource.close()
             except Exception:
                 pass
-        # Always clean up the temp input files.
-        for p in (map_path, bg_path, audio_temp_path, prepared_bg_path):
+        # A failed render must not leave a partially encoded file available.
+        incomplete_output = None if render_complete else output_path
+        for p in (map_path, bg_path, audio_temp_path, prepared_bg_path, incomplete_output):
             if p and os.path.exists(p):
                 try:
                     os.remove(p)
@@ -1520,7 +1518,7 @@ def download_video():
     render_root = os.path.realpath(RENDER_DIR)
     if os.path.commonpath([candidate, render_root]) != render_root:
         return jsonify({"status": "error", "error": "Invalid path."}), 400
-    if not os.path.isfile(candidate):
+    if not candidate.lower().endswith('.mp4') or not os.path.isfile(candidate):
         return jsonify({"status": "error", "error": "File not found."}), 404
 
     return send_file(

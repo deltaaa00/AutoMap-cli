@@ -40,15 +40,15 @@ class AutoMapClient:
         session: requests.Session | None = None,
     ) -> None:
         self.base_url = (base_url or os.environ.get("AUTOMAP_URL") or "http://host.docker.internal:3000").rstrip("/")
-        self.login_user = login if login is not None else os.environ.get("WEB_LOGIN", "deltaaa")
-        self.login_password = password if password is not None else os.environ.get("WEB_PASSWORD", "deltaaa00!")
+        self.login_user = login if login is not None else os.environ.get("WEB_LOGIN", "")
+        self.login_password = password if password is not None else os.environ.get("WEB_PASSWORD", "")
         self.timeout = float(timeout)
         self.http = session or requests.Session()
         self._logged_in = False
 
     def ensure_auth(self) -> None:
         """Sign in via /login when the web service runs with SERVER=TRUE."""
-        if self._logged_in:
+        if self._logged_in or not (self.login_user and self.login_password):
             return
         try:
             resp = self.http.post(

@@ -110,3 +110,47 @@ def test_agent_dashboard_and_api_endpoints(tmp_path, monkeypatch):
     assert up_resp.status_code == 200 and "beat.mp3" in up_resp.get_json()["saved"]
     del_resp = client.post("/api/agent/media/delete", json={"kind": "music", "filename": "beat.mp3"})
     assert del_resp.status_code == 200
+
+
+def test_oauth_callback_requires_the_browser_that_started_it(tmp_path, monkeypatch):
+    import io
+    import json
+    from urllib.parse import parse_qs, urlsplit
+
+    monkeypatch.setitem(web.app.config, "AGENT_DB_PATH", str(tmp_path / "agent.db"))
+    monkeypatch.setattr(web, "AUTH_ENABLED", False)
+    oauth = {
+        "web": {
+            "client_id": "test-client",
+            "client_secret": "test-secret",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+        },
+    }
+    client = web.app.test_client()
+
+    def connect():
+        return client.post("/api/agent/youtube/connect", data={
+            "client_secret": (io.BytesIO(json.dumps(oauth).encode()), "client_secret.json"),
+        })
+
+    response = connect()
+    assert response.status_code == 200
+    params = parse_qs(urlsplit(response.json["authorization_url"]).query)
+    assert params["code_challenge_method"] == ["S256"]
+    callback = f"/api/agent/youtube/callback?state={params['state'][0]}&error=access_denied"
+    assert web.app.test_client().get(callback).location == "/?youtube=failed"
+    assert client.get(callback).location == "/?youtube=denied"
+    assert client.get(callback).location == "/?youtube=failed"
+
+    oauth["web"]["token_uri"] = "https://example.test/token"
+    assert connect().status_code == 400
+
+
+def test_cross_origin_agent_mutations_are_rejected(tmp_path, monkeypatch):
+    monkeypatch.setitem(web.app.config, "AGENT_DB_PATH", str(tmp_path / "agent.db"))
+    monkeypatch.setattr(web, "AUTH_ENABLED", False)
+    response = web.app.test_client().post(
+        "/api/agent/youtube/disconnect", headers={"Origin": "https://other.example"},
+    )
+    assert response.status_code == 403

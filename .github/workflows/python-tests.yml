@@ -16,9 +16,12 @@ name: Run Pytest
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "dev"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "dev"]
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -26,6 +29,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -40,6 +45,14 @@ jobs:
         run: python -m playwright install --with-deps chromium
       - name: Run tests and measure coverage
         run: python -m pytest --cov --cov-report=term-missing --cov-report=xml
+      - name: Run Agent tests
+        env:
+          PYTHONPATH: AutoMap-agent
+        run: |
+          python -m pip install -r AutoMap-agent/requirements.txt
+          python -m pytest AutoMap-agent/tests
+      - name: Run frontend tests
+        run: node --test tests/frontend/*.test.cjs
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4

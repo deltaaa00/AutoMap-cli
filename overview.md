@@ -95,7 +95,7 @@ working key; media operations require additional tools and integration checks.
 - The worker uses yt-dlp, ffmpeg, pydub, and MoviePy. Its Dockerfile installs
   ffmpeg, curl, and Node.js. Software rendering defaults to `libx264`; hardware
   codecs require compatible host support.
-- Persistent media paths are under `/tmp/automap_storage/{downloads,cut,render}`.
+- The worker stores media under `instance/media` for native runs and `/tmp/automap_storage` in Compose.
   Downloads use a separate temporary directory per request before storing MP3s.
   Music-download requests trigger cleanup of files older than 30 minutes.
 - Cutting accepts `MM:SS` and produces an eight-second clip. Track titles are

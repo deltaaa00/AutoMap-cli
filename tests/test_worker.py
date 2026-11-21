@@ -13,27 +13,21 @@
 # limitations under the License.
 
 import base64
+import json
+import io
 import os
 from pathlib import Path
 import subprocess
 from unittest.mock import MagicMock, Mock
 
 import pytest
-import requests
+from PIL import Image
 
 
-@pytest.mark.parametrize('html,expected', [
-    ('<meta property="og:title" content="My song"><title>Other</title>', 'My song'),
-    ('<title>Fallback song</title>', 'Fallback song'), ('<html></html>', None),
-])
-def test_song_title_metadata(worker, monkeypatch, html, expected):
-    monkeypatch.setattr(requests, 'get', Mock(return_value=Mock(text=html)))
-    assert worker._get_song_title('https://example.test') == expected
-
-
-def test_song_title_network_error(worker, monkeypatch):
-    monkeypatch.setattr(requests, 'get', Mock(side_effect=requests.Timeout()))
-    assert worker._get_song_title('https://example.test') is None
+def sample_map():
+    output = io.BytesIO()
+    Image.new('RGBA', (8, 8)).save(output, format='PNG')
+    return base64.b64encode(output.getvalue()).decode()
 
 
 def test_cleanup_removes_only_expired_files(worker, monkeypatch):
@@ -60,11 +54,14 @@ def test_download_stores_mp3_and_cleans_temporary_files(worker, monkeypatch, tmp
     download = tmp_path / 'temporary-download'
     download.mkdir()
     monkeypatch.setattr(worker.tempfile, 'mkdtemp', lambda **kwargs: str(download))
-    run = Mock(side_effect=lambda *args, **kwargs: (download / 'track.mp3').write_bytes(b'mp3-data'))
+    def run_download(*args, **kwargs):
+        (download / 'track.mp3').write_bytes(b'mp3-data')
+        return Mock(stdout=json.dumps(title).encode())
+
+    run = Mock(side_effect=run_download)
     monkeypatch.setattr(worker.subprocess, 'run', run)
-    monkeypatch.setattr(worker, '_get_song_title', lambda url: title)
     monkeypatch.setattr(worker.uuid, 'uuid4', lambda: Mock(hex='0123456789abcdef'))
-    response = worker.app.test_client().post('/api/music_download/', json={'url': ' https://example.test/song '})
+    response = worker.app.test_client().post('/api/music_download/', json={'url': ' https://www.youtube.com/watch?v=videoId0001 '})
     assert response.status_code == 200, response.json
     expected_title = ('A_nice___song_' if title else 'downloaded_audio') + '_0123456789ab'
     assert response.json['title'] == expected_title
@@ -73,7 +70,7 @@ def test_download_stores_mp3_and_cleans_temporary_files(worker, monkeypatch, tmp
     assert not download.exists()
     command = run.call_args.args[0]
     assert command[0] == 'yt-dlp' and '--no-playlist' in command
-    assert command[-1] == 'https://example.test/song'
+    assert command[-1] == 'https://www.youtube.com/watch?v=videoId0001'
 
 
 @pytest.mark.parametrize('failure', [
@@ -85,7 +82,7 @@ def test_download_errors_cleanup(worker, monkeypatch, tmp_path, failure):
     folder.mkdir()
     monkeypatch.setattr(worker.tempfile, 'mkdtemp', lambda **kwargs: str(folder))
     monkeypatch.setattr(worker.subprocess, 'run', Mock(side_effect=failure))
-    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://example.test'})
+    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://www.youtube.com/watch?v=videoId0001'})
     assert response.status_code == 500 and response.json['status'] == 'error'
     assert not folder.exists()
 
@@ -102,7 +99,7 @@ def test_download_requires_url(worker, payload):
 def test_download_explains_youtube_authentication_failure(worker, monkeypatch, stderr, expected):
     failure = subprocess.CalledProcessError(1, 'yt-dlp', stderr=stderr)
     monkeypatch.setattr(worker.subprocess, 'run', Mock(side_effect=failure))
-    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://www.youtube.com/watch?v=test'})
+    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://www.youtube.com/watch?v=videoId0001'})
     assert response.status_code == 500
     assert expected in response.json['error']
 
@@ -113,11 +110,13 @@ def test_download_moves_audio_across_filesystems(worker, monkeypatch, tmp_path):
     download = tmp_path / 'temporary-download'
     download.mkdir()
     monkeypatch.setattr(worker.tempfile, 'mkdtemp', lambda **kwargs: str(download))
-    monkeypatch.setattr(worker.subprocess, 'run', Mock(
-        side_effect=lambda *args, **kwargs: (download / 'track.mp3').write_bytes(b'audio-data')))
-    monkeypatch.setattr(worker, '_get_song_title', lambda url: 'Selected_song')
+    def run_download(*args, **kwargs):
+        (download / 'track.mp3').write_bytes(b'audio-data')
+        return Mock(stdout=b'"Selected_song"')
+
+    monkeypatch.setattr(worker.subprocess, 'run', Mock(side_effect=run_download))
     monkeypatch.setattr(worker.os, 'rename', Mock(side_effect=OSError(errno.EXDEV, 'Invalid cross-device link')))
-    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://example.test/song'})
+    response = worker.app.test_client().post('/api/music_download', json={'url': 'https://www.youtube.com/watch?v=videoId0001'})
     assert response.status_code == 200, response.json
     assert response.json['title'].startswith('Selected_song_')
     assert (Path(worker.DOWNLOADS) / (response.json['title'] + '.mp3')).read_bytes() == b'audio-data'
@@ -173,9 +172,9 @@ def test_render_validation(worker, changes):
 
 @pytest.mark.parametrize('field', ['map_file', 'background_video', 'watermark_image'])
 def test_render_material_limit(worker, monkeypatch, field):
-    monkeypatch.setattr(worker, 'MAX_MATERIAL_BYTES', 3)
-    data = dict(map_file='eA==', background_video='eA==', video_title='test')
-    data[field] = base64.b64encode(b'1234').decode()
+    monkeypatch.setattr(worker, 'MAX_MATERIAL_BYTES', 256)
+    data = dict(map_file=sample_map(), background_video='eA==', video_title='test')
+    data[field] = base64.b64encode(b'x' * 257).decode()
     response = worker.app.test_client().post('/api/render_video', json=data)
     assert response.status_code == 400 and '15 MB' in response.json['error']
 
@@ -188,7 +187,7 @@ def test_render_material_limit(worker, monkeypatch, field):
     {'watermark_image': base64.b64encode(b'not an image').decode()},
 ])
 def test_invalid_watermark_rejected_before_render(worker, settings):
-    data = dict(map_file='eA==', background_video='eA==', video_title='test', **settings)
+    data = dict(map_file=sample_map(), background_video='eA==', video_title='test', **settings)
     response = worker.app.test_client().post('/api/render_video', json=data)
     assert response.status_code == 400, response.json
 
@@ -202,10 +201,10 @@ def test_failed_render_cleans_material_files(worker, monkeypatch, tmp_path):
         return file
     monkeypatch.setattr(worker.tempfile, 'NamedTemporaryFile', temporary)
     response = worker.app.test_client().post('/api/render_video', json={
-        'map_file': 'data:image/png;base64,eA==', 'background_video': 'eA==', 'video_title': 'test',
+        'map_file': sample_map(), 'background_video': 'eA==', 'video_title': 'test',
     })
     assert response.status_code == 500
-    assert len(created) == 2 and all(not Path(path).exists() for path in created)
+    assert len(created) == 3 and all(not Path(path).exists() for path in created)
 
 
 @pytest.mark.parametrize('title', ['', 'a' * 1001])
@@ -288,7 +287,7 @@ def test_cut_rejects_start_beyond_track(worker, monkeypatch):
 
 def test_render_requires_audio_when_music_is_enabled(worker):
     response = worker.app.test_client().post('/api/render_video', json={
-        'map_file': 'eA==', 'background_video': 'eA==', 'video_title': 'Headline',
+        'map_file': sample_map(), 'background_video': 'eA==', 'video_title': 'Headline',
         'audio_title': '', 'include_audio': True,
     })
     assert response.status_code == 400

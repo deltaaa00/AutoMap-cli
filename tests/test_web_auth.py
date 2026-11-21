@@ -24,8 +24,10 @@ from web_auth import init_web_auth
 @pytest.fixture
 def auth_app(tmp_path, monkeypatch):
     monkeypatch.setenv('SERVER', 'TRUE')
-    for name in ('WEB_LOGIN', 'WEB_PASSWORD', 'WEB_SECRET_KEY'):
-        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv('WEB_LOGIN', 'test-admin')
+    monkeypatch.setenv('WEB_PASSWORD', 'test-only-password')
+    monkeypatch.delenv('WEB_SECRET_KEY', raising=False)
+    monkeypatch.delenv('WEB_COOKIE_SECURE', raising=False)
     monkeypatch.setenv('WEB_AUTH_SECRET_FILE', str(tmp_path / 'secret'))
 
     def create(settings=None):
@@ -61,18 +63,19 @@ def test_unauthenticated_pages_and_api(auth_app):
     assert page.status_code == 200
     assert b'<html lang="en">' in page.data
     assert b'Sign in' in page.data and b'Username' in page.data and b'Password' in page.data
-    failure = client.post('/login', data={'login': 'deltaaa', 'password': 'wrong'})
+    failure = client.post('/login', data={'login': 'test-admin', 'password': 'wrong'})
     assert failure.status_code == 401
     assert b'Invalid username or password.' in failure.data
     assert client.get('/api/status').status_code == 401
 
 
-def test_default_login_cookie_survives_new_client_and_restart(auth_app):
+def test_login_cookie_survives_new_client_and_restart(auth_app):
     first = auth_app().test_client()
-    response = first.post('/login', data={'login': 'deltaaa', 'password': 'deltaaa00!', 'next': '/studio'})
+    response = first.post('/login', data={'login': 'test-admin', 'password': 'test-only-password', 'next': '/studio'})
     assert response.location == '/studio'
     cookie_header = response.headers['Set-Cookie']
     assert 'Expires=' in cookie_header and 'HttpOnly' in cookie_header and 'SameSite=Lax' in cookie_header
+    assert 'Secure' in cookie_header
     cookie = first.get_cookie('session')
     restarted = auth_app().test_client()
     restarted.set_cookie('session', cookie.value)
@@ -88,14 +91,14 @@ def test_default_login_cookie_survives_new_client_and_restart(auth_app):
 
 def test_environment_credentials_and_rotation(auth_app, monkeypatch):
     first = auth_app().test_client()
-    first.post('/login', data={'login': 'deltaaa', 'password': 'deltaaa00!'})
+    first.post('/login', data={'login': 'test-admin', 'password': 'test-only-password'})
     old_cookie = first.get_cookie('session').value
     monkeypatch.setenv('WEB_LOGIN', 'owner')
     monkeypatch.setenv('WEB_PASSWORD', 'новий-secret')
     client = auth_app().test_client()
     client.set_cookie('session', old_cookie)
     assert client.get('/api/status').status_code == 401
-    assert client.post('/login', data={'login': 'deltaaa', 'password': 'deltaaa00!'}).status_code == 401
+    assert client.post('/login', data={'login': 'test-admin', 'password': 'test-only-password'}).status_code == 401
     assert client.post('/login', data={'login': 'owner', 'password': 'новий-secret'}).status_code == 302
     assert client.get('/api/status').status_code == 200
 
@@ -103,14 +106,21 @@ def test_environment_credentials_and_rotation(auth_app, monkeypatch):
 @pytest.mark.parametrize('target', ['https://evil.example', '//evil.example', '/\\evil.example'])
 def test_login_rejects_external_redirects(auth_app, target):
     response = auth_app().test_client().post('/login', data={
-        'login': 'deltaaa', 'password': 'deltaaa00!', 'next': target,
+        'login': 'test-admin', 'password': 'test-only-password', 'next': target,
     })
     assert response.location == '/'
 
 
 def test_dotenv_credentials_and_env_precedence(auth_app, monkeypatch):
     monkeypatch.setenv('WEB_LOGIN', 'environment-user')
+    monkeypatch.delenv('WEB_PASSWORD')
     client = auth_app({'WEB_LOGIN': 'dotenv-user', 'WEB_PASSWORD': 'dotenv-password'}).test_client()
     assert client.post('/login', data={
         'login': 'environment-user', 'password': 'dotenv-password',
     }).status_code == 302
+
+@pytest.mark.parametrize('password', ['', 'deltaaa00!'])
+def test_server_rejects_missing_and_legacy_passwords(auth_app, monkeypatch, password):
+    monkeypatch.setenv('WEB_PASSWORD', password)
+    with pytest.raises(RuntimeError, match='unique WEB_PASSWORD'):
+        auth_app()

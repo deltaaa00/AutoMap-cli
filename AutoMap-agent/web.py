@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import json
 import os
 import secrets
+import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -25,6 +27,7 @@ from flask import (
 from agent.db import AgentDB
 from agent.media_pool import MAX_MEDIA_BYTES, MAX_MEDIA_MB, MediaPool, split_background_video
 from agent.optimizer import AgentOptimizer
+from agent.private_files import session_secret, write_private_text
 from agent.telegram_bot import TelegramBot
 from agent.youtube_intel import AGENT_YOUTUBE_SCOPES
 
@@ -59,19 +62,39 @@ def parse_oauth_client_config(raw_obj: object) -> dict[str, Any]:
         raise ValueError("Invalid client_secret.json format.")
     for section in ("web", "installed"):
         block = raw_obj.get(section)
-        if isinstance(block, dict) and block.get("client_id") and block.get("client_secret"):
-            return {section: block}
+        if not isinstance(block, dict):
+            continue
+        if not all(isinstance(block.get(key), str) and block[key] for key in ("client_id", "client_secret")):
+            continue
+        if (block.get("auth_uri") != "https://accounts.google.com/o/oauth2/auth"
+                or block.get("token_uri") != "https://oauth2.googleapis.com/token"):
+            raise ValueError("The client secret file must use the standard Google OAuth endpoints.")
+        return {section: block}
     raise ValueError("client_secret.json must contain a 'web' or 'installed' OAuth client.")
 
 
 app = Flask(__name__, template_folder=str(BASE_DIR / "templates"))
-app.secret_key = (os.environ.get("AGENT_SECRET_KEY") or secrets.token_hex(32)).strip()
+instance_dir = Path(os.environ["AGENT_DB_PATH"]).parent if os.environ.get("AGENT_DB_PATH") else Path(app.instance_path)
+app.secret_key = session_secret(instance_dir / "agent-session-secret")
 app.config["MAX_CONTENT_LENGTH"] = 250 * 1024 * 1024
 
 SERVER_MODE = os.environ.get("AGENT_SERVER", "FALSE").strip().upper() in ("1", "TRUE", "YES", "ON")
 AUTH_USER = os.environ.get("AGENT_WEB_USERNAME", "admin").strip()
 AUTH_PASS = os.environ.get("AGENT_WEB_PASSWORD", "").strip()
-AUTH_ENABLED = SERVER_MODE and bool(AUTH_PASS)
+if SERVER_MODE and (not AUTH_USER or not AUTH_PASS):
+    raise RuntimeError("Set AGENT_WEB_USERNAME and AGENT_WEB_PASSWORD before enabling AGENT_SERVER.")
+AUTH_ENABLED = SERVER_MODE
+AUTH_IDENTITY = hmac.new(app.secret_key.encode(), (AUTH_USER + "\0" + AUTH_PASS).encode(), hashlib.sha256).hexdigest()
+app.config.update(
+    SESSION_COOKIE_NAME="automap_agent",
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=SERVER_MODE,
+)
+if not SERVER_MODE:
+    allowed_hosts = os.environ.get("AGENT_TRUSTED_HOSTS", "")
+    app.config["TRUSTED_HOSTS"] = ["localhost", "127.0.0.1", "[::1]"]
+    app.config["TRUSTED_HOSTS"].extend(host.strip() for host in allowed_hosts.split(",") if host.strip())
 
 
 def _get_db() -> AgentDB:
@@ -111,11 +134,20 @@ def _public_automap_url(cfg: dict[str, Any]) -> str:
 
 @app.before_request
 def _require_auth():
-    if not AUTH_ENABLED:
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        origin = request.headers.get("Origin")
+        try:
+            allowed_origin = not origin or urlsplit(origin).netloc == request.host
+        except ValueError:
+            allowed_origin = False
+        if not allowed_origin or request.headers.get("Sec-Fetch-Site") in ("cross-site", "same-site"):
+            return jsonify(status="error", error="Cross-origin requests are forbidden."), 403
+    if request.path.startswith("/api/") and request.is_json:
+        if not isinstance(request.get_json(silent=True), dict):
+            return jsonify(status="error", error="Request body must be a JSON object."), 400
+    if not AUTH_ENABLED or request.endpoint in ("login_page", "healthz"):
         return None
-    if request.endpoint in ("login_page", "logout_page", "api_agent_youtube_callback", "healthz"):
-        return None
-    if session.get("agent_authed") is True:
+    if session.get("agent_identity") == AUTH_IDENTITY:
         return None
     if request.path.startswith("/api/"):
         return jsonify(status="error", error="Authentication required."), 401
@@ -135,8 +167,9 @@ def login_page():
     if request.method == "POST":
         user = str(request.form.get("username") or "").strip()
         pwd = str(request.form.get("password") or "")
-        if hmac.compare_digest(user, AUTH_USER) and hmac.compare_digest(pwd, AUTH_PASS):
-            session["agent_authed"] = True
+        if hmac.compare_digest(user.encode(), AUTH_USER.encode()) and hmac.compare_digest(pwd.encode(), AUTH_PASS.encode()):
+            session.clear()
+            session["agent_identity"] = AUTH_IDENTITY
             return redirect(url_for("agent_home"))
         error = "Invalid username or password."
     return render_template("login.html", error=error)
@@ -144,7 +177,7 @@ def login_page():
 
 @app.post("/logout")
 def logout_page():
-    session.pop("agent_authed", None)
+    session.clear()
     return redirect(url_for("login_page"))
 
 
@@ -248,7 +281,9 @@ def api_agent_youtube_connect():
     uploaded = request.files.get("client_secret")
     if uploaded is None:
         return jsonify(status="error", error="Choose a client_secret.json file first."), 400
-    raw = uploaded.read(128 * 1024)
+    raw = uploaded.read(128 * 1024 + 1)
+    if len(raw) > 128 * 1024:
+        return jsonify(status="error", error="OAuth client file exceeds the size limit."), 400
     try:
         cfg_obj = parse_oauth_client_config(json.loads(raw.decode("utf-8")))
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
@@ -256,13 +291,17 @@ def api_agent_youtube_connect():
 
     redirect_uri = _oauth_redirect_uri()
     host = (urlsplit(redirect_uri).hostname or "").lower()
-    if "installed" in cfg_obj and host not in ("localhost", "127.0.0.1"):
+    if "installed" in cfg_obj and host not in ("localhost", "127.0.0.1", "::1"):
         return jsonify(
             status="error",
             error="Desktop app credentials require localhost. For a hosted site use a Web application client with the displayed Redirect URI.",
         ), 400
 
-    flow = Flow.from_client_config(cfg_obj, scopes=list(AGENT_YOUTUBE_SCOPES), redirect_uri=redirect_uri)
+    if urlsplit(redirect_uri).scheme != "https" and host not in ("localhost", "127.0.0.1", "::1"):
+        return jsonify(status="error", error="Hosted Google authorization requires HTTPS."), 400
+    flow = Flow.from_client_config(
+        cfg_obj, scopes=list(AGENT_YOUTUBE_SCOPES), redirect_uri=redirect_uri, autogenerate_code_verifier=True,
+    )
     state = secrets.token_urlsafe(24)
     auth_url, _ = flow.authorization_url(
         access_type="offline",
@@ -270,20 +309,29 @@ def api_agent_youtube_connect():
         prompt="consent",
         state=state,
     )
-    pending_path = _get_db().path.parent / "agent_oauth_pending.json"
-    pending_path.write_text(
+    old_state = session.get("agent_oauth_state")
+    if old_state:
+        _pending_oauth_path(old_state).unlink(missing_ok=True)
+    pending_path = _pending_oauth_path(state)
+    write_private_text(
+        pending_path,
         json.dumps(
             {
                 "state": state,
                 "config": cfg_obj,
                 "redirect_uri": redirect_uri,
-                "code_verifier": getattr(flow, "code_verifier", None),
+                "code_verifier": flow.code_verifier,
+                "created": time.time(),
             }
         ),
-        encoding="utf-8",
     )
     session["agent_oauth_state"] = state
     return jsonify(status="success", authorization_url=auth_url)
+
+
+def _pending_oauth_path(state: str) -> Path:
+    key = hashlib.sha256(state.encode()).hexdigest()
+    return _get_db().path.parent / "agent_oauth_pending" / f"{key}.json"
 
 
 @app.get("/api/agent/youtube/callback")
@@ -291,19 +339,19 @@ def api_agent_youtube_callback():
     """Complete Google OAuth flow for the agent and persist its credentials token."""
     from google_auth_oauthlib.flow import Flow
 
-    if request.args.get("error"):
-        return redirect("/?youtube=denied")
-    state = str(request.args.get("state") or "")
-    code = str(request.args.get("code") or "")
-    pending_path = _get_db().path.parent / "agent_oauth_pending.json"
-    if not code or not state or not pending_path.is_file():
+    state = request.args.get("state", "")
+    expected = session.get("agent_oauth_state")
+    if not expected or not state or not hmac.compare_digest(state.encode(), expected.encode()):
         return redirect("/?youtube=failed")
+    session.pop("agent_oauth_state", None)
+    pending_path = _pending_oauth_path(expected)
     try:
         pending = json.loads(pending_path.read_text(encoding="utf-8"))
-        if pending.get("state") != state or (
-            session.get("agent_oauth_state") and session.get("agent_oauth_state") != state
-        ):
+        pending_path.unlink()
+        if time.time() - pending["created"] > 600:
             return redirect("/?youtube=failed")
+        if request.args.get("error") or not request.args.get("code"):
+            return redirect("/?youtube=denied")
         flow = Flow.from_client_config(
             pending["config"],
             scopes=list(AGENT_YOUTUBE_SCOPES),
@@ -312,12 +360,10 @@ def api_agent_youtube_callback():
         )
         if pending.get("code_verifier"):
             flow.code_verifier = pending["code_verifier"]
-        flow.fetch_token(code=code)
-        tok_path = _token_path()
-        tok_path.parent.mkdir(parents=True, exist_ok=True)
-        tok_path.write_text(flow.credentials.to_json(), encoding="utf-8")
-        pending_path.unlink(missing_ok=True)
-        session.pop("agent_oauth_state", None)
+        flow.fetch_token(code=request.args["code"])
+        if not flow.credentials.refresh_token:
+            return redirect("/?youtube=failed")
+        write_private_text(_token_path(), flow.credentials.to_json())
         return redirect("/?youtube=connected")
     except Exception:
         return redirect("/?youtube=failed")
@@ -328,6 +374,9 @@ def api_agent_youtube_disconnect():
     """Remove persisted agent YouTube OAuth token."""
     tok_path = _token_path()
     tok_path.unlink(missing_ok=True)
+    state = session.pop("agent_oauth_state", None)
+    if state:
+        _pending_oauth_path(state).unlink(missing_ok=True)
     return jsonify(status="success", message="Agent YouTube OAuth disconnected.")
 
 
@@ -567,4 +616,4 @@ def api_agent_video(exp_id: int):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "4000"))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host=os.environ.get("AGENT_HOST", "127.0.0.1"), port=port, debug=False)

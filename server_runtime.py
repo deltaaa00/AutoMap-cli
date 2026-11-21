@@ -28,11 +28,13 @@ def run_app(app, default_port=5000):
         return os.environ.get(name, file_settings.get(name) or default)
 
     port = int(setting("PORT", str(default_port)))
+    host = setting("BIND_HOST", "127.0.0.1")
     production = setting("SERVER", "FALSE") == "TRUE"
     if production:
         from waitress import serve
 
         app.debug = False
-        serve(app, host="0.0.0.0", port=port, threads=8, channel_timeout=600)
+        serve(app, host=host, port=port, threads=8, channel_timeout=600,
+              max_request_body_size=app.config.get("MAX_CONTENT_LENGTH") or 64 * 1024 * 1024)
     else:
-        app.run(host="0.0.0.0", port=port, debug=True)
+        app.run(host=host, port=port, debug=False)

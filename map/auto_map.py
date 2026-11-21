@@ -765,7 +765,7 @@ def _build_extrema_highlight_layer(
             pix_mask = np.zeros(w * h, dtype=np.uint8)
             pix_mask[flat[ids == region_idx]] = 255
             if pix_mask.any():
-                mask = Image.fromarray(pix_mask.reshape((h, w)), mode="L")
+                mask = Image.fromarray(pix_mask.reshape((h, w)))
         elif wc_interior_crisp is not None and 1 <= region_idx <= len(coords_list):
             max_px = int(0.08 * w * h)
             filled = _floodfill_bool_mask(wc_interior_crisp, coords_list[region_idx - 1], max_px)
@@ -776,7 +776,7 @@ def _build_extrema_highlight_layer(
                     if filled is not None and filled.any():
                         break
             if filled is not None and filled.any():
-                mask = Image.fromarray((filled.astype(np.uint8) * 255), mode="L")
+                mask = Image.fromarray(filled.astype(np.uint8) * 255)
 
         if mask is None:
             continue

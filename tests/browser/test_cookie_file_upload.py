@@ -15,6 +15,7 @@
 """Cookies remain parseable across file import, browser storage and both APIs."""
 from http.cookiejar import MozillaCookieJar
 from pathlib import Path
+from subprocess import CompletedProcess
 
 import pytest
 
@@ -45,10 +46,10 @@ def test_cookie_file_reaches_ytdlp_without_losing_empty_values(studio, worker, m
         received.append({cookie.name: cookie.value for cookie in jar})
         output = command[command.index('-o') + 1].replace('%(ext)s', 'mp3')
         Path(output).write_bytes(b'test-mp3')
+        return CompletedProcess(command, 0, stdout=b'"Test song"')
 
     monkeypatch.setattr(worker.subprocess, 'run', download)
-    monkeypatch.setattr(worker, '_get_song_title', lambda url: 'Test song')
-    page.locator('#musicUrlInput').fill('https://www.youtube.com/watch?v=test')
+    page.locator('#musicUrlInput').fill('https://www.youtube.com/watch?v=videoId0001')
     page.evaluate('handleMusicDownload({preventDefault(){}})')
     page.wait_for_function("!document.getElementById('musicBtn').disabled")
     assert received == [{'SID': 'fake-test-value', 'EMPTY': ''}]

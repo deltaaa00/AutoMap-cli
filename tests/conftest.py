@@ -32,8 +32,8 @@ class AuthenticatedWebClient(FlaskClient):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         response = self.post('/login', data={
-            'login': os.environ.get('WEB_LOGIN', 'deltaaa'),
-            'password': os.environ.get('WEB_PASSWORD', 'deltaaa00!'),
+            'login': os.environ.get('WEB_LOGIN', 'test-admin'),
+            'password': os.environ.get('WEB_PASSWORD', 'test-only-password'),
         })
         assert response.status_code == 302
 
@@ -77,6 +77,9 @@ def web(monkeypatch, tmp_path):
     monkeypatch.setattr(dotenv, 'dotenv_values', lambda *args, **kwargs: {})
     monkeypatch.delenv('GEMINI_API_KEY', raising=False)
     monkeypatch.setenv('SERVER', 'TRUE')
+    monkeypatch.setenv('WEB_LOGIN', 'test-admin')
+    monkeypatch.setenv('WEB_PASSWORD', 'test-only-password')
+    monkeypatch.setenv('WEB_COOKIE_SECURE', 'FALSE')
     monkeypatch.setenv('WEB_AUTH_SECRET_FILE', str(tmp_path / 'session-secret'))
     monkeypatch.chdir(ROOT)
     spec = importlib.util.spec_from_file_location('web_app', ROOT / 'main.py')
