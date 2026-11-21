@@ -512,13 +512,16 @@ def generate_map_idea(
     api_key: str | None = None,
     *,
     with_params: bool = False,
+    count: int = 1,
     available_themes: list[str] | tuple[str, ...] | None = None,
     available_fonts: list[str] | tuple[str, ...] | None = None,
     temperature: float | None = None,
     avoid_ideas: list[str] | tuple[str, ...] | None = None,
     top_channel_topics: list[str] | tuple[str, ...] | None = None,
 ) -> dict[str, object]:
-    """Generate a single map idea (and optionally matching map parameters) via the selected AI model."""
+    """Generate map ideas and optional parameters; multiple candidates share one model request."""
+    if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= 5:
+        raise ValueError('Idea count must be an integer from 1 to 5.')
     sampled_examples = random.sample(IDEA_EXAMPLES, min(6, len(IDEA_EXAMPLES)))
     examples_block = "\n".join(f'- "{ex}"' for ex in sampled_examples)
     cleaned_top = [str(item).strip() for item in (top_channel_topics or ()) if str(item).strip()][:10]
@@ -541,6 +544,42 @@ def generate_map_idea(
             f"{avoid_lines}"
         )
     idea_temp = 1.0 if temperature is None else validate_temperature(temperature)
+
+    if count > 1:
+        themes = [str(t) for t in (available_themes or list(constants._PALETTE_THEMES.keys()))]
+        fonts = list(available_fonts or ["Bips.ttf", "DIN Condensed.ttf", "kodchasan.ttf", "arialroundedmtbold.ttf"])
+        fields = (
+            'Each item must include mode (text or number), map_type (default, flag, world, world_countries), '
+            f'palette_theme from {themes}, font from {fonts}, '
+            'extra_option (none, show_most_least, show_short_form), and show_legend (boolean). '
+            'Use extra options only for number mode outside world maps.'
+        ) if with_params else ''
+        raw = _call_model_text(
+            'Generate engaging short map questions in English. Return only valid JSON.',
+            f'Generate exactly {count} distinct ideas covering different subjects. '
+            'Return an object with an "ideas" array of objects, each with an "idea" string. '
+            f'{fields}\nExamples:\n{examples_block}{top_block}{avoid_block}',
+            ai_model, api_key, temperature=idea_temp, json_mode=True,
+        )
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.IGNORECASE | re.DOTALL)
+        try:
+            items = json.loads(cleaned)['ideas']
+        except (ValueError, KeyError, TypeError) as error:
+            raise AIServiceError('AI returned invalid ideas. Please try again.', 502) from error
+        if not isinstance(items, list) or len(items) != count:
+            raise AIServiceError('AI returned an unexpected number of ideas. Please try again.', 502)
+        results = []
+        seen = set(avoid_keys)
+        for item in items:
+            if not isinstance(item, dict) or not isinstance(item.get('idea'), str) or not item['idea'].strip():
+                raise AIServiceError('AI returned an empty idea. Please try again.', 502)
+            idea = item['idea'].strip()
+            key = _normalize_idea_key(idea)
+            if key in seen:
+                raise AIServiceError('AI returned duplicate ideas. Please try again.', 502)
+            seen.add(key)
+            results.append(_normalize_map_idea(item, idea, themes, fonts) if with_params else {'idea': idea})
+        return {'ideas': results}
 
     if not with_params:
         system_msg = (
@@ -624,6 +663,13 @@ def generate_map_idea(
         if _normalize_idea_key(candidate_idea) not in avoid_keys:
             break
 
+    return _normalize_map_idea(parsed, idea, themes, fonts)
+
+
+def _normalize_map_idea(parsed, idea, themes, fonts):
+    allowed_modes = ("text", "number")
+    allowed_map_types = ("default", "flag", "world", "world_countries")
+    allowed_extras = ("none", "show_most_least", "show_short_form")
     mode = str(parsed.get("mode") or "text").strip().lower()
     if mode not in allowed_modes:
         mode = "text"

@@ -1345,30 +1345,34 @@ limitations under the License.
                             <i id="renderBtnIcon" class="fa-solid fa-film transition-transform "></i>
                             <span id="renderBtnText">Render video</span>
                         </button>
+                        <div id="renderResultDock"></div>
+
+
+                    </div>
+</div></aside>
+    </main>
 
                         <!-- Render result -->
-                        <div id="renderResult" class="hidden p-4 rounded-xl bg-slate-950/95 border border-slate-700 ">
+                        <div id="renderResult" role="status" aria-live="polite" class="hidden p-4 rounded-xl bg-slate-950/95 border border-slate-700 ">
+                            <button type="button" id="closeRenderResultBtn" onclick="dismissRenderResult()" aria-label="Close video ready notification" title="Close" class="render-result-close">&times;</button>
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div class="flex items-center gap-3 min-w-0">
                                     <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
                                         <i class="fa-solid fa-file-video text-slate-400 text-sm"></i>
                                     </div>
                                     <div class="min-w-0">
-                                        <div class="text-xs font-mono text-slate-400">Master Render Complete</div>
+                                        <div class="text-xs font-mono text-slate-400">Video ready</div>
                                         <span id="renderResultText" class="block text-xs font-mono text-slate-200 truncate">Ready</span>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2 shrink-0">
-                                    <button type="button" id="downloadVideoBtn" onclick="downloadRenderedVideo()" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-100 text-xs font-semibold transition flex items-center gap-2 ">
+                                    <button type="button" id="downloadVideoBtn" onclick="downloadRenderedVideo()" class="render-download-button">
                                         <i class="fa-solid fa-download"></i>
                                         <span>Download video</span>
                                     </button>
                                 </div>
                             </div>
                         </div>
-                    </div>
-</div></aside>
-    </main>
 
     <!-- Notification Toast -->
     <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-colors duration-300 pointer-events-none bg-slate-900/95 border border-slate-700/80 text-slate-100 px-4 py-3 rounded-xl flex items-center gap-3 text-xs font-medium">
@@ -1390,6 +1394,8 @@ limitations under the License.
             'watermarkFontSelect', 'watermarkColor', 'watermarkStarsToggle', 'codecSelect'];
         let videoSettingsReady = false;
         let manualVideoTitle = false;
+        let appliedIdeaId = null;
+        let selectedIdeaUpdatedAt = 0;
         const materialVersions = {mapFileInput: 0, bgFileInput: 0};
         let pendingAssetSaves = Promise.resolve();
 
@@ -1400,6 +1406,7 @@ limitations under the License.
                 return [id, input.type === 'checkbox' ? input.checked : input.value];
             }));
             values.manualVideoTitle = manualVideoTitle;
+            values.appliedIdeaId = appliedIdeaId;
             try {
                 localStorage.setItem(VIDEO_SETTINGS_KEY, JSON.stringify(values));
             } catch (error) {
@@ -1419,6 +1426,7 @@ limitations under the License.
             try {
                 const saved = JSON.parse(localStorage.getItem(VIDEO_SETTINGS_KEY) || '{}');
                 if (saved && typeof saved === 'object') {
+                    appliedIdeaId = saved.appliedIdeaId || null;
                     // Older saved titles were entered manually before topic transfer existed.
                     manualVideoTitle = typeof saved.manualVideoTitle === 'boolean'
                         ? saved.manualVideoTitle : !!saved.videoTitleInput;
@@ -1451,7 +1459,23 @@ limitations under the License.
             } catch (error) {
                 // Invalid or unavailable saved settings should not prevent opening the studio.
             }
+            let selectedIdea = null;
+            try {
+                selectedIdea = JSON.parse(localStorage.getItem('automap-selected-idea') || 'null');
+            } catch {}
+            if (selectedIdea && typeof selectedIdea.topic === 'string' && selectedIdea.topic.trim() &&
+                typeof selectedIdea.id === 'string' && Number.isFinite(selectedIdea.updatedAt)) {
+                selectedIdeaUpdatedAt = selectedIdea.updatedAt;
+                if (selectedIdea.id !== appliedIdeaId) {
+                    const title = document.getElementById('videoTitleInput');
+                    title.value = selectedIdea.topic.trim().slice(0, title.maxLength);
+                    manualVideoTitle = false;
+                    appliedIdeaId = selectedIdea.id;
+                    updateStageTitlePreview(title.value);
+                }
+            }
             videoSettingsReady = true;
+            saveVideoSettings();
             updateMapLayout();
             if (isDynamicStickerValue(document.getElementById('topLeftStickerSelect').value) ||
                 isDynamicStickerValue(document.getElementById('topRightStickerSelect').value)) {
@@ -1483,7 +1507,7 @@ limitations under the License.
                     const file = isNewGeneratedMap ? await prepareGeneratedMap(map.file) : map.file;
                     if (materialVersions.mapFileInput === 0) {
                         acceptFile('mapFileInput', file, isNewGeneratedMap, map.topic);
-                        if (renderFiles.mapFileInput === file && !manualVideoTitle && typeof map.topic === 'string' && map.topic.trim()) {
+                        if (renderFiles.mapFileInput === file && !manualVideoTitle && map.updatedAt > selectedIdeaUpdatedAt && typeof map.topic === 'string' && map.topic.trim()) {
                             const title = document.getElementById('videoTitleInput');
                             title.value = map.topic.trim().slice(0, title.maxLength);
                             manualVideoTitle = false;
@@ -4102,6 +4126,46 @@ limitations under the License.
             return () => { stopped = true; clearTimeout(timer); controller?.abort(); };
         }
 
+        let renderNotificationAudio = null;
+
+        function prepareRenderNotification() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                if (!renderNotificationAudio || renderNotificationAudio.state === 'closed') {
+                    renderNotificationAudio = new AudioContext();
+                }
+                // Unlock audio during the Render button gesture, before the request finishes.
+                renderNotificationAudio.resume().catch(() => {});
+            } catch {}
+        }
+
+        function playRenderNotification() {
+            const context = renderNotificationAudio;
+            if (!context) return;
+            const play = () => {
+                try {
+                    const start = context.currentTime;
+                    [660, 880, 1100].forEach((frequency, index) => {
+                        const oscillator = context.createOscillator();
+                        const gain = context.createGain();
+                        const at = start + index * 0.16;
+                        oscillator.frequency.value = frequency;
+                        gain.gain.setValueAtTime(0, at);
+                        gain.gain.linearRampToValueAtTime(0.12, at + 0.015);
+                        gain.gain.exponentialRampToValueAtTime(0.001, at + 0.28);
+                        oscillator.connect(gain);
+                        gain.connect(context.destination);
+                        oscillator.start(at);
+                        oscillator.stop(at + 0.3);
+                        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+                    });
+                } catch {}
+            };
+            if (context.state === 'running') play();
+            else context.resume().then(play).catch(() => {});
+        }
+
         async function handleRenderVideo(e) {
             e.preventDefault();
             const btn = document.getElementById('renderBtn');
@@ -4147,6 +4211,8 @@ limitations under the License.
                     youtube = youtubeSettings();
                 } catch (error) { showToast(error.message, 'error'); return; }
             }
+            prepareRenderNotification();
+            document.getElementById('renderResult').classList.add('hidden');
             renderResultData = null;
             document.getElementById('youtubeUpload').disabled = true;
             btn.disabled = true;
@@ -4231,7 +4297,9 @@ limitations under the License.
                 const resultText = document.getElementById('renderResultText');
                 resultText.textContent = filePath;
                 resultText.title = filePath;
-                resultBox.classList.remove('hidden');
+                document.body.append(resultBox);
+                resultBox.classList.remove('hidden', 'render-result-docked');
+                playRenderNotification();
 
                 // Load the rendered video into the Cinema Stage Player for immediate preview
                 const player = document.getElementById('renderedVideoPlayer');
@@ -4267,6 +4335,13 @@ limitations under the License.
                 btnText.textContent = "Render video";
                 btnIcon.className = "fa-solid fa-film";
             }
+        }
+
+        function dismissRenderResult() {
+            const result = document.getElementById('renderResult');
+            result.classList.add('render-result-docked');
+            document.getElementById('renderResultDock').append(result);
+            document.getElementById('downloadVideoBtn').focus({preventScroll: true});
         }
 
         function downloadRenderedVideo() {

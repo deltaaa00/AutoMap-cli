@@ -100,3 +100,39 @@ def test_idea_endpoint_validates_and_forwards_settings(web,monkeypatch,payload,s
 def test_idea_endpoint_provider_errors(web,monkeypatch,error,status):
     monkeypatch.setattr(web,'generate_map_idea',Mock(side_effect=error))
     assert web.app.test_client().post('/api/generate_idea',json={'api_key':'test-key'}).status_code==status
+
+
+@pytest.mark.parametrize('with_params', [False, True])
+def test_multiple_ideas_use_one_model_request(monkeypatch, with_params):
+    call = Mock(return_value=json.dumps({'ideas': [
+        {'idea': 'Where are the tallest trees?', 'mode': 'number'},
+        {'idea': 'What is the favorite breakfast?', 'mode': 'text'},
+    ]}))
+    monkeypatch.setattr(ai, '_call_model_text', call)
+    result = ai.generate_map_idea('deepseek-flash', count=2, with_params=with_params)
+    assert len(result['ideas']) == 2
+    assert ('params' in result['ideas'][0]) == with_params
+    call.assert_called_once()
+
+
+@pytest.mark.parametrize('items', [[{'idea': 'Same'}, {'idea': 'Same'}], [{'idea': 'Only one'}], [{}, {}]])
+def test_multiple_ideas_reject_invalid_results(monkeypatch, items):
+    monkeypatch.setattr(ai, '_call_model_text', Mock(return_value=json.dumps({'ideas': items})))
+    with pytest.raises(ai.AIServiceError):
+        ai.generate_map_idea('deepseek-flash', count=2)
+
+
+@pytest.mark.parametrize('count', [0, 6, True, '2', 2.5])
+def test_idea_endpoint_rejects_invalid_counts(web, count):
+    response = web.app.test_client().post('/api/generate_idea', json={'api_key': 'test-key', 'count': count})
+    assert response.status_code == 400
+
+
+def test_idea_endpoint_returns_multiple_candidates(web, monkeypatch):
+    candidates = [{'idea': 'First'}, {'idea': 'Second'}]
+    generate = Mock(return_value={'ideas': candidates})
+    monkeypatch.setattr(web, 'generate_map_idea', generate)
+    response = web.app.test_client().post('/api/generate_idea', json={'api_key': 'test-key', 'count': 2, 'with_params': True})
+    assert response.json['ideas'] == candidates
+    assert generate.call_args.kwargs['count'] == 2
+    assert generate.call_args.kwargs['with_params'] is True

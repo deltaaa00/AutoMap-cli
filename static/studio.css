@@ -349,3 +349,75 @@ button[class*="bg-accent-600"]:not([class*="bg-accent-600/"]) { color: #fff; }
 @media (max-width: 639px) {
     #videoPreviewRail > .workspace-actions { background: transparent; border: 0; padding: 0; }
 }
+
+/* Completed renders stay visible even when the editor is scrolled. */
+#renderResult {
+    position: fixed;
+    top: calc(20px + env(safe-area-inset-top, 0px));
+    right: 20px;
+    z-index: 80;
+    width: min(460px, calc(100vw - 40px));
+    padding: 16px;
+    border: 1px solid #88ba99;
+    background: #14251b;
+    box-shadow: 0 8px 32px #0008, 0 0 0 3px #88ba9926;
+}
+#renderResultText { max-width: 210px; }
+#renderResult .render-download-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 12px 20px;
+    border: 1px solid #c4e4ce;
+    border-radius: 10px;
+    background: #b9dfc5;
+    color: #12261a;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+#renderResult .render-download-button:hover { background: #d3efdc; }
+#renderResult .render-download-button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+@media (max-width: 639px) {
+    #renderResult { top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px; width: calc(100vw - 24px); }
+    #renderResult > div { display: flex; flex-direction: column; align-items: stretch; }
+    #renderResult .render-download-button { width: 100%; }
+    #renderResult > div > div:last-child { width: 100%; }
+}
+
+#renderResult > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+}
+#renderResult:not(.render-result-docked) > div > div:first-child { padding-right: 32px; }
+#renderResult > div > div:last-child, #renderResult .render-download-button { width: 100%; }
+#renderResultText { max-width: 100%; }
+#renderResult > div > div:first-child > div:last-child { min-width: 0; flex: 1; }
+#renderResult .render-result-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #c4e4ce;
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+}
+#renderResult .render-result-close:hover { background: #ffffff18; }
+#renderResult .render-result-close:focus-visible { outline: 2px solid #c4e4ce; }
+#renderResult.render-result-docked {
+    position: static;
+    width: 100%;
+    box-shadow: none;
+}
+#renderResult.render-result-docked .render-result-close { display: none; }
+#renderResult.render-result-docked > div { flex-direction: column; align-items: stretch; }
+#renderResult.render-result-docked .render-download-button { width: 100%; }

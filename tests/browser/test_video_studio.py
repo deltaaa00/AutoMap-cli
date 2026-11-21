@@ -891,3 +891,81 @@ def test_youtube_sign_in_status_is_visible_when_panel_is_closed(studio):
     assert page.locator('#youtubeSignOut').is_disabled()
     assert not page.locator('#youtubeAuto').is_checked()
     assert page.evaluate("JSON.parse(localStorage.getItem('automap-youtube-settings')).youtubeAuto") is False
+
+
+def test_selected_idea_transfers_to_studio_and_preserves_manual_edits(studio):
+    page, _ = studio
+    page.evaluate('async () => { await window.videoStudioReady; }')
+    page.locator('#videoTitleInput').fill('Previous manual title')
+    page.goto('http://automap.test/')
+    page.evaluate("applyGeneratedIdea({idea: 'Where are the oldest forests?'}, false)")
+    page.goto('http://automap.test/studio')
+    page.evaluate('async () => { await window.videoStudioReady; }')
+    assert page.locator('#videoTitleInput').input_value() == 'Where are the oldest forests?'
+    page.locator('#videoTitleInput').fill('My edited forest title')
+    page.reload()
+    page.evaluate('async () => { await window.videoStudioReady; }')
+    assert page.locator('#videoTitleInput').input_value() == 'My edited forest title'
+    page.goto('http://automap.test/')
+    page.evaluate("applyGeneratedIdea({idea: 'Which countries love tea?'}, false)")
+    page.goto('http://automap.test/studio')
+    page.evaluate('async () => { await window.videoStudioReady; }')
+    assert page.locator('#videoTitleInput').input_value() == 'Which countries love tea?'
+
+
+def test_render_completion_shows_fixed_download_and_sounds_only_on_success(studio):
+    page, _ = studio
+    page.evaluate('async () => { await window.videoStudioReady; }')
+    page.locator('#videoTitleInput').fill('Ready video')
+    page.evaluate('''() => {
+        renderFiles.mapFileInput = new File(['map'], 'map.png', {type:'image/png'});
+        renderFiles.bgFileInput = new File(['video'], 'bg.mp4', {type:'video/mp4'});
+        window.notificationNotes = [];
+        renderNotificationAudio = {
+            state: 'running', currentTime: 0, destination: {},
+            resume: () => Promise.resolve(),
+            createOscillator: () => ({frequency: {}, connect(){}, disconnect(){},
+                start(at){notificationNotes.push(at)}, stop(){}}),
+            createGain: () => ({gain: {setValueAtTime(){}, linearRampToValueAtTime(){},
+                exponentialRampToValueAtTime(){}}, connect(){}, disconnect(){}}),
+        };
+    }''')
+    page.route('**/api/render_video', lambda route: route.fulfill(json={
+        'status': 'success', 'file_path': '/render/ready.mp4'}))
+    page.evaluate('handleRenderVideo({preventDefault(){}})')
+    assert page.locator('#downloadVideoBtn').is_visible()
+    assert page.evaluate('notificationNotes.length') == 3
+    assert page.locator('#renderResult').evaluate('el => getComputedStyle(el).position') == 'fixed'
+    for viewport in [{'width': 1200, 'height': 900}, {'width': 390, 'height': 700}]:
+        page.set_viewport_size(viewport)
+        page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+        box = page.locator('#downloadVideoBtn').bounding_box()
+        assert box['y'] >= 0 and box['y'] + box['height'] <= viewport['height']
+        assert box['x'] >= 0 and box['x'] + box['width'] <= viewport['width']
+    page.route('**/api/render_video', lambda route: route.fulfill(status=500, json={
+        'status': 'error', 'error': 'Render failed'}))
+    page.evaluate('handleRenderVideo({preventDefault(){}})')
+    assert page.locator('#downloadVideoBtn').is_hidden()
+    assert page.evaluate('notificationNotes.length') == 3
+
+
+def test_close_render_notification_returns_download_to_render_actions(studio):
+    page, _ = studio
+    page.evaluate('async () => { await window.videoStudioReady; }')
+    page.locator('#videoTitleInput').fill('Finished video')
+    page.evaluate('''() => {
+        renderFiles.mapFileInput = new File(['map'], 'map.png', {type:'image/png'});
+        renderFiles.bgFileInput = new File(['video'], 'bg.mp4', {type:'video/mp4'});
+    }''')
+    page.route('**/api/render_video', lambda route: route.fulfill(json={
+        'status': 'success', 'file_path': '/render/ready.mp4'}))
+    page.evaluate('handleRenderVideo({preventDefault(){}})')
+    assert page.locator('#renderResult').evaluate('el => getComputedStyle(el).position') == 'fixed'
+    page.locator('#closeRenderResultBtn').click()
+    assert page.locator('#renderResultDock #downloadVideoBtn').is_visible()
+    assert page.locator('#renderResult').evaluate('el => getComputedStyle(el).position') == 'static'
+    assert page.locator('#closeRenderResultBtn').is_hidden()
+    assert page.evaluate('renderResultData.file_path') == '/render/ready.mp4'
+    page.evaluate('handleRenderVideo({preventDefault(){}})')
+    assert page.locator('#renderResult').evaluate('el => getComputedStyle(el).position') == 'fixed'
+    assert page.locator('#closeRenderResultBtn').is_visible()

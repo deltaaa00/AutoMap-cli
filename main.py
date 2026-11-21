@@ -759,6 +759,10 @@ def api_generate_idea():
     if provider_for_model(model) != provider:
         return jsonify(status='error', error=f"Model '{model}' does not match provider '{provider}'."), 400
 
+    count = data.get('count', 1)
+    if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= 5:
+        return jsonify(status='error', error='Idea count must be an integer from 1 to 5.'), 400
+
     with_params = str(data.get("with_params") or "").strip().lower() in ("1", "true", "yes", "on") or data.get("with_params") is True
 
     temperature = None
@@ -778,6 +782,7 @@ def api_generate_idea():
             model,
             api_key=api_key,
             with_params=with_params,
+            count=count,
             available_themes=list(_PALETTE_THEMES.keys()),
             available_fonts=_available_fonts(),
             temperature=temperature,
