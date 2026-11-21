@@ -117,7 +117,39 @@ def test_search_evidence_reaches_model_and_budget_removes_tools(monkeypatch, arg
     lookup.assert_called_once_with('GDP 2026' if 'GDP 2026' in arguments else 'GDP')
     assert payloads[0]['tool_choice']['function']['name'] == 'web_search'
     assert 'tools' not in payloads[1] and 'tool_choice' not in payloads[1]
-    assert payloads[1]['messages'][-1] == {'role': 'tool', 'tool_call_id': 'call1', 'content': evidence}
+    tool_result = payloads[1]['messages'][-1]
+    assert tool_result['role'] == 'tool' and tool_result['tool_call_id'] == 'call1'
+    assert json.loads(tool_result['content']) == {'search': json.loads(evidence),
+                                                 'search_budget': {'total': 1, 'used': 1, 'remaining': 0}}
+
+
+def test_model_sees_total_and_remaining_budget_and_console_records_actual_queries(monkeypatch):
+    monkeypatch.setenv('TAVILY_API_KEY', 'search-secret')
+    payloads = []
+    def model(path, key, *, payload):
+        payloads.append(copy.deepcopy(payload))
+        turn = len(payloads)
+        if turn < 3:
+            return {'choices': [{'finish_reason': 'tool_calls', 'message': {'role': 'assistant', 'content': None,
+                'tool_calls': [{'id': f'call{turn}', 'type': 'function', 'function': {
+                    'name': 'web_search', 'arguments': json.dumps({'query': 'GDP\n  2026 [bold] search-secret' if turn == 1 else 'Population 2026'})}}]}}]}
+        return {'choices': [{'finish_reason': 'stop', 'message': {'content': '{"ukraine":42}'}}]}
+    monkeypatch.setattr(ai, '_deepseek_json', model)
+    lookup = Mock(return_value=json.dumps({'results': [{'url': 'https://example.org'}]}))
+    monkeypatch.setattr(ai, '_web_search', lookup)
+    ai._deepseek_request('GDP', 'deepseek-flash', 'model-secret', web_search=True, max_search_requests=2)
+    assert 'total budget of 2' in payloads[0]['messages'][0]['content']
+    assert '2 remain' in payloads[0]['messages'][0]['content']
+    assert json.loads(payloads[1]['messages'][-1]['content'])['search_budget'] == {'total': 2, 'used': 1, 'remaining': 1}
+    assert json.loads(payloads[2]['messages'][-1]['content'])['search_budget'] == {'total': 2, 'used': 2, 'remaining': 0}
+    assert lookup.call_args_list[0].args == ('GDP 2026 [bold] search-secret',)
+    assert 'tools' not in payloads[2]
+    output = ai.log.console.file.getvalue()
+    assert '1/2 query="GDP 2026 [bold] [REDACTED]" remaining=1' in output
+    assert '2/2 query="Population 2026" remaining=0' in output
+    assert 'Completed: results=1' in output
+    assert 'Finished: used=2/2' in output
+    assert 'search-secret' not in output and 'model-secret' not in output
 
 
 def test_empty_search_is_explicit(monkeypatch):

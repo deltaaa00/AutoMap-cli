@@ -277,7 +277,7 @@ def test_theme_menu_selection_is_sent_on_first_generation(map_page):
     page.locator('#aiTemperature').press('Home')
     assert page.locator('#aiTemperatureValue').inner_text() == '0.00'
     page.fill('#topicInput', 'Population of Europe')
-    page.evaluate("document.getElementById('apiKeyInput').value = 'test-key-never-send'")
+    set_browser_key(page, 'test-key-never-send')
     payloads = []
     png = io.BytesIO()
     Image.new('RGB', (2, 2), 'green').save(png, format='PNG')
@@ -358,21 +358,21 @@ def test_temperature_defaults_to_point_seven_five_and_can_be_reset(map_page):
 def test_api_key_and_topic_survive_reload_and_can_be_cleared(map_page):
     page = map_page
     page.evaluate('closeFillingStudio()')
-    page.locator('#apiKeyInput').fill('AIza-test-browser-key')
+    set_browser_key(page, 'AIza-test-browser-key')
     page.locator('#topicInput').fill('Population of European countries')
     page.click('#openFillingStudioBtn')
     page.select_option('#fillingPaletteTheme', 'oceanic')
     page.wait_for_function('!paletteAnalysisPending')
     page.locator('#fillingStudioModal button[onclick="closeFillingStudio()"]').click()
     page.reload()
-    assert page.locator('#apiKeyInput').input_value() == 'AIza-test-browser-key'
-    assert page.locator('#apiKeyInput').get_attribute('type') == 'password'
+    assert page.evaluate('getFormState().api_key') == 'AIza-test-browser-key'
+    assert page.locator('#apiKeyInput').count() == 0
     assert page.locator('#topicInput').input_value() == 'Population of European countries'
     assert page.locator('#fillingPaletteTheme').input_value() == 'oceanic'
-    page.locator('#apiKeyInput').fill('')
+    set_browser_key(page, '')
     page.evaluate('clearTopicInput()')
     page.reload()
-    assert page.locator('#apiKeyInput').input_value() == ''
+    assert page.evaluate('getFormState().api_key') == ''
     assert page.locator('#topicInput').input_value() == ''
 
 
@@ -382,9 +382,8 @@ def test_map_inputs_work_when_browser_storage_is_blocked(map_page):
         get() { throw new DOMException('Storage blocked', 'SecurityError'); }
     });''')
     page.reload()
-    page.locator('#apiKeyInput').fill('test-key')
     page.locator('#topicInput').fill('Test topic')
-    assert page.evaluate('getFormState().api_key') == 'test-key'
+    assert page.evaluate('getFormState().api_key') == ''
     # The preview updates after typing settles; storage may still be blocked.
     expect(page.locator('#cliCommandDisplay')).to_contain_text('Test topic')
 
@@ -438,7 +437,7 @@ def test_generation_failure_shows_actual_error_and_keeps_retry_available(map_pag
     page = map_page
     page.locator('#fillingStudioModal button[onclick="closeFillingStudio()"]').click()
     page.fill('#topicInput', 'Population of Europe')
-    page.evaluate("document.getElementById('apiKeyInput').value = 'test-key-never-send'")
+    set_browser_key(page, 'test-key-never-send')
     error = 'The AI model is overloaded. Please try again later.'
     page.route('**/api/generate', lambda route: route.fulfill(
         status=503, json={'status': 'error', 'error': error}))
@@ -458,30 +457,40 @@ def stub_provider_model_lists(page):
     page.route('**/api/models', respond)
 
 
+def set_browser_key(page, value, provider=None):
+    # Simulate the storage event sent to a map tab by API Manager.
+    provider = provider or page.evaluate('activeAiProvider')
+    page.evaluate("""({provider, value}) => {
+        const key = `automap-${provider}-api-key`;
+        if (value) localStorage.setItem(key, value); else localStorage.removeItem(key);
+        dispatchEvent(new StorageEvent('storage', {key}));
+    }""", {'provider': provider, 'value': value})
+
+
 def test_provider_groups_and_keys_survive_switches_reload_and_independent_clear(map_page):
     page = map_page
     stub_provider_model_lists(page)
     page.evaluate('closeFillingStudio()')
     assert page.locator('#modelSelect optgroup').count() == 2
     assert page.locator('#modelSelect optgroup').evaluate_all('(groups) => groups.map(group => group.label)') == ['Gemini', 'DeepSeek']
-    page.locator('#apiKeyInput').fill('gemini-browser-key')
+    set_browser_key(page, 'gemini-browser-key')
     page.select_option('#modelSelect', 'deepseek-flash')
-    page.wait_for_function("activeAiProvider === 'deepseek' && document.getElementById('apiKeyLabel').textContent.includes('DeepSeek')")
-    assert page.locator('#apiKeyInput').input_value() == ''
-    page.locator('#apiKeyInput').fill('deepseek-browser-key')
+    page.wait_for_function("activeAiProvider === 'deepseek'")
+    assert page.evaluate('getFormState().api_key') == ''
+    set_browser_key(page, 'deepseek-browser-key')
     page.reload()
     page.wait_for_function("activeAiProvider === 'deepseek' && getFormState().model === 'deepseek-flash'")
-    assert page.locator('#apiKeyInput').input_value() == 'deepseek-browser-key'
-    assert page.locator('#apiKeyInput').get_attribute('type') == 'password'
+    assert page.evaluate('getFormState().api_key') == 'deepseek-browser-key'
+    assert page.locator('#apiKeyInput').count() == 0
     assert page.evaluate('getFormState().provider') == 'deepseek'
     page.select_option('#modelSelect', 'gemini-3.8-flash')
-    assert page.locator('#apiKeyInput').input_value() == 'gemini-browser-key'
+    assert page.evaluate('getFormState().api_key') == 'gemini-browser-key'
     page.select_option('#modelSelect', 'deepseek-flash')
-    page.locator('#apiKeyInput').fill('')
+    set_browser_key(page, '')
     page.reload()
-    assert page.locator('#apiKeyInput').input_value() == ''
+    assert page.evaluate('getFormState().api_key') == ''
     page.select_option('#modelSelect', 'gemini-3.8-flash')
-    assert page.locator('#apiKeyInput').input_value() == 'gemini-browser-key'
+    assert page.evaluate('getFormState().api_key') == 'gemini-browser-key'
     assert page.locator('#modelSelect optgroup').count() == 2
 
 
@@ -489,9 +498,9 @@ def test_deepseek_generation_sends_only_active_provider_key(map_page):
     page = map_page
     stub_provider_model_lists(page)
     page.evaluate('closeFillingStudio()')
-    page.locator('#apiKeyInput').fill('gemini-do-not-send')
+    set_browser_key(page, 'gemini-do-not-send')
     page.select_option('#modelSelect', 'deepseek-flash')
-    page.locator('#apiKeyInput').fill('deepseek-use-this')
+    set_browser_key(page, 'deepseek-use-this')
     page.locator('#topicInput').fill('Population of Europe')
     payloads = []
     def capture(route):
@@ -512,7 +521,7 @@ def test_tavily_key_is_sent_only_for_enabled_deepseek_search_and_excluded_from_h
     page = map_page
     stub_provider_model_lists(page)
     page.select_option('#modelSelect', 'deepseek-flash')
-    page.locator('#tavilyApiKeyInput').fill('tvly-browser-secret')
+    set_browser_key(page, 'tvly-browser-secret', 'tavily')
     page.locator('#deepseekWebSearchToggle').check()
     assert page.evaluate('getFormState().tavily_api_key') == 'tvly-browser-secret'
     page.evaluate("addToHistory(getFormState(), 'test')")
@@ -527,14 +536,14 @@ def test_tavily_key_is_sent_only_for_enabled_deepseek_search_and_excluded_from_h
 
 def test_tavily_key_survives_reload_and_clearing_removes_it(map_page):
     page = map_page
-    page.locator('#tavilyApiKeyInput').fill('tvly-saved-secret')
+    set_browser_key(page, 'tvly-saved-secret', 'tavily')
     assert page.evaluate("localStorage.getItem('automap-tavily-api-key')") == 'tvly-saved-secret'
     page.reload()
-    assert page.locator('#tavilyApiKeyInput').input_value() == 'tvly-saved-secret'
-    page.locator('#tavilyApiKeyInput').fill('')
+    assert page.evaluate("savedApiKey('tavily')") == 'tvly-saved-secret'
+    set_browser_key(page, '', 'tavily')
     assert page.evaluate("localStorage.getItem('automap-tavily-api-key')") is None
     page.reload()
-    assert page.locator('#tavilyApiKeyInput').input_value() == ''
+    assert page.evaluate("savedApiKey('tavily')") == ''
 
 
 def test_api_manager_keys_are_shared_with_map_generator(map_page):
@@ -550,8 +559,9 @@ def test_api_manager_keys_are_shared_with_map_generator(map_page):
     assert page.locator('#deepseekKey').input_value() == 'deepseek-manager-key'
     assert page.locator('#managerSearchLimit').input_value() == '3'
     page.get_by_role('link', name='Map generator', exact=True).click()
-    assert page.locator('#apiKeyInput').input_value() == 'gemini-manager-key'
-    assert page.locator('#tavilyApiKeyInput').input_value() == 'tavily-manager-key'
+    page.wait_for_function("typeof getFormState === 'function'")
+    assert page.evaluate('getFormState().api_key') == 'gemini-manager-key'
+    assert page.evaluate("savedApiKey('tavily')") == 'tavily-manager-key'
     assert page.locator('#deepseekWebSearchToggle').is_checked()
     assert page.locator('#deepseekMaxSearchInput').input_value() == '3'
     page.goto('http://automap.test/api-manager')
@@ -598,12 +608,12 @@ def test_server_deepseek_key_hides_input_without_exposing_key(map_page, monkeypa
     monkeypatch.setenv('DEEPSEEK_API_KEY', 'server-deepseek-never-expose')
     page.select_option('#modelSelect', 'deepseek-flash')
     page.wait_for_function("activeAiProvider === 'deepseek' && !apiKeyRequired")
-    assert page.locator('#apiKeySection').is_hidden()
-    assert page.locator('#apiKeyInput').input_value() == ''
+    assert page.locator('#apiConnectionNotice').is_hidden()
+    assert page.evaluate('getFormState().api_key') == ''
     assert 'server-deepseek-never-expose' not in page.content()
     page.select_option('#modelSelect', 'gemini-3.8-flash')
     page.wait_for_function('apiKeyRequired')
-    assert page.locator('#apiKeySection').is_visible()
+    assert page.locator('#apiConnectionNotice').is_visible()
 
 
 def test_provider_keys_stay_independent_when_storage_is_blocked(map_page):
@@ -613,29 +623,26 @@ def test_provider_keys_stay_independent_when_storage_is_blocked(map_page):
         get() { throw new DOMException('Storage blocked', 'SecurityError'); }
     });''')
     page.reload()
-    page.locator('#apiKeyInput').fill('gemini-memory')
+    assert page.evaluate('getFormState().api_key') == ''
     page.select_option('#modelSelect', 'deepseek-flash')
-    page.locator('#apiKeyInput').fill('deepseek-memory')
-    page.select_option('#modelSelect', 'gemini-3.8-flash')
-    assert page.locator('#apiKeyInput').input_value() == 'gemini-memory'
-    page.select_option('#modelSelect', 'deepseek-flash')
-    assert page.locator('#apiKeyInput').input_value() == 'deepseek-memory'
+    assert page.evaluate('getFormState().api_key') == ''
+    expect(page.locator('#apiManagerLink')).to_have_attribute('href', '/api-manager')
 
 
 def test_history_uses_model_provider_and_its_saved_key(map_page):
     page = map_page
     stub_provider_model_lists(page)
     page.evaluate('closeFillingStudio()')
-    page.locator('#apiKeyInput').fill('gemini-history-key')
+    set_browser_key(page, 'gemini-history-key')
     page.select_option('#modelSelect', 'deepseek-flash')
-    page.locator('#apiKeyInput').fill('deepseek-history-key')
+    set_browser_key(page, 'deepseek-history-key')
     page.select_option('#modelSelect', 'gemini-3.8-flash')
     page.evaluate('''() => {
         addToHistory({...getFormState(), provider:'gemini', model:'deepseek-flash'}, 'Legacy history');
         restoreHistoryItem(0);
     }''')
     assert page.evaluate('getFormState().provider') == 'deepseek'
-    assert page.locator('#apiKeyInput').input_value() == 'deepseek-history-key'
+    assert page.evaluate('getFormState().api_key') == 'deepseek-history-key'
     assert page.locator('#modelSelect').input_value() == 'deepseek-flash'
 
 
@@ -768,6 +775,7 @@ def test_topic_is_saved_immediately_and_idea_generation_requires_a_click(map_pag
     assert page.locator('#topicInput').input_value() == 'Моя остання тема'
     assert idea_requests == []
     page.locator('#generateIdeaBtn').click()
+    page.locator('#ideaChoices button').filter(has_text='Explicitly generated idea').click()
     page.wait_for_function("document.getElementById('topicInput').value === 'Explicitly generated idea'")
     assert len(idea_requests) == 1
     page.reload()

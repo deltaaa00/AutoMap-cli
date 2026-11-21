@@ -103,14 +103,14 @@ Keys can come from the process environment or the project-root `.env` file. Envi
 In the browser:
 
 1. Choose a model from the **Gemini** or **DeepSeek** section.
-2. If that provider has no configured server key, enter its key in the displayed field.
-3. The shared key field switches with the selected model. Keys are saved separately in this browser for the next visit: switching providers restores the matching key, and clearing the current provider's field leaves the other saved key untouched.
+2. Open **API Manager** to save a key for each provider that has no server key.
+3. Return to the map generator. It reads the matching saved key automatically when you select a model. Key entry and removal are available only in API Manager.
 
 Browser-supplied keys are sent to the application server for the active provider's requests. Server-configured keys are not returned to the browser. Browser persistence requires storage to remain enabled; it is specific to the browser profile and site origin.
 
 DeepSeek uses its official Chat Completions API with JSON output and thinking disabled for map generation. No separate OpenAI SDK is required. API requests have a 45-second timeout and no application-level automatic retry. Map drawing takes additional time. Provider overload, quota limits, invalid credentials, insufficient DeepSeek balance, and timeouts are reported in the interface.
 
-Enable **DeepSeek Web Search** to search across websites using [Tavily](https://docs.tavily.com/documentation/api-reference/endpoint/search) or [Brave Search](https://api-dashboard.search.brave.com/api-reference/web/search/get). Enter your Tavily key in the **Tavily API key** field beside the search toggle. It is saved in this browser across reloads, sent only when DeepSeek search is enabled, and excluded from map history. Clear the field to remove the saved key. A supplied Tavily key overrides the server search provider for that request. Alternatively, configure a separate search-service key on the server:
+Enable **DeepSeek Web Search** to search across websites using [Tavily](https://docs.tavily.com/documentation/api-reference/endpoint/search) or [Brave Search](https://api-dashboard.search.brave.com/api-reference/web/search/get). Enter your Tavily key in **API Manager → Web search**. It is saved in this browser across reloads, sent only when DeepSeek search is enabled, and excluded from map history. Use **Remove browser key** in API Manager to remove it. A supplied Tavily key overrides the server search provider for that request. Alternatively, configure a separate search-service key on the server:
 
 ```dotenv
 WEB_SEARCH_PROVIDER=tavily
@@ -123,6 +123,8 @@ Open **API Manager** (`/api-manager`) from the map generator or Video Studio to 
 Restart the application (recreate the web container for Docker). If no provider is selected, a configured Tavily key takes precedence over Brave. Search credentials stay on the server and are independent of the DeepSeek key. Queries are sent to the selected search service; titles, source URLs, snippets, and available dates are passed to DeepSeek. The first search is required; further searches share the selected limit of 1–10 calls. Missing configuration, quota errors, or provider failures stop generation with an error instead of silently using Wikipedia or model knowledge. Each search has a 20-second read timeout in addition to model request timeouts. Search services may charge per request.
 
 Search snippets do not guarantee accurate or current values. The model is instructed to prefer primary sources, check years, and use null for unsupported values. Source URLs currently go to the model; the map output and UI do not include a source bibliography. Cached map answers can be reused; API clients can set `refresh_ai: true` to research again.
+
+DeepSeek receives the total search-call budget in its system prompt and updated `total`, `used`, and `remaining` counts in every tool result. This limit applies to one map, not the search provider's monthly account quota. Server console logs show each actual query, its number, result count, and remaining budget, even with verbose logging disabled. Each research run has an ID so concurrent maps can be distinguished. For Docker, follow them with `docker compose logs -f web`. Cached answers do not run new searches.
 
 ## Run from the source checkout
 
@@ -214,7 +216,7 @@ Worker files older than approximately **30 minutes** are cleaned up when relevan
 
 1. Install the updated `requirements.txt` (or rebuild the Docker containers).
 2. In Google Cloud Console, enable **YouTube Data API v3**, configure the OAuth consent screen and, while the app is in testing, add your Google account as a test user. Download an **OAuth client secret JSON** file.
-3. Open **Video Studio → YouTube upload**, choose the JSON file, and click **Connect Google / YouTube**. Approve access to the desired channel.
+3. Open **API Manager → YouTube Data API**, choose the JSON file, and click **Connect Google / YouTube**. Approve access to the desired channel.
 4. The YouTube title follows the video topic by default (up to 100 characters). Disable **Use the video topic as the YouTube title** to enter a custom title. Set the description, comma-separated tags, visibility, and the made-for-kids setting.
 5. Enable **Automatically upload after rendering**, then render. AutoMap uploads the resulting MP4 in the background and shows progress and a YouTube link. You can also click **Upload rendered video to YouTube** after rendering. Visibility defaults to **Private**. Metadata, custom title, title mode, and the automatic upload setting are saved in this browser and restored when you return.
 
@@ -387,7 +389,7 @@ The coverage configuration requires **85%** coverage. See [tests/README.md](test
 ## Troubleshooting
 
 - **AI overload, timeout, or quota error:** retry later or select another available model. Drawing and encoding still take time after the AI response; AutoMap does not guarantee a fixed generation time.
-- **Key input appears for one provider only:** that provider has no server key. Gemini and DeepSeek credentials are independent.
+- **API key missing:** open API Manager to save a key for the selected provider. Gemini and DeepSeek credentials are independent.
 - **Video or music requests cannot reach the worker:** check `YTDLP_URL` for native launches and inspect `docker compose logs yt-dlp-worker` for Compose.
 - **Audio download or conversion fails:** verify FFmpeg/yt-dlp availability, the source URL's accessibility, and the resulting file size. External sites may change or restrict downloads.
 - **Files or preferences disappear after reopening:** browser storage may be disabled, cleared, or full; worker files also expire. Keep downloaded copies of important material.

@@ -46,13 +46,11 @@ async function loadYouTubeConnection() {
         if (!response.ok) throw new Error(result.error || 'Could not check YouTube connection.');
         youtubeCsrf = result.csrf_token;
         youtubeConnected = result.connected;
-        ytElement('youtubeSignOut').disabled = !result.connected;
         const label = result.connected ? 'Signed in to YouTube' : 'Not signed in to YouTube';
         ytElement('youtubeConnection').textContent = label;
         const badge = ytElement('youtubeConnectionBadge');
         badge.textContent = label;
         badge.className = `ml-2 text-xs font-normal ${result.connected ? 'text-emerald-400' : 'text-amber-300'}`;
-        ytElement('youtubeRedirect').textContent = result.redirect_uri;
         return result;
     })();
     try { return await youtubeConnectionRequest; }
@@ -86,31 +84,6 @@ async function youtubeRequest(url, options = {}) {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'YouTube request failed.');
     return result;
-}
-
-async function connectYouTube() {
-    const file = ytElement('youtubeSecret').files[0];
-    if (!file) { showToast('Choose the client secret JSON file first.', 'warn'); return; }
-    ytElement('youtubeConnect').disabled = true;
-    try {
-        const form = new FormData();
-        form.append('client_secret', file);
-        const result = await youtubeRequest('/api/youtube/connect', {method: 'POST', body: form});
-        window.location.assign(result.authorization_url);
-    } catch (error) {
-        ytElement('youtubeConnection').textContent = error.message;
-        showToast(error.message, 'error');
-    } finally { ytElement('youtubeConnect').disabled = false; }
-}
-
-async function disconnectYouTube() {
-    try {
-        await youtubeRequest('/api/youtube/disconnect', {method: 'POST'});
-        ytElement('youtubeAuto').checked = false;
-        saveYouTubeSettings();
-        await loadYouTubeConnection();
-        showToast('Signed out of YouTube. Sign in again to choose another Google account.', 'info');
-    } catch (error) { showToast(error.message, 'error'); }
 }
 
 function watchYouTubeUpload(jobId) {

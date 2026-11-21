@@ -1208,14 +1208,6 @@ limitations under the License.
                         <div class="space-y-3 mt-3 text-xs">
                             <p class="text-slate-400">Connect your channel once, then upload automatically after rendering. Credentials stay on the server.</p>
                             <p class="text-slate-400">Rendered videos are vertical 9:16 and up to 30 seconds long, ready for Shorts. YouTube classifies them automatically after processing.</p>
-                            <label class="block">Google OAuth client secret (.json)
-                                <input id="youtubeSecret" type="file" accept=".json,application/json" class="block w-full mt-1 text-slate-300">
-                            </label>
-                            <p class="text-slate-400 break-all">Web application redirect URI: <code id="youtubeRedirect">Loading…</code>. Desktop app files work on localhost.</p>
-                            <div class="flex flex-wrap gap-2">
-                                <button type="button" id="youtubeConnect" onclick="connectYouTube()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-800">Connect Google / YouTube</button>
-                                <button type="button" id="youtubeSignOut" onclick="disconnectYouTube()" disabled class="px-3 py-2 rounded-lg bg-slate-700 disabled:opacity-50">Sign out of YouTube</button>
-                            </div>
                             <p id="youtubeConnection" role="status" class="text-slate-300">Checking connection…</p>
                             <label class="flex items-center gap-2"><input id="youtubeAuto" type="checkbox">Automatically upload after rendering</label>
                             <label class="flex items-center gap-2"><input id="youtubeUseTopic" type="checkbox" checked>Use the video topic as the YouTube title</label>
@@ -4209,7 +4201,7 @@ limitations under the License.
             let youtube = null;
             if (document.getElementById('youtubeAuto').checked) {
                 try {
-                    if (!youtubeConnected) throw new Error('Connect your YouTube account first.');
+                    if (!youtubeConnected) throw new Error('Connect your YouTube account in API Manager first.');
                     youtube = youtubeSettings();
                 } catch (error) { showToast(error.message, 'error'); return; }
             }

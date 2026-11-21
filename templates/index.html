@@ -205,29 +205,9 @@ limitations under the License.
 
                 <form style="scroll-margin-top: 145px" id="cliForm" onsubmit="handleGenerate(event)" class="space-y-5">
 
-                    <!-- API Key Input: shown only when the server has no .env key -->
-                    <div id="apiKeySection" class="hidden p-4 rounded-xl bg-slate-800 border border-slate-700 transition-colors">
-                        <div class="flex justify-between items-center mb-2">
-                            <label for="apiKeyInput" class="text-xs font-semibold text-slate-400 flex items-center gap-2">
-                                <i class="fa-solid fa-key text-slate-400"></i>
-                                <span id="apiKeyLabel">Gemini API Key</span>
-                            </label>
-                            <span class="text-xs font-mono px-2 py-1 rounded bg-slate-800 text-slate-400">Saved in browser</span>
-                        </div>
-                        <div class="relative">
-                            <input type="password" id="apiKeyInput" placeholder="Paste your Gemini API key (AIza...)..."
-                                autocomplete="off" spellcheck="false"
-                                oninput="updateApiKeyIndicator()" onchange="updateApiKeyIndicator()"
-                                class="w-full px-4 py-3 pr-10 bg-slate-950/90 border border-slate-700 rounded-xl text-sm font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-700 focus:ring-1 focus:ring-accent-400 transition">
-                            <button type="button" onclick="toggleApiKeyVisibility()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-100 p-1" title="Show / hide key">
-                                <i id="apiKeyEyeIcon" class="fa-solid fa-eye text-xs"></i>
-                            </button>
-                        </div>
-                        <p class="text-xs text-slate-400 mt-2 flex items-center gap-1">
-                            <i class="fa-solid fa-shield-halved text-xs"></i>
-                            <span>Saved in this browser for your next visit. Clear this field to remove the saved key.</span>
-                        </p>
-                        <a href="/api-manager" class="inline-block mt-2 text-xs text-accent-300 underline">Manage all API connections</a>
+                    <div id="apiConnectionNotice" class="hidden p-3 rounded-xl bg-slate-900 border border-slate-700 text-sm text-slate-300" role="status">
+                        <span id="apiConnectionMessage">Configure your API key in API Manager.</span>
+                        <a id="apiManagerLink" href="/api-manager" class="text-accent-300 underline">Open API Manager</a>
                     </div>
 
                     <h3 class="workflow-heading"><span>01</span> Topic and map</h3>
@@ -633,10 +613,8 @@ limitations under the License.
                                 class="rounded border-slate-700 bg-slate-900 text-accent-500 focus:ring-accent-500">
                             <span>DeepSeek Web Search <span class="text-xs text-slate-400">(search across websites)</span></span>
                         </label>
-                        <p class="text-xs text-slate-400 mt-1">Enter your Tavily key below, or use a search key configured on the server. Source URLs and snippets are passed to DeepSeek.</p>
-                        <label for="tavilyApiKeyInput" class="block mt-2 text-xs text-slate-300">Tavily API key</label>
-                        <input type="password" id="tavilyApiKeyInput" autocomplete="off" spellcheck="false" placeholder="tvly-…" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100">
-                        <p class="mt-1 text-xs text-slate-400">Saved in this browser; excluded from map history. Clear the field to remove the saved key and use the server key. <a href="https://app.tavily.com/" target="_blank" rel="noopener noreferrer" class="underline">Get a Tavily key</a></p>
+                        <p class="text-xs text-slate-400 mt-1">Configure the search connection in API Manager. Source URLs and snippets are passed to DeepSeek.</p>
+                        <a href="/api-manager#searchHeading" class="inline-block mt-2 text-xs text-accent-300 underline">Manage search API connection</a>
                         <div class="mt-2 flex items-center gap-3 text-xs text-slate-300">
                             <label for="deepseekMaxSearchInput" class="shrink-0">Max searches:</label>
                             <input type="range" id="deepseekMaxSearchInput" min="1" max="10" step="1" value="5"
@@ -1212,11 +1190,6 @@ limitations under the License.
 
         // --- Initialize on Load ---
         window.addEventListener('DOMContentLoaded', () => {
-            const tavilyKeyInput = document.getElementById('tavilyApiKeyInput');
-            try { tavilyKeyInput.value = localStorage.getItem('automap-tavily-api-key') || ''; } catch {}
-            const saveTavilyKey = () => saveBrowserValue('automap-tavily-api-key', tavilyKeyInput.value.trim());
-            tavilyKeyInput.addEventListener('input', saveTavilyKey);
-            tavilyKeyInput.addEventListener('change', saveTavilyKey);
             restoreSearchPreferences();
             window.runHistoryReady = restoreRunHistory();
             setInterval(pruneRunHistory, 60000);
@@ -1236,29 +1209,12 @@ limitations under the License.
                 // Keep the default when browser storage is unavailable.
             }
             populateProviderModels(activeAiProvider);
-            updateProviderKeyLabel();
             restoreMapPaletteTheme();
             updateCommandPreview();
             renderFillingStudio();
             // Discover real fonts from the backend on startup (silent — no toast)
             fetchFontsFromServer(true);
             loadAvailableModels();
-
-            // Bind live input/change listeners on #apiKeyInput so #statusIndicator updates immediately
-            const apiKeyInputEl = document.getElementById('apiKeyInput');
-            if (apiKeyInputEl) {
-                apiKeyInputEl.addEventListener('input', () => {
-                    providerKeys[activeAiProvider] = apiKeyInputEl.value.trim();
-                    saveBrowserValue(PROVIDER_KEY_STORAGE[activeAiProvider], apiKeyInputEl.value.trim());
-                    updateApiKeyIndicator();
-                });
-                apiKeyInputEl.addEventListener('change', () => {
-                    providerKeys[activeAiProvider] = apiKeyInputEl.value.trim();
-                    saveBrowserValue(PROVIDER_KEY_STORAGE[activeAiProvider], apiKeyInputEl.value.trim());
-                    updateApiKeyIndicator();
-                    loadAvailableModels();
-                });
-            }
 
             // Ask the server whether an API key from .env is available.
             checkApiKeyStatus();
@@ -1328,20 +1284,16 @@ limitations under the License.
             } catch {}
         }
 
-        window.addEventListener('storage', event => {
-            try {
-                for (const provider of Object.keys(PROVIDER_KEY_STORAGE)) {
-                    if (event.key === PROVIDER_KEY_STORAGE[provider] || event.key === null) {
-                        providerKeys[provider] = localStorage.getItem(PROVIDER_KEY_STORAGE[provider]) || '';
-                        if (provider === activeAiProvider) document.getElementById('apiKeyInput').value = providerKeys[provider];
-                    }
-                }
-                if (event.key === 'automap-tavily-api-key' || event.key === null) {
-                    document.getElementById('tavilyApiKeyInput').value = localStorage.getItem('automap-tavily-api-key') || '';
-                }
-                restoreSearchPreferences();
-                updateApiKeyIndicator();
-            } catch {}
+        function savedApiKey(provider) {
+            try { return (localStorage.getItem(PROVIDER_KEY_STORAGE[provider] || 'automap-tavily-api-key') || '').trim(); }
+            catch { return providerKeys[provider] || ''; }
+        }
+
+        window.addEventListener('storage', () => {
+            for (const provider of Object.keys(providerKeys)) providerKeys[provider] = savedApiKey(provider);
+            restoreSearchPreferences();
+            updateApiKeyIndicator();
+            loadAvailableModels();
         });
 
         function modelProvider(model) {
@@ -1359,11 +1311,6 @@ limitations under the License.
             else if (modelProvider(select.value) !== provider) select.value = models[0];
         }
 
-        function updateProviderKeyLabel() {
-            document.getElementById('apiKeyLabel').textContent = `${PROVIDER_LABELS[activeAiProvider]} API Key`;
-            document.getElementById('apiKeyInput').placeholder = `Paste your ${PROVIDER_LABELS[activeAiProvider]} API key...`;
-        }
-
         function onAiModelChange(model) {
             changeAiProvider(modelProvider(model), model);
         }
@@ -1371,16 +1318,9 @@ limitations under the License.
         function changeAiProvider(provider, selectedModel = null) {
             if (selectedModel) provider = modelProvider(selectedModel);
             if (!(provider in PROVIDER_LABELS)) return;
-            const input = document.getElementById('apiKeyInput');
             if (provider !== activeAiProvider) {
-                providerKeys[activeAiProvider] = input.value.trim();
-                saveBrowserValue(PROVIDER_KEY_STORAGE[activeAiProvider], input.value.trim());
                 activeAiProvider = provider;
-                input.value = providerKeys[provider];
-                input.type = 'password';
-                document.getElementById('apiKeyEyeIcon').className = 'fa-solid fa-eye text-xs';
                 apiKeyRequired = true;
-                document.getElementById('apiKeySection').classList.remove('hidden');
                 populateProviderModels(provider, selectedModel);
                 saveBrowserValue(PROVIDER_STORAGE_KEY, provider);
                 checkApiKeyStatus();
@@ -1392,7 +1332,6 @@ limitations under the License.
                 }
                 select.value = selectedModel;
             }
-            updateProviderKeyLabel();
             updateApiKeyIndicator();
             updateCommandPreview();
         }
@@ -1403,7 +1342,6 @@ limitations under the License.
                 for (const provider of Object.keys(providerKeys)) {
                     providerKeys[provider] = localStorage.getItem(PROVIDER_KEY_STORAGE[provider]) || '';
                 }
-                document.getElementById('apiKeyInput').value = providerKeys[activeAiProvider];
                 document.getElementById('topicInput').value = localStorage.getItem(MAP_TOPIC_STORAGE_KEY) || '';
             } catch {
                 // Use empty fields when browser storage is unavailable.
@@ -1416,8 +1354,9 @@ limitations under the License.
             const headerDot = document.getElementById('headerApiDot');
             const headerText = document.getElementById('headerApiText');
             const stageDot = document.getElementById('stageStatusDot');
-            const apiKeyInput = document.getElementById('apiKeyInput');
-            const hasEnteredKey = !!(apiKeyInput && apiKeyInput.value.trim().length > 0);
+            const hasEnteredKey = !!savedApiKey(activeAiProvider);
+            document.getElementById('apiConnectionNotice').classList.toggle('hidden', !apiKeyRequired || hasEnteredKey);
+            document.getElementById('apiConnectionMessage').textContent = `Configure your ${PROVIDER_LABELS[activeAiProvider]} key in API Manager.`;
             const needsKeyNow = apiKeyRequired && !hasEnteredKey;
 
             if (needsKeyNow) {
@@ -1465,29 +1404,8 @@ limitations under the License.
                 logToConsole(`[Warning] Could not read /api/status (${err.message}). Assuming API key is required.`, 'warn');
             }
 
-            const section = document.getElementById('apiKeySection');
-
-            if (apiKeyRequired) {
-                section.classList.remove('hidden');
-                logToConsole(`[Info] Enter your ${PROVIDER_LABELS[provider]} API key above.`, 'warn');
-            } else {
-                section.classList.add('hidden');
-                logToConsole(`[Info] Server has a ${PROVIDER_LABELS[provider]} API key — no key input needed.`, 'info');
-            }
 
             updateApiKeyIndicator();
-        }
-
-        function toggleApiKeyVisibility() {
-            const input = document.getElementById('apiKeyInput');
-            const icon = document.getElementById('apiKeyEyeIcon');
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.className = 'fa-solid fa-eye-slash text-xs';
-            } else {
-                input.type = 'password';
-                icon.className = 'fa-solid fa-eye text-xs';
-            }
         }
 
         // --- Prompt presets ---
@@ -1678,7 +1596,7 @@ limitations under the License.
             const version = ++modelListVersion;
             const select = document.getElementById('modelSelect');
             if (!select) return;
-            const apiKey = (document.getElementById('apiKeyInput')?.value || '').trim();
+            const apiKey = savedApiKey(activeAiProvider);
             try {
                 const res = await fetch('/api/models', {
                     method: 'POST',
@@ -2164,7 +2082,7 @@ limitations under the License.
             const model = document.getElementById('modelSelect').value;
             const font = document.getElementById('fontSelect').value;
             const topic = document.getElementById('topicInput').value.trim();
-            const apiKey = document.getElementById('apiKeyInput').value.trim();
+            const apiKey = savedApiKey(activeAiProvider);
             const autoStyleEl = document.getElementById('autoStyleFromMapToggle');
             const auto_style = autoStyleEl ? !!autoStyleEl.checked : true;
             const palette_theme = document.getElementById('fillingPaletteTheme')?.value || 'auto';
@@ -2173,7 +2091,7 @@ limitations under the License.
             return {
                 provider: activeAiProvider,
                 web_search: activeAiProvider === 'deepseek' && !!document.getElementById('deepseekWebSearchToggle')?.checked,
-                ...(activeAiProvider === 'deepseek' && document.getElementById('deepseekWebSearchToggle')?.checked && document.getElementById('tavilyApiKeyInput')?.value.trim() ? {tavily_api_key: document.getElementById('tavilyApiKeyInput').value.trim()} : {}),
+                ...(activeAiProvider === 'deepseek' && document.getElementById('deepseekWebSearchToggle')?.checked && savedApiKey('tavily') ? {tavily_api_key: savedApiKey('tavily')} : {}),
                 max_search_requests: parseInt(document.getElementById('deepseekMaxSearchInput')?.value || '5', 10) || 5,
                 mode,
                 map_type: mapType,
@@ -2491,9 +2409,9 @@ limitations under the License.
 
             // If the server has no .env key, a key must be entered in the form.
             if (apiKeyRequired && !state.api_key) {
-                logToConsole(`[Error] Enter your ${PROVIDER_LABELS[activeAiProvider]} API key in the form.`, 'error');
-                showToast("Please enter your Gemini API key first.", "error");
-                document.getElementById('apiKeyInput').focus();
+                logToConsole(`[Error] Enter your ${PROVIDER_LABELS[activeAiProvider]} API key in API Manager.`, 'error');
+                showToast(`Configure your ${PROVIDER_LABELS[activeAiProvider]} API key in API Manager.`, "error");
+                document.getElementById('apiManagerLink').focus();
                 return;
             }
 

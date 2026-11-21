@@ -47,6 +47,11 @@ def info(message: str) -> None:
         console.print(f"[cyan]·[/] {message}")
 
 
+def research(message: str) -> None:
+    """Always show search audit records, treating query text as plain text."""
+    console.print(message, markup=False, highlight=False, soft_wrap=True)
+
+
 def step(message: str) -> None:
     """Log a major step marker (shown only in verbose mode)."""
     if _verbose:

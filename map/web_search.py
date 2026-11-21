@@ -36,11 +36,15 @@ def _text(value, limit):
     return re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]*>', '', str(value or '')))).strip()[:limit]
 
 
-def search_web(query, max_results=5, *, api_key=None):
-    """Return bounded JSON evidence with source URLs; never substitute model answers."""
+def normalize_query(query):
     if not isinstance(query, str) or not query.strip():
         raise SearchError('Web search requires a nonempty text query.')
-    query = ' '.join(query.split()[:75])[:600]
+    return ' '.join(query.split()[:75])[:600]
+
+
+def search_web(query, max_results=5, *, api_key=None):
+    """Return bounded JSON evidence with source URLs; never substitute model answers."""
+    query = normalize_query(query)
     count = max(1, min(10, int(max_results)))
     provider, key = search_config(api_key)
     response = None

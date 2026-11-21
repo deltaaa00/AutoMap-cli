@@ -818,7 +818,7 @@ def test_youtube_auto_upload_uses_metadata_and_shows_video_link(studio):
     assert not page.locator('#youtubeUseTopic').is_checked()
     assert page.locator('#youtubeTags').input_value() == 'географія, maps'
     assert page.locator('#youtubePrivacy').input_value() == 'unlisted'
-    assert page.locator('#youtubeSecret').input_value() == ''
+    assert page.locator('#youtubeSecret').count() == 0
 
 
 def test_youtube_refreshes_stale_request_token_and_retries_once(studio):
@@ -881,16 +881,10 @@ def test_youtube_sign_in_status_is_visible_when_panel_is_closed(studio):
         'connected': True, 'csrf_token': 'test-token', 'redirect_uri': 'https://automap.test/api/youtube/callback'}))
     page.evaluate('loadYouTubeConnection()')
     assert page.locator('#youtubeConnectionBadge').inner_text() == 'Signed in to YouTube'
-    page.route('**/api/youtube/disconnect', lambda route: route.fulfill(json={'connected': False}))
-    page.route('**/api/youtube/status', lambda route: route.fulfill(json={
-        'connected': False, 'csrf_token': 'test-token', 'redirect_uri': 'https://automap.test/api/youtube/callback'}))
     page.locator('#youtubePanel summary').click()
-    page.locator('#youtubeAuto').check()
-    page.locator('#youtubeSignOut').click()
-    page.wait_for_function("document.getElementById('youtubeConnectionBadge').textContent === 'Not signed in to YouTube'")
-    assert page.locator('#youtubeSignOut').is_disabled()
-    assert not page.locator('#youtubeAuto').is_checked()
-    assert page.evaluate("JSON.parse(localStorage.getItem('automap-youtube-settings')).youtubeAuto") is False
+    assert page.locator('#youtubeSignOut').count() == 0
+    assert page.locator('#youtubeSecret').count() == 0
+    assert page.get_by_role('link', name='Manage YouTube connection in API Manager').get_attribute('href') == '/api-manager#youtubeHeading'
 
 
 def test_selected_idea_transfers_to_studio_and_preserves_manual_edits(studio):
