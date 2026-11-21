@@ -110,6 +110,20 @@ Browser-supplied keys are sent to the application server for the active provider
 
 DeepSeek uses its official Chat Completions API with JSON output and thinking disabled for map generation. No separate OpenAI SDK is required. API requests have a 45-second timeout and no application-level automatic retry. Map drawing takes additional time. Provider overload, quota limits, invalid credentials, insufficient DeepSeek balance, and timeouts are reported in the interface.
 
+Enable **DeepSeek Web Search** to search across websites using [Tavily](https://docs.tavily.com/documentation/api-reference/endpoint/search) or [Brave Search](https://api-dashboard.search.brave.com/api-reference/web/search/get). Enter your Tavily key in the **Tavily API key** field beside the search toggle. It is saved in this browser across reloads, sent only when DeepSeek search is enabled, and excluded from map history. Clear the field to remove the saved key. A supplied Tavily key overrides the server search provider for that request. Alternatively, configure a separate search-service key on the server:
+
+```dotenv
+WEB_SEARCH_PROVIDER=tavily
+TAVILY_API_KEY=your_tavily_api_key
+# Alternatively: WEB_SEARCH_PROVIDER=brave and BRAVE_SEARCH_API_KEY=your_brave_search_api_key
+```
+
+Open **API Manager** (`/api-manager`) from the map generator or Video Studio to manage Gemini, DeepSeek, and Tavily browser keys, see server configuration status, and connect or disconnect YouTube with your Google OAuth client JSON. Browser keys use the same storage as the map generator. The web-search toggle and maximum search count are saved across reloads and shared between both pages. YouTube authorization returns to the manager when started there; video upload settings remain in Video Studio.
+
+Restart the application (recreate the web container for Docker). If no provider is selected, a configured Tavily key takes precedence over Brave. Search credentials stay on the server and are independent of the DeepSeek key. Queries are sent to the selected search service; titles, source URLs, snippets, and available dates are passed to DeepSeek. The first search is required; further searches share the selected limit of 1–10 calls. Missing configuration, quota errors, or provider failures stop generation with an error instead of silently using Wikipedia or model knowledge. Each search has a 20-second read timeout in addition to model request timeouts. Search services may charge per request.
+
+Search snippets do not guarantee accurate or current values. The model is instructed to prefer primary sources, check years, and use null for unsupported values. Source URLs currently go to the model; the map output and UI do not include a source bibliography. Cached map answers can be reused; API clients can set `refresh_ai: true` to research again.
+
 ## Run from the source checkout
 
 Use **Python 3.12**, matching the Docker images and test workflow. Keep the repository's `resources/` directory available: the renderer uses its map artwork and fonts.

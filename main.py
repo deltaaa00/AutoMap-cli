@@ -166,6 +166,20 @@ def studio():
     return render_template("video.html", title_fonts=_available_fonts())
 
 
+@app.get('/api-manager')
+def api_manager():
+    """Manage browser API credentials and the existing YouTube OAuth connection."""
+    youtube_uploads.owner()
+    youtube_uploads.csrf()
+    response = app.make_response(render_template('api_manager.html',
+        server_keys={provider: bool(_server_api_key(provider)) for provider in ('gemini', 'deepseek')},
+        search_server_configured=any(
+            str(os.environ.get(name) or '').strip() and not str(os.environ.get(name)).lower().startswith('your_')
+            for name in ('TAVILY_API_KEY', 'BRAVE_SEARCH_API_KEY'))))
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
 @app.route('/api/video_title_preview', methods=['POST'])
 def video_title_preview():
     """Proxy title/watermark/sticker preview requests to the yt-dlp render worker."""
@@ -295,6 +309,8 @@ def _auto_map_with_ai_cache(*, refresh: bool, provider: str, api_key, **kwargs):
         identity = ''
     short_form = 'short_form' in str(kwargs.get('optional_feature') or '')
     scope = ai_cache.scope(identity, api_key)
+    if kwargs.get("web_search") and kwargs.get("tavily_api_key"):
+        scope = ai_cache.scope(scope, kwargs["tavily_api_key"])
     base_fields = dict(
         prompt=str(kwargs.get('prompt') or ''),
         map_type=str(kwargs.get('map_type') or ''),
@@ -691,7 +707,7 @@ def generate():
             io_res=True,
             api_key=api_key,
             **temperature_options,
-            **({"web_search": True, "max_search_requests": max(1, min(10, int(data.get("max_search_requests") or 5)))} if str(data.get("web_search") or "").strip().lower() in ("1", "true", "yes", "on") else {}),
+            **({"web_search": True, "max_search_requests": max(1, min(10, int(data.get("max_search_requests") or 5))), **({"tavily_api_key": str(data.get("tavily_api_key") or "").strip()} if data.get("tavily_api_key") else {})} if str(data.get("web_search") or "").strip().lower() in ("1", "true", "yes", "on") else {}),
             **style_kwargs,
         )
     except AIServiceError as error:
@@ -1042,7 +1058,7 @@ def generate_batch():
                 io_res=True,
                 api_key=item_api_key,
                 **temperature_options,
-                **({"web_search": True, "max_search_requests": max(1, min(10, int(data.get("max_search_requests") or 5)))} if str(data.get("web_search") or "").strip().lower() in ("1", "true", "yes", "on") else {}),
+                **({"web_search": True, "max_search_requests": max(1, min(10, int(data.get("max_search_requests") or 5))), **({"tavily_api_key": str(data.get("tavily_api_key") or "").strip()} if data.get("tavily_api_key") else {})} if str(data.get("web_search") or "").strip().lower() in ("1", "true", "yes", "on") else {}),
                 **item_style_kwargs,
             )
         except Exception as err:  # noqa: BLE001

@@ -258,6 +258,7 @@ class YouTubeUploads:
                 auth_url, state = flow.authorization_url(access_type='offline', prompt='consent select_account')
                 owner = self.owner()
                 pending = {'config': config, 'state': state, 'verifier': flow.code_verifier, 'redirect': callback, 'created': time.time()}
+                pending['return_to'] = '/api-manager' if request.form.get('return_to') == '/api-manager' else '/studio'
                 self.save_secret(self.token_path(owner).with_suffix('.pending'), pending)
                 return jsonify(authorization_url=auth_url)
             except ValueError as error:
@@ -268,14 +269,17 @@ class YouTubeUploads:
         @app.get('/api/youtube/callback')
         def youtube_callback():
             pending_path = self.token_path(self.owner()).with_suffix('.pending')
+            return_to = '/studio'
             try:
                 pending = self.load_secret(pending_path)
+                if pending.get('return_to') == '/api-manager':
+                    return_to = '/api-manager'
                 state = request.args.get('state', '')
                 if not state or not hmac.compare_digest(state, pending['state']) or time.time() - pending['created'] > 600:
                     raise ValueError('Expired or invalid OAuth state.')
                 pending_path.unlink(missing_ok=True)
                 if request.args.get('error') or not request.args.get('code'):
-                    return redirect('/studio?youtube=denied')
+                    return redirect(return_to + '?youtube=denied')
                 from google_auth_oauthlib.flow import Flow
                 flow = Flow.from_client_config(pending['config'], scopes=[SCOPE], state=state,
                                                redirect_uri=pending['redirect'], code_verifier=pending['verifier'])
@@ -283,10 +287,10 @@ class YouTubeUploads:
                 if not flow.credentials.refresh_token:
                     raise ValueError('Missing refresh token.')
                 self.save_secret(self.token_path(self.owner()), json.loads(flow.credentials.to_json()))
-                return redirect('/studio?youtube=connected')
+                return redirect(return_to + '?youtube=connected')
             except Exception:
                 # Never echo an OAuth exception into a page or log.
-                return redirect('/studio?youtube=error')
+                return redirect(return_to + '?youtube=error')
 
         @app.post('/api/youtube/disconnect')
         def youtube_disconnect():

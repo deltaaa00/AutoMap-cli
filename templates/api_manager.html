@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>API Manager — AutoMap</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='studio.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='api-manager.css') }}">
+    <script src="{{ url_for('static', filename='api-manager.js') }}" defer></script>
+</head>
+<body class="api-manager">
+<header><div class="manager-navigation">
+    <a class="brand" href="/">
+        <span class="brand-mark"><svg class="automap-mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M4 8l8-4 8 4 8-4v20l-8 4-8-4-8 4V8Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 4v20M20 8v20" stroke="currentColor" stroke-width="1.5"/></svg></span>
+        <span><span class="brand-title">AutoMap Studio</span><span class="brand-subtitle">API connections &amp; credentials</span></span>
+    </a>
+    <nav aria-label="Workspace"><a href="/">Map generator</a><a href="/studio">Video Studio</a><a href="/api-manager" aria-current="page">API Manager</a></nav>
+</div></header>
+<main>
+    <div class="intro"><p class="eyebrow">Workspace settings</p><h1>API Manager</h1><p>Connect your AI models, web search, and YouTube account.</p></div>
+    <p id="managerMessage" role="status" aria-live="polite"></p>
+    <section aria-labelledby="modelHeading">
+        <div class="section-heading"><h2 id="modelHeading">AI models</h2><p>Keys are saved in this browser and shared with the map generator.</p></div>
+        <div class="cards">
+        {% for provider, label, description, link in [('gemini', 'Google Gemini', 'Generate map data and topic ideas with Gemini.', 'https://aistudio.google.com/apikey'), ('deepseek', 'DeepSeek', 'Generate map data and research topics with DeepSeek.', 'https://platform.deepseek.com/api_keys')] %}
+            <article class="card" data-provider="{{ provider }}" data-server="{{ 'true' if server_keys[provider] else 'false' }}">
+                <div class="card-title"><h3>{{ label }}</h3><span class="key-status" id="{{ provider }}Status">Loading…</span></div>
+                <p>{{ description }}</p>
+                <label for="{{ provider }}Key">API key</label>
+                <div class="key-field"><input id="{{ provider }}Key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your API key"><button type="button" data-reveal="{{ provider }}Key" aria-label="Show {{ label }} API key" aria-pressed="false">Show</button></div>
+                <div class="actions"><button type="button" class="primary" data-save="{{ provider }}">Save key</button><button type="button" data-remove="{{ provider }}">Remove browser key</button><a href="{{ link }}" target="_blank" rel="noopener noreferrer">Get API key</a></div>
+                <p class="detail">{% if server_keys[provider] %}A server key is also configured. Removing the browser key keeps the server configuration.{% else %}No server key configured. Add a browser key to use this provider.{% endif %}</p>
+            </article>
+        {% endfor %}
+        </div>
+    </section>
+    <section aria-labelledby="searchHeading">
+        <div class="section-heading"><h2 id="searchHeading">Web search</h2><p>Give DeepSeek source URLs and snippets from across the web.</p></div>
+        <article class="card" data-provider="tavily" data-server="{{ 'true' if search_server_configured else 'false' }}">
+            <div class="card-title"><h3>Tavily</h3><span class="key-status" id="tavilyStatus">Loading…</span></div>
+            <label for="tavilyKey">API key</label>
+            <div class="key-field"><input id="tavilyKey" type="password" autocomplete="off" spellcheck="false" placeholder="tvly-…"><button type="button" data-reveal="tavilyKey" aria-label="Show Tavily API key" aria-pressed="false">Show</button></div>
+            <div class="actions"><button type="button" class="primary" data-save="tavily">Save key</button><button type="button" data-remove="tavily">Remove browser key</button><a href="https://app.tavily.com/" target="_blank" rel="noopener noreferrer">Get API key</a></div>
+            <div class="search-settings"><label class="checkbox"><input type="checkbox" id="managerWebSearch">Enable web search for DeepSeek</label><label for="managerSearchLimit">Maximum searches per map <output id="managerSearchValue">5</output></label><input id="managerSearchLimit" type="range" min="1" max="10" value="5"></div>
+            <p class="detail">A browser Tavily key overrides the server search provider. Search limits apply to each map.</p>
+        </article>
+    </section>
+    <section aria-labelledby="youtubeHeading">
+        <div class="section-heading"><h2 id="youtubeHeading">YouTube Data API</h2><p>Authorize Video Studio to upload videos to your YouTube account.</p></div>
+        <article class="card">
+            <div class="card-title"><h3>Google / YouTube</h3><span class="key-status" id="managerYoutubeStatus" role="status">Checking connection…</span></div>
+            <p>Uploads use Google OAuth, rather than an API key. Enable YouTube Data API v3 in your Google Cloud project, then download an OAuth client JSON file.</p>
+            <label for="managerYoutubeSecret">OAuth client JSON</label><input type="file" id="managerYoutubeSecret" accept=".json,application/json">
+            <p class="detail">For a Web application client, add this authorized redirect URI:</p><code id="managerYoutubeRedirect">Loading…</code>
+            <p class="detail">Desktop app credentials work on localhost. Google credentials and OAuth tokens are stored encrypted on the server.</p>
+            <div class="actions"><button type="button" class="primary" id="managerYoutubeConnect">Connect Google / YouTube</button><button type="button" id="managerYoutubeDisconnect" disabled>Disconnect</button><button type="button" id="managerYoutubeRefresh">Refresh status</button><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud credentials</a></div>
+            <p class="detail">Choose titles, visibility, and automatic uploads in <a href="/studio#youtubePanel">Video Studio</a>.</p>
+        </article>
+    </section>
+    <p class="footnote">“Saved in browser” confirms storage, not API access or account balance. Clearing a key removes the browser copy. Server keys stay hidden.</p>
+</main>
+</body></html>

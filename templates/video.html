@@ -261,6 +261,7 @@ limitations under the License.
                     <span class="text-accent-300 font-semibold">03 Frame &amp; Render</span>
                 </div>
 
+                <a href="/api-manager" class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-xs font-semibold">API Manager</a>
                 <button type="button" id="clearAllDataBtn" onclick="clearAllUserData(this)" class="px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-400 border border-slate-700 text-xs font-semibold transition-colors shrink-0">Clear all data</button>
                 {% if config.WEB_AUTH_ENABLED and session.get('web_identity') %}
                 <form method="post" action="{{ url_for('web_logout') }}">
@@ -1203,6 +1204,7 @@ limitations under the License.
 
                     <details class="p-4 rounded-xl bg-slate-950/80 border border-slate-700 space-y-3" id="youtubePanel">
                         <summary class="cursor-pointer text-sm font-semibold text-slate-400"><i class="fa-brands fa-youtube mr-2"></i>YouTube upload <span id="youtubeConnectionBadge" role="status" class="ml-2 text-xs font-normal text-slate-400">Checking sign-in…</span></summary>
+                        <a href="/api-manager#youtubeHeading" class="inline-block mt-3 text-sm text-slate-300 underline">Manage YouTube connection in API Manager</a>
                         <div class="space-y-3 mt-3 text-xs">
                             <p class="text-slate-400">Connect your channel once, then upload automatically after rendering. Credentials stay on the server.</p>
                             <p class="text-slate-400">Rendered videos are vertical 9:16 and up to 30 seconds long, ready for Shorts. YouTube classifies them automatically after processing.</p>

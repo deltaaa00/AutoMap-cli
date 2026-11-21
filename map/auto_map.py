@@ -815,6 +815,7 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
              temperature: float | None = None,
              web_search: bool = False,
              max_search_requests: int = 5,
+             tavily_api_key: str | None = None,
              show_legend: bool = False,
              highlight_extrema: bool = False,
              highlight_high_color: str = "#00e5ff",
@@ -957,6 +958,8 @@ def auto_map(prompt: str, mode: str, map_type: str, size_mod: int,
         if web_search:
             ai_options["web_search"] = True
             ai_options["max_search_requests"] = max_search_requests
+            if tavily_api_key:
+                ai_options["tavily_api_key"] = tavily_api_key
         ai_answer = ai_request(prompt, map_type, model, api_key, **ai_options)
 
     if ai_answer is None:

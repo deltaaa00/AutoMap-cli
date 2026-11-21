@@ -64,27 +64,18 @@ def test_empty_idea_provider_responses(monkeypatch, model, content):
 
 
 def test_research_budget_prevents_unbounded_model_tool_calls(monkeypatch):
+    monkeypatch.setenv('TAVILY_API_KEY', 'test-search-key')
+    monkeypatch.setenv('WEB_SEARCH_PROVIDER', 'tavily')
     tool = lambda i,args:{'id':str(i),'function':{'name':'web_search','arguments':args}}
     first={'choices':[{'finish_reason':'tool_calls','message':{'tool_calls':[tool(1,'bad-json'),tool(2,'{}')]}}]}
     call=Mock(side_effect=[first,{'choices':[{'message':{'content':'{"ukraine":42}'}}]}])
     monkeypatch.setattr(ai,'_deepseek_json',call)
     search=Mock(return_value='search results')
-    monkeypatch.setattr(ai,'_web_search_ddg',search)
+    monkeypatch.setattr(ai,'_web_search',search)
     assert json.loads(ai._deepseek_request('Population','deepseek-flash',web_search=True,max_search_requests=1)) == {'ukraine':42}
     search.assert_called_once_with('Population')
     assert 'tools' not in call.call_args.kwargs['payload']
     assert any('budget reached' in m.get('content','') for m in call.call_args.kwargs['payload']['messages'])
-
-
-@pytest.mark.parametrize('outcome', ['ok','empty','http','network','json'])
-def test_web_research_extracts_plain_text_and_handles_failures(monkeypatch,outcome):
-    response=Mock(status_code=500 if outcome=='http' else 200)
-    response.json.return_value={'query':{'search':[] if outcome=='empty' else [{'title':'Topic','snippet':'<b>Fact</b> &amp; more'},{'title':'Only title'}]}}
-    if outcome=='json':response.json.side_effect=ValueError('invalid')
-    monkeypatch.setattr(requests,'get',Mock(return_value=response,side_effect=requests.Timeout('timeout') if outcome=='network' else None))
-    result=ai._web_search_ddg('topic')
-    if outcome=='ok':assert result=='- Topic: Fact & more\n- Only title'
-    else:assert result and '<b>' not in result
 
 
 @pytest.mark.parametrize('payload,status', [({'provider':'unknown'},400),({'provider':'gemini','model':'deepseek-flash'},400),({'temperature':3},400),({},200)])

@@ -150,6 +150,7 @@ limitations under the License.
                 </div>
 
                 <!-- Agent & Video Studio Navigation Links -->
+                <a href="/api-manager" class="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-xs font-semibold">API Manager</a>
                 <a href="{{ agent_url }}" target="_blank" rel="noopener noreferrer" class="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-200 text-xs font-semibold border border-emerald-500/35 transition-colors flex items-center gap-1.5">
                     <i class="fa-solid fa-robot text-xs"></i>
                     <span>Agent</span>
@@ -226,6 +227,7 @@ limitations under the License.
                             <i class="fa-solid fa-shield-halved text-xs"></i>
                             <span>Saved in this browser for your next visit. Clear this field to remove the saved key.</span>
                         </p>
+                        <a href="/api-manager" class="inline-block mt-2 text-xs text-accent-300 underline">Manage all API connections</a>
                     </div>
 
                     <h3 class="workflow-heading"><span>01</span> Topic and map</h3>
@@ -629,8 +631,12 @@ limitations under the License.
                         <label class="mt-3 pt-2.5 border-t border-accent-400/20 flex items-center gap-2 text-xs text-accent-300 cursor-pointer select-none">
                             <input type="checkbox" id="deepseekWebSearchToggle" onchange="try { localStorage.setItem('automap-deepseek-web-search', this.checked ? '1' : '0'); } catch {}"
                                 class="rounded border-slate-700 bg-slate-900 text-accent-500 focus:ring-accent-500">
-                            <span>DeepSeek Web Search <span class="text-xs text-slate-400">(enables/disables API search tool)</span></span>
+                            <span>DeepSeek Web Search <span class="text-xs text-slate-400">(search across websites)</span></span>
                         </label>
+                        <p class="text-xs text-slate-400 mt-1">Enter your Tavily key below, or use a search key configured on the server. Source URLs and snippets are passed to DeepSeek.</p>
+                        <label for="tavilyApiKeyInput" class="block mt-2 text-xs text-slate-300">Tavily API key</label>
+                        <input type="password" id="tavilyApiKeyInput" autocomplete="off" spellcheck="false" placeholder="tvly-…" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-sm text-slate-100">
+                        <p class="mt-1 text-xs text-slate-400">Saved in this browser; excluded from map history. Clear the field to remove the saved key and use the server key. <a href="https://app.tavily.com/" target="_blank" rel="noopener noreferrer" class="underline">Get a Tavily key</a></p>
                         <div class="mt-2 flex items-center gap-3 text-xs text-slate-300">
                             <label for="deepseekMaxSearchInput" class="shrink-0">Max searches:</label>
                             <input type="range" id="deepseekMaxSearchInput" min="1" max="10" step="1" value="5"
@@ -1206,6 +1212,12 @@ limitations under the License.
 
         // --- Initialize on Load ---
         window.addEventListener('DOMContentLoaded', () => {
+            const tavilyKeyInput = document.getElementById('tavilyApiKeyInput');
+            try { tavilyKeyInput.value = localStorage.getItem('automap-tavily-api-key') || ''; } catch {}
+            const saveTavilyKey = () => saveBrowserValue('automap-tavily-api-key', tavilyKeyInput.value.trim());
+            tavilyKeyInput.addEventListener('input', saveTavilyKey);
+            tavilyKeyInput.addEventListener('change', saveTavilyKey);
+            restoreSearchPreferences();
             window.runHistoryReady = restoreRunHistory();
             setInterval(pruneRunHistory, 60000);
             window.addEventListener('focus', pruneRunHistory);
@@ -1306,6 +1318,31 @@ limitations under the License.
                 // Inputs remain usable if browser storage is blocked or full.
             }
         }
+
+        function restoreSearchPreferences() {
+            try {
+                document.getElementById('deepseekWebSearchToggle').checked = localStorage.getItem('automap-deepseek-web-search') === '1';
+                const limit = Math.max(1, Math.min(10, Number(localStorage.getItem('automap-deepseek-max-search')) || 5));
+                document.getElementById('deepseekMaxSearchInput').value = limit;
+                document.getElementById('deepseekMaxSearchVal').textContent = limit;
+            } catch {}
+        }
+
+        window.addEventListener('storage', event => {
+            try {
+                for (const provider of Object.keys(PROVIDER_KEY_STORAGE)) {
+                    if (event.key === PROVIDER_KEY_STORAGE[provider] || event.key === null) {
+                        providerKeys[provider] = localStorage.getItem(PROVIDER_KEY_STORAGE[provider]) || '';
+                        if (provider === activeAiProvider) document.getElementById('apiKeyInput').value = providerKeys[provider];
+                    }
+                }
+                if (event.key === 'automap-tavily-api-key' || event.key === null) {
+                    document.getElementById('tavilyApiKeyInput').value = localStorage.getItem('automap-tavily-api-key') || '';
+                }
+                restoreSearchPreferences();
+                updateApiKeyIndicator();
+            } catch {}
+        });
 
         function modelProvider(model) {
             return String(model || '').toLowerCase().startsWith('deepseek-') ? 'deepseek' : 'gemini';
@@ -2135,7 +2172,8 @@ limitations under the License.
 
             return {
                 provider: activeAiProvider,
-                web_search: !!document.getElementById('deepseekWebSearchToggle')?.checked,
+                web_search: activeAiProvider === 'deepseek' && !!document.getElementById('deepseekWebSearchToggle')?.checked,
+                ...(activeAiProvider === 'deepseek' && document.getElementById('deepseekWebSearchToggle')?.checked && document.getElementById('tavilyApiKeyInput')?.value.trim() ? {tavily_api_key: document.getElementById('tavilyApiKeyInput').value.trim()} : {}),
                 max_search_requests: parseInt(document.getElementById('deepseekMaxSearchInput')?.value || '5', 10) || 5,
                 mode,
                 map_type: mapType,
@@ -3246,7 +3284,7 @@ limitations under the License.
         }
 
         function addToHistory(state, cmd, extra = {}) {
-            const {api_key, ...savedState} = state;
+            const {api_key, tavily_api_key, ...savedState} = state;
             const createdAt = Date.now();
             const entry = {
                 id: `${createdAt}-${Math.random().toString(36).slice(2)}`,

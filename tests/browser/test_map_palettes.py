@@ -508,6 +508,90 @@ def test_deepseek_generation_sends_only_active_provider_key(map_page):
     assert 'DeepSeek is overloaded' in page.locator('#generationError').inner_text()
 
 
+def test_tavily_key_is_sent_only_for_enabled_deepseek_search_and_excluded_from_history(map_page):
+    page = map_page
+    stub_provider_model_lists(page)
+    page.select_option('#modelSelect', 'deepseek-flash')
+    page.locator('#tavilyApiKeyInput').fill('tvly-browser-secret')
+    page.locator('#deepseekWebSearchToggle').check()
+    assert page.evaluate('getFormState().tavily_api_key') == 'tvly-browser-secret'
+    page.evaluate("addToHistory(getFormState(), 'test')")
+    assert 'tvly-browser-secret' not in page.evaluate('JSON.stringify(runHistory)')
+    page.locator('#deepseekWebSearchToggle').uncheck()
+    assert page.evaluate('getFormState().tavily_api_key') is None
+    page.locator('#deepseekWebSearchToggle').check()
+    page.select_option('#modelSelect', 'gemini-3.8-flash')
+    assert page.evaluate('getFormState().tavily_api_key') is None
+    assert page.evaluate('getFormState().web_search') is False
+
+
+def test_tavily_key_survives_reload_and_clearing_removes_it(map_page):
+    page = map_page
+    page.locator('#tavilyApiKeyInput').fill('tvly-saved-secret')
+    assert page.evaluate("localStorage.getItem('automap-tavily-api-key')") == 'tvly-saved-secret'
+    page.reload()
+    assert page.locator('#tavilyApiKeyInput').input_value() == 'tvly-saved-secret'
+    page.locator('#tavilyApiKeyInput').fill('')
+    assert page.evaluate("localStorage.getItem('automap-tavily-api-key')") is None
+    page.reload()
+    assert page.locator('#tavilyApiKeyInput').input_value() == ''
+
+
+def test_api_manager_keys_are_shared_with_map_generator(map_page):
+    page = map_page
+    page.goto('http://automap.test/api-manager')
+    for provider in ('gemini', 'deepseek', 'tavily'):
+        page.locator(f'#{provider}Key').fill(f'{provider}-manager-key')
+        page.locator(f'[data-save="{provider}"]').click()
+        assert page.locator(f'#{provider}Status').inner_text() == 'Saved in browser'
+    page.locator('#managerWebSearch').check()
+    page.locator('#managerSearchLimit').fill('3')
+    page.reload()
+    assert page.locator('#deepseekKey').input_value() == 'deepseek-manager-key'
+    assert page.locator('#managerSearchLimit').input_value() == '3'
+    page.get_by_role('link', name='Map generator', exact=True).click()
+    assert page.locator('#apiKeyInput').input_value() == 'gemini-manager-key'
+    assert page.locator('#tavilyApiKeyInput').input_value() == 'tavily-manager-key'
+    assert page.locator('#deepseekWebSearchToggle').is_checked()
+    assert page.locator('#deepseekMaxSearchInput').input_value() == '3'
+    page.goto('http://automap.test/api-manager')
+    page.locator('[data-remove="deepseek"]').click()
+    page.reload()
+    assert page.locator('#deepseekKey').input_value() == ''
+
+
+def test_api_manager_layout_and_youtube_status(map_page):
+    page = map_page
+    page.goto('http://automap.test/api-manager')
+    expect(page.locator('#managerYoutubeStatus')).to_have_text('Not connected')
+    assert page.locator('#managerYoutubeDisconnect').is_disabled()
+    assert '/api/youtube/callback' in page.locator('#managerYoutubeRedirect').inner_text()
+    page.locator('#managerYoutubeConnect').click()
+    assert 'Choose your Google OAuth' in page.locator('#managerMessage').inner_text()
+    for width in (390, 1280):
+        page.set_viewport_size({'width': width, 'height': 900})
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+
+
+def test_map_search_preferences_survive_reload_and_sync_with_manager(map_page):
+    page = map_page
+    page.locator('#deepseekWebSearchToggle').check()
+    page.locator('#deepseekMaxSearchInput').fill('8')
+    page.reload()
+    assert page.locator('#deepseekWebSearchToggle').is_checked()
+    assert page.locator('#deepseekMaxSearchInput').input_value() == '8'
+    assert page.locator('#deepseekMaxSearchVal').inner_text() == '8'
+    page.goto('http://automap.test/api-manager')
+    assert page.locator('#managerWebSearch').is_checked()
+    assert page.locator('#managerSearchLimit').input_value() == '8'
+    page.locator('#managerWebSearch').uncheck()
+    page.reload()
+    assert not page.locator('#managerWebSearch').is_checked()
+    page.goto('http://automap.test/')
+    assert not page.locator('#deepseekWebSearchToggle').is_checked()
+    assert page.locator('#deepseekMaxSearchInput').input_value() == '8'
+
+
 def test_server_deepseek_key_hides_input_without_exposing_key(map_page, monkeypatch):
     page = map_page
     stub_provider_model_lists(page)
