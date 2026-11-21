@@ -182,7 +182,7 @@ class AgentRunner:
         palette_theme = "auto"
         font = "Bips.ttf"
         extra_option = "show_most_least"
-        topic_reason = ""
+        topic_reason = "Custom user idea" if topic else ""
 
         if not topic:
             comp = self.optimizer.pick_competitor_inspiration()
@@ -535,9 +535,58 @@ class AgentRunner:
         self.db.mark_competitor_music_imported(comp_id)
         return f"Added track to pool: {saved.name}"
 
+    def _handle_telegram_message(self, text: str) -> None:
+        """Handle a text idea or command sent directly in the authorized Telegram chat."""
+        raw = str(text or "").strip()
+        if not raw:
+            return
+        low = raw.lower()
+        if low in ("/start", "/help", "help"):
+            self.bot.send_message(
+                "👋 Надішли мені будь-яку тему або ідею для карти (наприклад: "
+                "`Average sleep hours in Europe`), і я згенерую з неї Shorts та надішлю на підтвердження.\n\n"
+                "Команди:\n"
+                "• /sync — оновити аналітику YouTube та конкурентів"
+            )
+            return
+        if low == "/sync":
+            self.bot.send_message("🔄 Оновлюю аналітику каналу та конкурентів...")
+            try:
+                res = self.run_daily_sync()
+                self.bot.send_message(
+                    f"✅ Синхронізація завершена: оновлено {res['analytics_updated']} експериментів, "
+                    f"проскановано {res['competitor_updated']} відео конкурентів."
+                )
+            except Exception as exc:
+                log.exception("Telegram /sync failed")
+                self.bot.send_message(f"❌ Помилка синхронізації: {exc}")
+            return
+
+        for prefix in ("/idea ", "/topic "):
+            if low.startswith(prefix):
+                raw = raw[len(prefix) :].strip()
+                break
+
+        if raw.startswith("/"):
+            self.bot.send_message("Невідома команда. Надішли просто текст ідеї або /help.")
+            return
+
+        idea = raw[:140].strip()
+        if len(idea) < 3:
+            self.bot.send_message("Напиши, будь ласка, трохи детальнішу ідею (мін. 3 символи).")
+            return
+
+        self.bot.send_message(f"🎬 Прийняв ідею: «{idea}»\nГенерую карту та рендерю Shorts...")
+        try:
+            self.generate_candidate_video(forced_topic=idea)
+        except Exception as exc:
+            log.exception("Telegram custom idea generation failed: %s", idea)
+            self.bot.send_message(f"❌ Не вдалося згенерувати відео для «{idea}»: {exc}")
+
     def process_telegram_callbacks(self) -> None:
-        """Handle inline button taps from Telegram."""
-        for cb in self.bot.poll_callbacks(timeout=1):
+        """Handle inline button taps and text ideas from Telegram."""
+        callbacks, messages = self.bot.poll_updates(timeout=1)
+        for cb in callbacks:
             data = cb["data"]
             parts = data.split(":")
             msg = "Done."
@@ -557,6 +606,8 @@ class AgentRunner:
             self.bot.answer_callback(cb["callback_id"], msg)
             if msg and not msg.startswith("Skipped"):
                 self.bot.send_message(msg)
+        for msg_item in messages:
+            self._handle_telegram_message(str(msg_item.get("text") or ""))
 
     def process_web_commands(self) -> None:
         """Execute queued actions triggered from the /agent web dashboard."""

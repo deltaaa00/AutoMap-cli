@@ -70,6 +70,10 @@
                     <span id="tgStatusPill" class="text-slate-400">Telegram: —</span>
                     <span id="ytApiPill" class="text-slate-400">YT API: —</span>
                 </div>
+                <input id="customTopicInput" type="text" maxlength="140"
+                    placeholder="Custom idea (optional, e.g. Average sleep in Europe)…"
+                    onkeydown="if (event.key === 'Enter') { event.preventDefault(); triggerGenerate(); }"
+                    class="w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500">
                 <div class="flex gap-2">
                     <button type="button" onclick="triggerGenerate()" class="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition">
                         <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Generate Video
@@ -632,12 +636,15 @@
         }
 
         async function triggerGenerate() {
+            const topicEl = document.getElementById('customTopicInput');
+            const topic = topicEl ? topicEl.value.trim() : '';
             const res = await fetch('/api/agent/trigger', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({}),
+                body: JSON.stringify(topic ? {topic} : {}),
             });
             const data = await res.json();
+            if (res.ok && topicEl) topicEl.value = '';
             showAgentToast(data.message || data.error, !res.ok);
             loadOverview();
         }

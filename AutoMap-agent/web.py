@@ -471,7 +471,8 @@ def api_agent_trigger():
     topic = str(data.get("topic") or "").strip()[:140]
     db = _get_db()
     cmd_id = db.enqueue_command("trigger_generate", {"topic": topic})
-    return jsonify(status="success", command_id=cmd_id, message="Video generation queued.")
+    msg = f'Queued video for idea: "{topic}"' if topic else "Video generation queued."
+    return jsonify(status="success", command_id=cmd_id, message=msg)
 
 
 @app.post("/api/agent/sync")

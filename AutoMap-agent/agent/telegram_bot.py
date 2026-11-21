@@ -24,6 +24,7 @@ class TelegramBot:
         self.chat_id = str(chat_id if chat_id is not None else os.environ.get("TELEGRAM_CHAT_ID", "")).strip()
         self.http = http or requests.Session()
         self._offset = 0
+        self._buffered_messages: list[dict[str, Any]] = []
 
     @property
     def enabled(self) -> bool:
@@ -123,38 +124,64 @@ class TelegramBot:
         }
         return self.send_message(text, reply_markup=keyboard)
 
-    def poll_callbacks(self, *, timeout: int = 1) -> list[dict[str, Any]]:
-        """Poll pending inline button callbacks from the authorized chat only."""
+    def poll_updates(self, *, timeout: int = 1) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Poll pending inline button callbacks and text messages from the authorized chat only."""
+        buffered = list(self._buffered_messages)
+        self._buffered_messages.clear()
         if not self.enabled:
-            return []
+            return [], buffered
         try:
             resp = self.http.get(
                 f"{self._base}/getUpdates",
-                params={"offset": self._offset, "timeout": timeout, "allowed_updates": '["callback_query"]'},
+                params={
+                    "offset": self._offset,
+                    "timeout": timeout,
+                    "allowed_updates": '["callback_query","message"]',
+                },
                 timeout=timeout + 10,
             )
         except requests.RequestException:
-            return []
+            return [], buffered
         if not resp.ok:
-            return []
+            return [], buffered
         updates = resp.json().get("result") or []
         callbacks: list[dict[str, Any]] = []
+        messages: list[dict[str, Any]] = buffered
         for upd in updates:
             self._offset = max(self._offset, int(upd.get("update_id", 0)) + 1)
             cq = upd.get("callback_query")
-            if not cq:
+            if cq:
+                msg = cq.get("message") or {}
+                chat_id = str((msg.get("chat") or {}).get("id") or "")
+                if chat_id != self.chat_id:
+                    continue
+                callbacks.append(
+                    {
+                        "callback_id": str(cq.get("id") or ""),
+                        "data": str(cq.get("data") or ""),
+                        "message_id": msg.get("message_id"),
+                    }
+                )
                 continue
-            msg = cq.get("message") or {}
-            chat_id = str((msg.get("chat") or {}).get("id") or "")
-            if chat_id != self.chat_id:
-                continue
-            callbacks.append(
-                {
-                    "callback_id": str(cq.get("id") or ""),
-                    "data": str(cq.get("data") or ""),
-                    "message_id": msg.get("message_id"),
-                }
-            )
+            msg = upd.get("message")
+            if msg:
+                chat_id = str((msg.get("chat") or {}).get("id") or "")
+                text = str(msg.get("text") or "").strip()
+                if chat_id != self.chat_id or not text:
+                    continue
+                messages.append(
+                    {
+                        "message_id": msg.get("message_id"),
+                        "text": text,
+                    }
+                )
+        return callbacks, messages
+
+    def poll_callbacks(self, *, timeout: int = 1) -> list[dict[str, Any]]:
+        """Poll pending inline button callbacks from the authorized chat only."""
+        callbacks, messages = self.poll_updates(timeout=timeout)
+        if messages:
+            self._buffered_messages.extend(messages)
         return callbacks
 
     def answer_callback(self, callback_id: str, text: str) -> None:
