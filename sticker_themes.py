@@ -27,6 +27,9 @@ ALLOWED_STICKERS: tuple[str, ...] = (
     'mountain', 'volcano', 'island', 'rainbow', 'moon', 'rain',
     'robot', 'satellite', 'laptop', 'graduation', 'medal',
     'cat', 'dog', 'fish', 'burger', 'train',
+    'bank', 'coin', 'hospital', 'pill', 'family', 'city',
+    'castle', 'museum', 'gamepad', 'camera', 'oil', 'leaf',
+    'scales', 'ship',
 )
 
 # Mapping from sticker name to lowercase hex Twemoji codepoint for SVG/PNG asset lookup.
@@ -69,6 +72,10 @@ TWEMOJI_CODEPOINTS: dict[str, str] = {
     'moon': '1f319', 'rain': '1f327', 'robot': '1f916', 'satellite': '1f6f0',
     'laptop': '1f4bb', 'graduation': '1f393', 'medal': '1f3c5', 'cat': '1f431',
     'dog': '1f436', 'fish': '1f41f', 'burger': '1f354', 'train': '1f686',
+    'bank': '1f3e6', 'coin': '1fa99', 'hospital': '1f3e5', 'pill': '1f48a',
+    'family': '1f46a', 'city': '1f3d9', 'castle': '1f3f0', 'museum': '1f3db',
+    'gamepad': '1f3ae', 'camera': '1f4f7', 'oil': '1f6e2', 'leaf': '1f33f',
+    'scales': '2696', 'ship': '1f6a2',
 }
 
 # Ordered priority rules: ((keywords...), (left_sticker, right_sticker)).
@@ -204,6 +211,76 @@ AUTO_STICKER_THEMES: tuple[tuple[tuple[str, ...], tuple[str, str]], ...] = (
         ),
         ('heart', 'star'),
     ),
+    (
+        (
+            'hospital', 'doctor', 'medical', 'medicine', 'healthcare', 'pharma',
+            'pill', 'pills', 'vaccine', 'disease', 'cancer', 'mortality',
+        ),
+        ('hospital', 'pill'),
+    ),
+    (
+        (
+            'bank', 'banks', 'banking', 'debt', 'inflation', 'currency', 'coin',
+            'gold', 'reserve', 'credit', 'billionaire',
+        ),
+        ('bank', 'coin'),
+    ),
+    (
+        (
+            'family', 'birth', 'fertility', 'child', 'children', 'baby', 'babies',
+            'marriage', 'divorce', 'household',
+        ),
+        ('family', 'heart'),
+    ),
+    (
+        (
+            'city', 'cities', 'urban', 'capital', 'skyscraper', 'rent', 'housing',
+            'apartment', 'metro',
+        ),
+        ('city', 'pin'),
+    ),
+    (
+        (
+            'castle', 'castles', 'medieval', 'unesco', 'heritage', 'museum',
+            'museums', 'ancient', 'monument', 'palace', 'founded',
+        ),
+        ('castle', 'museum'),
+    ),
+    (
+        (
+            'game', 'gaming', 'gamer', 'gamers', 'gta', 'playstation', 'xbox',
+            'steam', 'esports', 'video game', 'minecraft',
+        ),
+        ('gamepad', 'trophy'),
+    ),
+    (
+        (
+            'photo', 'camera', 'movie', 'movies', 'cinema', 'film', 'instagram',
+            'tiktok', 'youtube', 'influencer', 'social media',
+        ),
+        ('camera', 'star'),
+    ),
+    (
+        (
+            'law', 'legal', 'court', 'crime', 'corruption', 'freedom', 'democracy',
+            'rights', 'justice', 'prison', 'police',
+        ),
+        ('scales', 'shield'),
+    ),
+    (
+        (
+            'oil', 'petroleum', 'coal', 'fossil', 'emission', 'co2', 'carbon',
+            'renewable', 'solar', 'green', 'ecology', 'vegan', 'vegetarian', 'farm',
+        ),
+        ('oil', 'leaf'),
+    ),
+    (
+        (
+            'ship', 'ships', 'navy', 'port', 'ports', 'cruise', 'maritime',
+            'export', 'import', 'trade', 'cargo',
+        ),
+        ('ship', 'compass'),
+    ),
 )
 
 # Short keywords that must match whole words only (e.g. 'ai', 'car', 'top')
@@ -211,7 +288,7 @@ AUTO_STICKER_THEMES: tuple[tuple[tuple[str, ...], tuple[str, str]], ...] = (
 EXACT_WORD_KEYWORDS: set[str] = {
     'ai', 'gdp', 'nato', 'top', 'iq', 'car', 'sun', 'pet', 'dog', 'cat',
     'bar', 'pub', 'tea', 'oil', 'gas', 'bus', 'gym', 'ice', 'hot', 'god',
-    'sea',
+    'sea', 'gta', 'co2', 'law',
 }
 
 _AUTO_STICKER_THEMES = AUTO_STICKER_THEMES
