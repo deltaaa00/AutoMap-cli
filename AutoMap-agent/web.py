@@ -23,7 +23,7 @@ from flask import (
 )
 
 from agent.db import AgentDB
-from agent.media_pool import MediaPool
+from agent.media_pool import MAX_MEDIA_BYTES, MAX_MEDIA_MB, MediaPool, split_background_video
 from agent.optimizer import AgentOptimizer
 from agent.telegram_bot import TelegramBot
 from agent.youtube_intel import AGENT_YOUTUBE_SCOPES
@@ -66,6 +66,7 @@ def parse_oauth_client_config(raw_obj: object) -> dict[str, Any]:
 
 app = Flask(__name__, template_folder=str(BASE_DIR / "templates"))
 app.secret_key = (os.environ.get("AGENT_SECRET_KEY") or secrets.token_hex(32)).strip()
+app.config["MAX_CONTENT_LENGTH"] = 250 * 1024 * 1024
 
 SERVER_MODE = os.environ.get("AGENT_SERVER", "FALSE").strip().upper() in ("1", "TRUE", "YES", "ON")
 AUTH_USER = os.environ.get("AGENT_WEB_USERNAME", "admin").strip()
@@ -189,6 +190,7 @@ def api_agent_overview():
         "youtube_api_configured": bool(sec["youtube_api_key"]),
         "gemini_api_configured": bool(sec["gemini_api_key"]),
         "deepseek_api_configured": bool(sec["deepseek_api_key"]),
+        "tavily_api_configured": bool(sec["tavily_api_key"]),
         "automap_auth_configured": bool(sec["automap_login"] and sec["automap_password"]),
         "automap_public_url": _public_automap_url(cfg),
         "youtube_oauth_connected": _token_path().is_file(),
@@ -209,6 +211,7 @@ def api_agent_secrets():
         "youtube_api_key",
         "gemini_api_key",
         "deepseek_api_key",
+        "tavily_api_key",
         "automap_login",
         "automap_password",
     ):
@@ -347,14 +350,58 @@ def api_agent_media_upload():
         ext = Path(orig_name).suffix.lower()
         if ext not in allowed_exts:
             return jsonify(status="error", error=f"Unsupported file format: {orig_name}"), 400
-        raw = fh.read(15 * 1024 * 1024 + 1)
-        if not raw or len(raw) > 15 * 1024 * 1024:
-            return jsonify(status="error", error=f"{orig_name} exceeds the 15 MB limit or is empty."), 400
         stem = "".join(ch if ch.isalnum() or ch in ("_", "-") else "_" for ch in Path(orig_name).stem).strip("_")[:60] or kind
         dest = target_dir / f"{stem}{ext}"
-        dest.write_bytes(raw)
-        saved_names.append(dest.name)
+        counter = 2
+        while dest.exists():
+            dest = target_dir / f"{stem}_{counter}{ext}"
+            counter += 1
+        total_bytes = 0
+        try:
+            with dest.open("wb") as out_fh:
+                while True:
+                    chunk = fh.stream.read(64 * 1024)
+                    if not chunk:
+                        break
+                    total_bytes += len(chunk)
+                    if total_bytes > MAX_MEDIA_BYTES:
+                        raise ValueError(f"{orig_name} exceeds the {MAX_MEDIA_MB} MB limit.")
+                    out_fh.write(chunk)
+            if total_bytes == 0:
+                raise ValueError(f"{orig_name} is empty.")
+        except ValueError as exc:
+            dest.unlink(missing_ok=True)
+            return jsonify(status="error", error=str(exc)), 400
+
+        if kind == "background":
+            parts = split_background_video(dest)
+            saved_names.extend(p.name for p in parts)
+        else:
+            saved_names.append(dest.name)
     return jsonify(status="success", saved=saved_names, message=f"Uploaded: {', '.join(saved_names)}")
+
+
+@app.post("/api/agent/media/split")
+def api_agent_media_split():
+    """Split an existing long background video into <=15s clips."""
+    data = request.get_json(silent=True) or {}
+    filename = Path(str(data.get("filename") or "")).name
+    if not filename:
+        return jsonify(status="error", error="Invalid media file."), 400
+    pool = _get_media_pool()
+    target_dir = pool.backgrounds_dir.resolve()
+    target = (target_dir / filename).resolve()
+    try:
+        target.relative_to(target_dir)
+    except ValueError:
+        return jsonify(status="error", error="Invalid path."), 403
+    if not target.is_file():
+        return jsonify(status="error", error="File not found."), 404
+    parts = split_background_video(target)
+    if len(parts) == 1 and parts[0] == target:
+        return jsonify(status="success", split=False, message=f"{filename} is already short (<22s).")
+    names = [p.name for p in parts]
+    return jsonify(status="success", split=True, saved=names, message=f"Split into {len(names)} clips: {', '.join(names)}")
 
 
 @app.post("/api/agent/media/delete")
@@ -441,6 +488,13 @@ def api_agent_config():
             updates["video_duration"] = max(9, min(15, int(data["video_duration"])))
         except (TypeError, ValueError):
             pass
+    if "web_search_enabled" in data:
+        updates["web_search_enabled"] = bool(data["web_search_enabled"])
+    if "max_search_requests" in data:
+        try:
+            updates["max_search_requests"] = max(1, min(5, int(data["max_search_requests"])))
+        except (TypeError, ValueError):
+            return jsonify(status="error", error="max_search_requests must be between 1 and 5."), 400
 
     db = _get_db()
     updated = db.update_config(updates)

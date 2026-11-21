@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-MAX_MEDIA_BYTES = 15 * 1024 * 1024
+MAX_MEDIA_MB = 100
+MAX_MEDIA_BYTES = MAX_MEDIA_MB * 1024 * 1024
 BACKGROUND_EXTS = {".mp4", ".mov", ".webm"}
 MUSIC_EXTS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"}
 
@@ -108,7 +110,7 @@ class MediaPool:
     def save_music_bytes(self, title: str, data: bytes, *, ext: str = ".mp3") -> Path:
         """Save downloaded competitor audio into agent_media/music/ cleanly."""
         if not data or len(data) > MAX_MEDIA_BYTES:
-            raise ValueError("Audio file is empty or exceeds the 15 MB limit.")
+            raise ValueError(f"Audio file is empty or exceeds the {MAX_MEDIA_MB} MB limit.")
         self.ensure_dirs()
         slug = re.sub(r"[^a-zA-Z0-9._-]+", "_", (title or "competitor_track").strip()).strip("_.")
         slug = (slug or "competitor_track")[:64]
@@ -122,3 +124,105 @@ class MediaPool:
             counter += 1
         dest.write_bytes(data)
         return dest
+
+
+def probe_video_duration(video_path: Path) -> float | None:
+    """Return video duration in seconds using ffprobe, or None if unavailable."""
+    try:
+        res = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(video_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+        if res.returncode != 0:
+            return None
+        val = float((res.stdout or "").strip())
+        return val if val > 0 else None
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+
+
+def split_background_video(
+    source_path: Path,
+    *,
+    segment_seconds: int = 15,
+    min_tail_seconds: int = 8,
+    min_duration_to_split: float = 22.0,
+) -> list[Path]:
+    """Split a long background video into <=15s H.264 MP4 clips and remove the original."""
+    duration = probe_video_duration(source_path)
+    if duration is None or duration < min_duration_to_split:
+        return [source_path]
+
+    seg = max(9, min(20, int(segment_seconds)))
+    stem = re.sub(r"[^a-zA-Z0-9_-]+", "_", source_path.stem).strip("_")[:50] or "bg"
+    created: list[Path] = []
+    start = 0.0
+    part = 1
+    try:
+        while start < duration:
+            remaining = duration - start
+            if remaining < min_tail_seconds and created:
+                break
+            clip_len = min(float(seg), remaining)
+            out_path = source_path.parent / f"{stem}_part{part:02d}.mp4"
+            counter = 2
+            while out_path.exists():
+                out_path = source_path.parent / f"{stem}_part{part:02d}_{counter}.mp4"
+                counter += 1
+            res = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-ss",
+                    f"{start:.2f}",
+                    "-i",
+                    str(source_path),
+                    "-t",
+                    f"{clip_len:.2f}",
+                    "-vf",
+                    "scale='min(1080,iw)':-2",
+                    "-c:v",
+                    "libx264",
+                    "-preset",
+                    "veryfast",
+                    "-crf",
+                    "22",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-an",
+                    "-movflags",
+                    "+faststart",
+                    str(out_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=180,
+                check=False,
+            )
+            if res.returncode != 0 or not out_path.is_file() or out_path.stat().st_size == 0:
+                out_path.unlink(missing_ok=True)
+                raise RuntimeError(res.stderr[-300:] if res.stderr else "ffmpeg split failed")
+            created.append(out_path)
+            start += seg
+            part += 1
+    except Exception:
+        for p in created:
+            p.unlink(missing_ok=True)
+        return [source_path]
+
+    if created:
+        source_path.unlink(missing_ok=True)
+        return created
+    return [source_path]

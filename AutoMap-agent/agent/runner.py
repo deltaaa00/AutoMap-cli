@@ -168,7 +168,7 @@ class AgentRunner:
         if media.background is None:
             raise RuntimeError(
                 f"No background video found in {self.media_pool.backgrounds_dir}. "
-                "Add at least one .mp4/.mov/.webm (<= 15 MB)."
+                "Add at least one .mp4/.mov/.webm (<= 100 MB)."
             )
 
         arm, arm_reason = self.optimizer.choose_arm()
@@ -292,6 +292,8 @@ class AgentRunner:
             extra_option = "show_most_least"
 
         label_suffix = infer_label_suffix(topic, mode)
+        web_search_enabled = bool(cfg.get("web_search_enabled", True))
+        max_search_requests = max(1, min(5, int(cfg.get("max_search_requests") or 5)))
         map_payload: dict[str, Any] = {
             "provider": provider,
             "model": model,
@@ -307,6 +309,11 @@ class AgentRunner:
             "highlight_extrema": zoom_roll,
             "label_suffix": label_suffix,
         }
+        if web_search_enabled:
+            map_payload["web_search"] = True
+            map_payload["max_search_requests"] = max_search_requests
+            if secrets.get("tavily_api_key"):
+                map_payload["tavily_api_key"] = secrets["tavily_api_key"]
         if ai_api_key:
             map_payload["api_key"] = ai_api_key
         map_resp = None
@@ -319,6 +326,21 @@ class AgentRunner:
                 break
             except AutoMapClientError as exc:
                 last_map_err = exc
+                err_low = str(exc).lower()
+                if map_payload.get("web_search") and any(
+                    tok in err_low for tok in ("tavily_api_key", "brave_search_api_key", "web search requires")
+                ):
+                    log.warning("Web search key missing on server; retrying '%s' without web_search.", topic)
+                    map_payload.pop("web_search", None)
+                    map_payload.pop("max_search_requests", None)
+                    map_payload.pop("tavily_api_key", None)
+                    try:
+                        map_resp = self.client.generate_map(map_payload)
+                        model = cand_model
+                        break
+                    except AutoMapClientError as retry_exc:
+                        last_map_err = retry_exc
+                        exc = retry_exc
                 if _is_retryable_model_error(exc):
                     log.warning("Model %s unavailable during generate_map (%s), trying fallback...", cand_model, exc)
                     continue
@@ -344,6 +366,9 @@ class AgentRunner:
         if effective_reveal and zoom_key and map_values:
             try:
                 clean_payload = dict(map_payload)
+                clean_payload.pop("web_search", None)
+                clean_payload.pop("max_search_requests", None)
+                clean_payload.pop("tavily_api_key", None)
                 clean_payload["ai_answer_override"] = map_values
                 clean_payload["skip_label_countries"] = [zoom_key]
                 clean_resp = self.client.generate_map(clean_payload)

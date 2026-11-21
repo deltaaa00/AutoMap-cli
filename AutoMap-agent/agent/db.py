@@ -28,6 +28,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "own_top_topics": [],
     "description_template": "{topic}\n\n{hashtags}",
     "automap_url": "",
+    "web_search_enabled": True,
+    "max_search_requests": 5,
 }
 
 
@@ -253,6 +255,9 @@ class AgentDB:
             "deepseek_api_key": str(
                 stored.get("deepseek_api_key") or os.environ.get("DEEPSEEK_API_KEY") or ""
             ).strip(),
+            "tavily_api_key": str(
+                stored.get("tavily_api_key") or os.environ.get("TAVILY_API_KEY") or ""
+            ).strip(),
             "automap_login": str(
                 stored.get("automap_login") or os.environ.get("WEB_LOGIN") or ""
             ).strip(),
@@ -270,6 +275,7 @@ class AgentDB:
             "youtube_api_key",
             "gemini_api_key",
             "deepseek_api_key",
+            "tavily_api_key",
             "automap_login",
             "automap_password",
         ):
@@ -281,6 +287,7 @@ class AgentDB:
             "youtube_api_configured": bool(current["youtube_api_key"]),
             "gemini_api_configured": bool(current["gemini_api_key"]),
             "deepseek_api_configured": bool(current["deepseek_api_key"]),
+            "tavily_api_configured": bool(current["tavily_api_key"]),
             "automap_auth_configured": bool(current["automap_login"] and current["automap_password"]),
         }
 
