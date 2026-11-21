@@ -44,7 +44,7 @@ COPY --from=rust-builder /wheels/*.whl /tmp/
 RUN pip install --no-cache-dir /tmp/*.whl && rm -f /tmp/*.whl
 
 
-COPY yt-dlp_serv.py server_runtime.py render_progress.py ./
+COPY yt-dlp_serv.py server_runtime.py ./
 COPY media/ media/
 COPY resources/fonts/ resources/fonts/
 

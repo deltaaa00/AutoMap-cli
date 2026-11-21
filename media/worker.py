@@ -42,7 +42,7 @@ from functools import lru_cache
 from urllib.parse import urlencode, urlsplit
 
 from flask import Flask, request, jsonify, send_file
-from render_progress import RenderProgress
+from media.render_progress import RenderProgress
 from media.native_layers import build_native_layers
 from media.camera import apply_camera_zoom
 

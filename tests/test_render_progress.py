@@ -26,7 +26,7 @@ import pytest
 from flask import Flask, jsonify
 import requests
 
-from render_progress import RenderProgress
+from media.render_progress import RenderProgress
 
 
 def test_progress_tracks_encoding_and_completes_only_after_response():
